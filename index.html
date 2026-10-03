@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <title>Rainbow Driver MVP</title>
+  <style>
+    :root{--bg:#f6f7f9;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#111827;--ok:#0f766e;--warn:#b45309;--danger:#b91c1c}
+    *{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{max-width:760px;margin:auto;padding:16px 14px 40px}.hero{padding:8px 2px 14px}.brand{font-size:22px;font-weight:800}.tag{color:var(--muted);font-size:13px;margin-top:4px}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 16px}.tabs button{border:1px solid var(--line);background:#fff;padding:12px;border-radius:12px;font-size:15px;font-weight:700}.tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}.row{display:flex;gap:10px;align-items:center}.between{justify-content:space-between}.status{font-weight:800}.dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;background:#9ca3af}.dot.on{background:#10b981}.muted{color:var(--muted);font-size:13px}
+    label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px} input,textarea,select{width:100%;font-size:16px;border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;color:var(--text)} textarea{min-height:84px;resize:vertical}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{border:0;border-radius:12px;padding:13px 14px;font-size:15px;font-weight:800;cursor:pointer}.primary{background:var(--accent);color:#fff}.secondary{background:#eef2f7;color:var(--text)}.ok{background:#ecfdf5;color:var(--ok)}.danger{background:#fef2f2;color:var(--danger)}.full{width:100%}.small{padding:9px 10px;font-size:13px}
+    .fare{display:grid;grid-template-columns:1fr auto;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}.fare:last-child{border-bottom:0}.total{font-size:23px;font-weight:900}
+    .req{border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:10px}.req h3{margin:0 0 8px;font-size:16px}.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2f7;font-size:12px;font-weight:800}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.hidden{display:none!important}.notice{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+    .toggle{display:flex;align-items:center;gap:8px}.toggle input{width:auto}.coords{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--muted);word-break:break-all}
+    footer{color:var(--muted);font-size:12px;text-align:center;padding-top:8px}
+    @media(max-width:480px){.grid2{grid-template-columns:1fr}.wrap{padding-left:12px;padding-right:12px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="brand">Rainbow Driver</div>
+    <div class="tag">個人受け用 MVP</div>
+  </div>
+
+  <div class="notice">試作版です。依頼データはこの端末のブラウザ内に保存されます。別端末間のリアルタイム同期は次段階で追加します。</div>
+
+  <div class="tabs">
+    <button id="tabCustomer" class="active">お客様画面</button>
+    <button id="tabDriver">ドライバー管理</button>
+  </div>
+
+  <section id="customerView">
+    <div class="card">
+      <div class="row between">
+        <div>
+          <div class="status"><span id="customerDot" class="dot"></span><span id="customerStatusText">受付停止中</span></div>
+          <div id="customerStatusSub" class="muted">現在は新規依頼を受け付けていません</div>
+        </div>
+      </div>
+    </div>
+
+    <form id="requestForm" class="card">
+      <div class="grid2">
+        <div>
+          <label for="customerName">お名前</label>
+          <input id="customerName" autocomplete="name" placeholder="例：山田" />
+        </div>
+        <div>
+          <label for="customerPhone">電話番号（任意）</label>
+          <input id="customerPhone" inputmode="tel" autocomplete="tel" placeholder="090-..." />
+        </div>
+      </div>
+
+      <label for="pickup">お迎え場所</label>
+      <input id="pickup" placeholder="住所・施設名など" required />
+      <div class="actions">
+        <button class="btn secondary small" type="button" id="geoBtn">現在地を取得</button>
+      </div>
+      <div id="geoResult" class="coords"></div>
+
+      <label for="destination">目的地</label>
+      <input id="destination" placeholder="住所・施設名など" required />
+
+      <div class="grid2">
+        <div>
+          <label for="pickupKm">迎車距離（km）</label>
+          <input id="pickupKm" type="number" min="0" step="0.1" value="5" required />
+        </div>
+        <div>
+          <label for="driveKm">運転距離（km）</label>
+          <input id="driveKm" type="number" min="0" step="0.1" value="10" required />
+        </div>
+      </div>
+
+      <label for="notes">備考（任意）</label>
+      <textarea id="notes" placeholder="車種・希望時刻・その他"></textarea>
+
+      <div class="card" style="margin:14px 0 0;background:#fafafa">
+        <div class="fare"><span>迎車料金</span><strong id="pickupFare">¥1,000</strong></div>
+        <div class="fare"><span>運転料金</span><strong id="driveFare">¥3,500</strong></div>
+        <div class="fare"><span>高速・駐車</span><strong>別途実費</strong></div>
+        <div class="fare"><span>概算合計</span><strong id="totalFare" class="total">¥4,500</strong></div>
+      </div>
+
+      <button id="submitBtn" class="btn primary full" type="submit" style="margin-top:14px">この内容で依頼する</button>
+    </form>
+
+    <div class="card">
+      <strong>この端末の依頼状況</strong>
+      <div id="customerRequests" class="muted" style="margin-top:8px">まだ依頼はありません。</div>
+    </div>
+  </section>
+
+  <section id="driverView" class="hidden">
+    <div class="card">
+      <div class="row between">
+        <div>
+          <strong>受付状態</strong>
+          <div class="muted">ONのときだけ新規依頼を受け付けます</div>
+        </div>
+        <label class="toggle" style="margin:0"><input id="acceptingToggle" type="checkbox" /> <span id="acceptingLabel">OFF</span></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row between"><strong>依頼一覧</strong><button id="clearDone" class="btn secondary small" type="button">完了済みを整理</button></div>
+      <div id="driverRequests" class="muted" style="margin-top:8px">依頼はありません。</div>
+    </div>
+
+    <div class="card">
+      <strong>このMVPでできること</strong>
+      <div class="muted" style="margin-top:8px;line-height:1.7">受付ON/OFF、料金計算、依頼作成、受諾・辞退、対応中・完了、ブラウザ現在地取得。次段階でクラウド同期・通知・地図・お客様とドライバーの別端末連携を追加します。</div>
+    </div>
+  </section>
+
+  <footer>Rainbow Driver MVP / 決済機能なし / 個人受け用</footer>
+</div>
+<script>
+(() => {
+  const KEY_REQ='rd_mvp_requests_v1';
+  const KEY_ACCEPT='rd_mvp_accepting_v1';
+  const $=id=>document.getElementById(id);
+  const fmt=n=>'¥'+Math.round(n).toLocaleString('ja-JP');
+  const loadReq=()=>{try{return JSON.parse(localStorage.getItem(KEY_REQ)||'[]')}catch{return[]}};
+  const saveReq=r=>localStorage.setItem(KEY_REQ,JSON.stringify(r));
+  const isAccepting=()=>localStorage.getItem(KEY_ACCEPT)==='1';
+  const setAccepting=v=>localStorage.setItem(KEY_ACCEPT,v?'1':'0');
+
+  function pickupFare(km){
+    km=Math.max(0,Number(km)||0);
+    if(km<=5)return 1000;if(km<=10)return 1500;if(km<=15)return 2000;if(km<=20)return 2500;
+    return 2500 + Math.ceil((km-20)/5)*500;
+  }
+  function driveFare(km){
+    km=Math.max(0,Number(km)||0);
+    if(km<=2)return 1800;if(km<=5)return 2800;if(km<=10)return 3500;if(km<=15)return 4500;if(km<=20)return 5500;if(km<=25)return 6500;if(km<=30)return 7500;if(km<=35)return 9000;if(km<=40)return 10500;
+    return 10500 + Math.ceil(km-40)*250;
+  }
+  function updateFare(){
+    const p=pickupFare($('pickupKm').value),d=driveFare($('driveKm').value);
+    $('pickupFare').textContent=fmt(p);$('driveFare').textContent=fmt(d);$('totalFare').textContent=fmt(p+d);
+  }
+  function statusLabel(s){return({pending:'依頼中',accepted:'受諾済み',declined:'辞退',enroute:'対応中',completed:'完了'})[s]||s}
+  function updateAcceptingUI(){
+    const on=isAccepting();$('acceptingToggle').checked=on;$('acceptingLabel').textContent=on?'ON':'OFF';
+    $('customerDot').classList.toggle('on',on);$('customerStatusText').textContent=on?'現在受付中':'受付停止中';
+    $('customerStatusSub').textContent=on?'新規依頼を受け付けています':'現在は新規依頼を受け付けていません';$('submitBtn').disabled=!on;$('submitBtn').style.opacity=on?'1':'.45';
+  }
+  function render(){
+    updateAcceptingUI();const reqs=loadReq();
+    $('customerRequests').innerHTML=reqs.length?reqs.slice().reverse().map(r=>`<div class="req"><h3>${escapeHtml(r.pickup)} → ${escapeHtml(r.destination)}</h3><div class="badge">${statusLabel(r.status)}</div><div class="muted" style="margin-top:6px">${escapeHtml(r.createdAt)} / 概算 ${fmt(r.total)}</div></div>`).join(''):'まだ依頼はありません。';
+    $('driverRequests').innerHTML=reqs.length?reqs.slice().reverse().map(r=>`<div class="req"><h3>${escapeHtml(r.name||'お客様')}：${escapeHtml(r.pickup)} → ${escapeHtml(r.destination)}</h3><div class="badge">${statusLabel(r.status)}</div><div class="muted" style="margin-top:7px">迎車 ${r.pickupKm}km / 運転 ${r.driveKm}km / 概算 ${fmt(r.total)}</div><div class="muted">${escapeHtml(r.phone||'電話番号なし')} / ${escapeHtml(r.notes||'備考なし')}</div><div class="actions">${buttonsFor(r)}</div></div>`).join(''):'依頼はありません。';
+    document.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',()=>changeStatus(b.dataset.id,b.dataset.act)));
+  }
+  function buttonsFor(r){
+    if(r.status==='pending')return `<button class="btn ok small" data-act="accepted" data-id="${r.id}">受諾</button><button class="btn danger small" data-act="declined" data-id="${r.id}">辞退</button>`;
+    if(r.status==='accepted')return `<button class="btn secondary small" data-act="enroute" data-id="${r.id}">対応中へ</button>`;
+    if(r.status==='enroute')return `<button class="btn ok small" data-act="completed" data-id="${r.id}">完了</button>`;return '';
+  }
+  function changeStatus(id,status){const reqs=loadReq();const r=reqs.find(x=>x.id===id);if(r){r.status=status;r.updatedAt=new Date().toLocaleString('ja-JP');saveReq(reqs);render()}}
+  function escapeHtml(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+
+  $('pickupKm').addEventListener('input',updateFare);$('driveKm').addEventListener('input',updateFare);
+  $('acceptingToggle').addEventListener('change',e=>{setAccepting(e.target.checked);render()});
+  $('requestForm').addEventListener('submit',e=>{e.preventDefault();if(!isAccepting()){alert('現在は受付停止中です');return}
+    const pkm=Math.max(0,Number($('pickupKm').value)||0),dkm=Math.max(0,Number($('driveKm').value)||0);const p=pickupFare(pkm),d=driveFare(dkm);
+    const req={id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name:$('customerName').value.trim(),phone:$('customerPhone').value.trim(),pickup:$('pickup').value.trim(),destination:$('destination').value.trim(),pickupKm:pkm,driveKm:dkm,notes:$('notes').value.trim(),coords:$('geoResult').dataset.coords||'',pickupFare:p,driveFare:d,total:p+d,status:'pending',createdAt:new Date().toLocaleString('ja-JP')};
+    const reqs=loadReq();reqs.push(req);saveReq(reqs);alert('依頼を作成しました');render();
+  });
+  $('geoBtn').addEventListener('click',()=>{
+    if(!navigator.geolocation){$('geoResult').textContent='このブラウザは位置情報に対応していません';return}
+    $('geoResult').textContent='現在地を取得中…';navigator.geolocation.getCurrentPosition(pos=>{const c=`${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;$('geoResult').textContent='現在地取得済み: '+c;$('geoResult').dataset.coords=c;if(!$('pickup').value)$('pickup').value='現在地（GPS）'},err=>{$('geoResult').textContent='現在地を取得できませんでした: '+err.message},{enableHighAccuracy:true,timeout:10000,maximumAge:30000});
+  });
+  $('clearDone').addEventListener('click',()=>{saveReq(loadReq().filter(r=>r.status!=='completed'&&r.status!=='declined'));render()});
+  $('tabCustomer').addEventListener('click',()=>{$('customerView').classList.remove('hidden');$('driverView').classList.add('hidden');$('tabCustomer').classList.add('active');$('tabDriver').classList.remove('active')});
+  $('tabDriver').addEventListener('click',()=>{$('driverView').classList.remove('hidden');$('customerView').classList.add('hidden');$('tabDriver').classList.add('active');$('tabCustomer').classList.remove('active')});
+  if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{})}
+  updateFare();render();
+})();
+</script>
+</body>
+</html>

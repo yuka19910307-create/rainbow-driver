@@ -190,6 +190,30 @@
   el('toggleShare').onclick=async function(){try{var j=await driverPost({action:'set_location_sharing',share_location:!sharing});sharing=!!j.status.share_location;el('toggleShare').textContent=sharing?'ON':'OFF';await refreshAvailability()}catch(e){alert('更新エラー: '+e.message)}};
   el('driverLocBtn').onclick=function(){el('driverLocStatus').textContent='現在地を取得中…';getPosition(async function(pos){try{await driverPost({action:'set_location',latitude:pos.lat,longitude:pos.lng});var txt='現在地登録済み '+pos.lat.toFixed(5)+', '+pos.lng.toFixed(5);if(mapsReady&&geocoder){var a=await reverseGeocode(pos);if(a)txt='現在地登録済み：'+a}el('driverLocStatus').textContent=txt;el('driverLocStatus').className='ok';await refreshAvailability()}catch(e){el('driverLocStatus').textContent='位置更新エラー: '+e.message;el('driverLocStatus').className='warn'}},function(e){el('driverLocStatus').textContent='位置情報を取得できません: '+(e.message||'許可設定を確認してください');el('driverLocStatus').className='warn'})};
 
+  function pushKeyBytes(s){var p="=".repeat((4-s.length%4)%4);var b=(s+p).replace(/-/g,"+").replace(/_/g,"/");var raw=atob(b);return Uint8Array.from(Array.from(raw).map(function(ch){return ch.charCodeAt(0)}))}
+  async function enableDriverPush(){
+    var st=el('pushStatus');
+    try{
+      if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))throw new Error('この端末ではWeb通知を利用できません');
+      st.textContent='通知を設定中…';
+      var reg=await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      var permission=await Notification.requestPermission();
+      if(permission!=='granted')throw new Error('通知が許可されていません');
+      var cfg=await driverPost({action:'push_config'});
+      var sub=await reg.pushManager.getSubscription();
+      if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:pushKeyBytes(cfg.vapid_public_key)});
+      await driverPost({action:'push_subscribe',subscription:sub.toJSON()});
+      st.textContent='通知ON';
+      st.className='ok';
+      el('enablePushBtn').textContent='通知ON';
+    }catch(e){
+      st.textContent='通知設定エラー: '+(e.message||String(e));
+      st.className='warn';
+    }
+  }
+  if(el('enablePushBtn'))el('enablePushBtn').onclick=enableDriverPush;
+
   if(DRIVER_MODE){
     showDriver();
     var savedMaps=safeGet('rd_maps_key');if(savedMaps){el('apiKey').value=savedMaps;setTimeout(function(){el('connectMaps').click()},100)}

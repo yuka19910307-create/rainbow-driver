@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <title>Rainbow Driver MVP</title>
+  <style>
+    :root{--bg:#f6f7f9;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#111827;--ok:#0f766e;--warn:#b45309;--danger:#b91c1c;--blue:#2563eb}
+    *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{max-width:760px;margin:auto;padding:16px 14px 40px}.hero{padding:8px 2px 14px}.brand{font-size:22px;font-weight:800}.tag{color:var(--muted);font-size:13px;margin-top:4px}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 16px}.tabs button{border:1px solid var(--line);background:#fff;padding:12px;border-radius:12px;font-size:15px;font-weight:700}.tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}.row{display:flex;gap:10px;align-items:center}.between{justify-content:space-between}.status{font-weight:800}.dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;background:#9ca3af}.dot.on{background:#10b981}.muted{color:var(--muted);font-size:13px}.tiny{font-size:12px;color:var(--muted)}
+    label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px}input,textarea,select{width:100%;font-size:16px;border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;color:var(--text)}textarea{min-height:84px;resize:vertical}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{border:0;border-radius:12px;padding:13px 14px;font-size:15px;font-weight:800;cursor:pointer}.primary{background:var(--accent);color:#fff}.secondary{background:#eef2f7;color:var(--text)}.blue{background:#eff6ff;color:#1d4ed8}.ok{background:#ecfdf5;color:var(--ok)}.danger{background:#fef2f2;color:var(--danger)}.full{width:100%}.small{padding:9px 10px;font-size:13px}.btn:disabled{opacity:.45;cursor:not-allowed}
+    .fare{display:grid;grid-template-columns:1fr auto;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}.fare:last-child{border-bottom:0}.total{font-size:23px;font-weight:900}.calcValue{font-weight:800}
+    .req{border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:10px}.req h3{margin:0 0 8px;font-size:16px}.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2f7;font-size:12px;font-weight:800}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.hidden{display:none!important}
+    .notice{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:12px}.info{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:12px;padding:10px 12px;font-size:13px;margin-top:10px}.good{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+    .toggle{display:flex;align-items:center;gap:8px}.toggle input{width:auto}.coords{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--muted);word-break:break-all}.pill{display:inline-block;padding:5px 8px;border-radius:999px;background:#eef2f7;font-size:12px;font-weight:700}
+    .placeWrap{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;min-height:48px;display:flex;align-items:center}.placeWrap gmp-place-autocomplete{display:block;width:100%;min-height:48px}.fallback{border:0!important;border-radius:0!important}
+    .settingRow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}.apiStatus{margin-top:8px}.mapHint{padding:10px 12px;background:#f9fafb;border:1px dashed var(--line);border-radius:12px;margin-top:10px}
+    footer{color:var(--muted);font-size:12px;text-align:center;padding-top:8px}@media(max-width:480px){.grid2{grid-template-columns:1fr}.wrap{padding-left:12px;padding-right:12px}.settingRow{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero"><div class="brand">Rainbow Driver</div><div class="tag">個人受け用 MVP / 距離自動計算版</div></div>
+  <div id="startupNotice" class="notice">アプリを読み込み中です…</div>
+
+  <div class="tabs"><button id="tabCustomer" class="active">お客様画面</button><button id="tabDriver">ドライバー管理</button></div>
+
+  <section id="customerView">
+    <div class="card"><div class="row between"><div><div class="status"><span id="customerDot" class="dot"></span><span id="customerStatusText">受付停止中</span></div><div id="customerStatusSub" class="muted">現在は新規依頼を受け付けていません</div></div></div></div>
+
+    <form id="requestForm" class="card">
+      <div class="grid2"><div><label for="customerName">お名前</label><input id="customerName" autocomplete="name" placeholder="例：山田" /></div><div><label for="customerPhone">電話番号（任意）</label><input id="customerPhone" inputmode="tel" autocomplete="tel" placeholder="090-..." /></div></div>
+
+      <label>お迎え場所</label>
+      <div id="pickupPlaceWrap" class="placeWrap"><input id="pickupFallback" class="fallback" placeholder="住所・施設名など" /></div>
+      <div class="actions"><button class="btn secondary small" type="button" id="pickupGeoBtn">現在地をお迎え場所にする</button><button class="btn secondary small" type="button" id="pickupClearBtn">選択解除</button></div>
+      <div id="pickupSelected" class="muted" style="margin-top:6px">未選択</div>
+
+      <label>目的地</label>
+      <div id="destinationPlaceWrap" class="placeWrap"><input id="destinationFallback" class="fallback" placeholder="住所・施設名など" /></div>
+      <div id="destinationSelected" class="muted" style="margin-top:6px">未選択</div>
+
+      <button id="calcBtn" class="btn blue full" type="button" style="margin-top:14px">距離・料金を自動計算</button>
+      <div id="calcMessage" class="info">API設定・ドライバー現在地・迎車場所・目的地が揃うと自動計算できます。</div>
+
+      <div class="card" style="margin:14px 0 0;background:#fafafa">
+        <div class="fare"><span>迎車距離</span><strong id="pickupDistance" class="calcValue">未計算</strong></div>
+        <div class="fare"><span>迎車目安</span><strong id="pickupDuration" class="calcValue">未計算</strong></div>
+        <div class="fare"><span>運転距離</span><strong id="driveDistance" class="calcValue">未計算</strong></div>
+        <div class="fare"><span>運転目安</span><strong id="driveDuration" class="calcValue">未計算</strong></div>
+        <div class="fare"><span>迎車料金</span><strong id="pickupFare">--</strong></div>
+        <div class="fare"><span>運転料金</span><strong id="driveFare">--</strong></div>
+        <div class="fare"><span>高速・駐車</span><strong>別途実費</strong></div>
+        <div class="fare"><span>概算合計</span><strong id="totalFare" class="total">--</strong></div>
+      </div>
+
+      <label for="notes">備考（任意）</label><textarea id="notes" placeholder="車種・希望時刻・その他"></textarea>
+      <button id="submitBtn" class="btn primary full" type="submit" style="margin-top:14px">この内容で依頼する</button>
+    </form>
+
+    <div class="card"><strong>この端末の依頼状況</strong><div id="customerRequests" class="muted" style="margin-top:8px">まだ依頼はありません。</div></div>
+  </section>
+
+  <section id="driverView" class="hidden">
+    <div class="card"><div class="row between"><div><strong>受付状態</strong><div class="muted">ONのときだけ新規依頼を受け付けます</div></div><label class="toggle" style="margin:0"><input id="acceptingToggle" type="checkbox" /> <span id="acceptingLabel">OFF</span></label></div></div>
+
+    <div class="card">
+      <strong>ドライバー現在地</strong><div class="muted" style="margin-top:4px">迎車距離は「ここ → お客様のお迎え場所」で計算します。</div>
+      <div class="actions"><button id="driverGeoBtn" class="btn blue" type="button">現在地を更新</button></div>
+      <div id="driverGeoStatus" class="mapHint muted">まだ登録されていません。</div>
+    </div>
+
+    <div class="card">
+      <strong>Google Maps連携</strong><div class="muted" style="margin-top:4px">Google CloudでWebsite制限＋3 API制限を設定したキーを、この端末だけに保存します。チャットには貼らなくてOKです。</div>
+      <div class="settingRow"><div><label for="apiKeyInput">Maps Platform API Key</label><input id="apiKeyInput" type="password" autocomplete="off" placeholder="AIza..." /></div><button id="saveApiKeyBtn" type="button" class="btn primary">保存・接続</button></div>
+      <div class="actions"><button id="removeApiKeyBtn" type="button" class="btn secondary small">この端末からキーを削除</button></div>
+      <div id="apiStatus" class="apiStatus muted">未設定</div>
+    </div>
+
+    <div class="card"><div class="row between"><strong>依頼一覧</strong><button id="clearDone" class="btn secondary small" type="button">完了済みを整理</button></div><div id="driverRequests" class="muted" style="margin-top:8px">依頼はありません。</div></div>
+  </section>
+
+  <footer>Rainbow Driver MVP / 決済機能なし / 個人受け用</footer>
+</div>
+<script>
+(() => {
+  var KEY_REQ='rd_mvp_requests_v3', KEY_ACCEPT='rd_mvp_accepting_v1', KEY_API='rd_maps_api_key_v1', KEY_DRIVER='rd_driver_location_v1';
+  var memoryStore={};
+  function $(id){return document.getElementById(id)}
+  function fmt(n){return '¥'+Math.round(n).toLocaleString('ja-JP')}
+  function storeGet(k){try{return window.localStorage.getItem(k)}catch(e){return Object.prototype.hasOwnProperty.call(memoryStore,k)?memoryStore[k]:null}}
+  function storeSet(k,v){try{window.localStorage.setItem(k,v)}catch(e){memoryStore[k]=String(v)}}
+  function storeRemove(k){try{window.localStorage.removeItem(k)}catch(e){delete memoryStore[k]}}
+  function loadJSON(k,f){try{var raw=storeGet(k);if(!raw)return f;var parsed=JSON.parse(raw);return parsed===null?f:parsed}catch(e){return f}}
+  function saveJSON(k,v){storeSet(k,JSON.stringify(v))}
+  function loadReq(){return loadJSON(KEY_REQ,[])} function saveReq(r){saveJSON(KEY_REQ,r)}
+  function isAccepting(){return storeGet(KEY_ACCEPT)==='1'} function setAccepting(v){storeSet(KEY_ACCEPT,v?'1':'0')}
+
+  let googleReady=false, googleLoading=false, pickupLoc=null, destinationLoc=null, lastCalc=null, pickupWidget=null, destinationWidget=null;
+
+  function pickupFare(km){km=Math.max(0,Number(km)||0);if(km<=5)return 1000;if(km<=10)return 1500;if(km<=15)return 2000;if(km<=20)return 2500;return 2500+Math.ceil((km-20)/5)*500}
+  function driveFare(km){km=Math.max(0,Number(km)||0);if(km<=2)return 1800;if(km<=5)return 2800;if(km<=10)return 3500;if(km<=15)return 4500;if(km<=20)return 5500;if(km<=25)return 6500;if(km<=30)return 7500;if(km<=35)return 9000;if(km<=40)return 10500;return 10500+Math.ceil(km-40)*250}
+  function escapeHtml(s){return String(s==null?'':s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+  function statusLabel(s){return({pending:'依頼中',accepted:'受諾済み',declined:'辞退',enroute:'対応中',completed:'完了'})[s]||s}
+  function durationText(ms){if(!Number.isFinite(ms))return '—';const min=Math.max(1,Math.round(ms/60000));return min<60?`約${min}分`:`約${Math.floor(min/60)}時間${min%60?min%60+'分':''}`}
+  function distanceText(km){return `${km.toFixed(1)} km`}
+
+  function updateAcceptingUI(){const on=isAccepting();$('acceptingToggle').checked=on;$('acceptingLabel').textContent=on?'ON':'OFF';$('customerDot').classList.toggle('on',on);$('customerStatusText').textContent=on?'現在受付中':'受付停止中';$('customerStatusSub').textContent=on?'新規依頼を受け付けています':'現在は新規依頼を受け付けていません';refreshSubmitState()}
+  function refreshSubmitState(){const ok=isAccepting()&&lastCalc&&lastCalc.pickupKm>=0&&lastCalc.driveKm>=0;$('submitBtn').disabled=!ok}
+  function render(){updateAcceptingUI();renderDriverLocation();renderApiStatus();const reqs=loadReq();$('customerRequests').innerHTML=reqs.length?reqs.slice().reverse().map(r=>`<div class="req"><h3>${escapeHtml(r.pickup)} → ${escapeHtml(r.destination)}</h3><div class="badge">${statusLabel(r.status)}</div><div class="muted" style="margin-top:6px">${escapeHtml(r.createdAt)} / 概算 ${fmt(r.total)}</div></div>`).join(''):'まだ依頼はありません。';$('driverRequests').innerHTML=reqs.length?reqs.slice().reverse().map(r=>`<div class="req"><h3>${escapeHtml(r.name||'お客様')}：${escapeHtml(r.pickup)} → ${escapeHtml(r.destination)}</h3><div class="badge">${statusLabel(r.status)}</div><div class="muted" style="margin-top:7px">迎車 ${r.pickupKm.toFixed(1)}km / 運転 ${r.driveKm.toFixed(1)}km / 概算 ${fmt(r.total)}</div><div class="muted">${escapeHtml(r.phone||'電話番号なし')} / ${escapeHtml(r.notes||'備考なし')}</div><div class="actions">${buttonsFor(r)}</div></div>`).join(''):'依頼はありません。';document.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',()=>changeStatus(b.dataset.id,b.dataset.act)))}
+  function buttonsFor(r){if(r.status==='pending')return `<button class="btn ok small" data-act="accepted" data-id="${r.id}">受諾</button><button class="btn danger small" data-act="declined" data-id="${r.id}">辞退</button>`;if(r.status==='accepted')return `<button class="btn secondary small" data-act="enroute" data-id="${r.id}">対応中へ</button>`;if(r.status==='enroute')return `<button class="btn ok small" data-act="completed" data-id="${r.id}">完了</button>`;return ''}
+  function changeStatus(id,status){const reqs=loadReq(),r=reqs.find(x=>x.id===id);if(r){r.status=status;r.updatedAt=new Date().toLocaleString('ja-JP');saveReq(reqs);render()}}
+
+  function renderDriverLocation(){const d=loadJSON(KEY_DRIVER,null);$('driverGeoStatus').textContent=d?`登録済み：${d.lat.toFixed(5)}, ${d.lng.toFixed(5)}（${d.updatedAt}）`:'まだ登録されていません。'}
+  function renderApiStatus(){const key=storeGet(KEY_API)||'';$('apiStatus').textContent=key?(googleReady?'Google Maps接続済み':'APIキー保存済み。接続準備中または再読込が必要です。'):'APIキー未設定';$('apiStatus').className='apiStatus '+(googleReady?'info good':'muted')}
+
+  function loadGoogleMaps(){const key=storeGet(KEY_API)||'';if(!key||googleReady||googleLoading)return;googleLoading=true;$('apiStatus').textContent='Google Mapsへ接続中…';const s=document.createElement('script');s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async&libraries=places`;s.async=true;s.onload=async()=>{googleLoading=false;try{await google.maps.importLibrary('places');await google.maps.importLibrary('routes');googleReady=true;await setupPlaceWidgets();renderApiStatus();$('calcMessage').textContent='Google Maps接続済み。地点を選んで「距離・料金を自動計算」を押してください。';$('calcMessage').className='info good'}catch(e){console.error(e);showApiError(e)}};s.onerror=()=>{googleLoading=false;showApiError(new Error('Google Maps JavaScript APIを読み込めませんでした'))};document.head.appendChild(s)}
+  function showApiError(e){googleReady=false;$('apiStatus').textContent='接続エラー：APIキー・Website制限・3 APIの有効化を確認してください。';$('apiStatus').className='apiStatus notice';$('calcMessage').textContent='Google Mapsに接続できません。ドライバー管理のAPI設定を確認してください。';$('calcMessage').className='notice';console.error(e)}
+
+  async function setupPlaceWidgets(){if(!googleReady||pickupWidget||destinationWidget)return;const {PlaceAutocompleteElement}=await google.maps.importLibrary('places');
+    pickupWidget=new PlaceAutocompleteElement({includedRegionCodes:['jp']});pickupWidget.placeholder='住所・施設名を検索';pickupWidget.style.width='100%';
+    destinationWidget=new PlaceAutocompleteElement({includedRegionCodes:['jp']});destinationWidget.placeholder='住所・施設名を検索';destinationWidget.style.width='100%';
+    const pw=$('pickupPlaceWrap'),dw=$('destinationPlaceWrap');pw.innerHTML='';dw.innerHTML='';pw.appendChild(pickupWidget);dw.appendChild(destinationWidget);
+    pickupWidget.addEventListener('gmp-select',async e=>{const place=e.placePrediction.toPlace();await place.fetchFields({fields:['formattedAddress','displayName','location']});pickupLoc={lat:place.location.lat(),lng:place.location.lng(),label:place.formattedAddress||place.displayName||'お迎え場所'};$('pickupSelected').textContent='選択済み：'+pickupLoc.label;resetCalc()});
+    destinationWidget.addEventListener('gmp-select',async e=>{const place=e.placePrediction.toPlace();await place.fetchFields({fields:['formattedAddress','displayName','location']});destinationLoc={lat:place.location.lat(),lng:place.location.lng(),label:place.formattedAddress||place.displayName||'目的地'};$('destinationSelected').textContent='選択済み：'+destinationLoc.label;resetCalc()});
+  }
+  function resetCalc(){lastCalc=null;['pickupDistance','pickupDuration','driveDistance','driveDuration'].forEach(id=>$(id).textContent='未計算');$('pickupFare').textContent='--';$('driveFare').textContent='--';$('totalFare').textContent='--';refreshSubmitState()}
+
+  async function getRoute(origin,destination){const {Route}=await google.maps.importLibrary('routes');const res=await Route.computeRoutes({origin,destination,travelMode:'DRIVING',routingPreference:'TRAFFIC_AWARE',fields:['distanceMeters','durationMillis']});if(!res.routes||!res.routes.length)throw new Error('ルートが見つかりません');const r=res.routes[0];return {km:(r.distanceMeters||0)/1000,duration:r.durationMillis||0}}
+  async function calculateRoutes(){if(!googleReady){$('calcMessage').textContent='先にドライバー管理でGoogle Maps APIキーを保存してください。';$('calcMessage').className='notice';return}const driver=loadJSON(KEY_DRIVER,null);if(!driver){$('calcMessage').textContent='先にドライバー管理で現在地を更新してください。';$('calcMessage').className='notice';return}if(!pickupLoc||!destinationLoc){$('calcMessage').textContent='お迎え場所と目的地を選択してください。';$('calcMessage').className='notice';return}
+    $('calcBtn').disabled=true;$('calcBtn').textContent='計算中…';$('calcMessage').textContent='道路ルートを計算しています…';$('calcMessage').className='info';try{const [p,d]=await Promise.all([getRoute({lat:driver.lat,lng:driver.lng},{lat:pickupLoc.lat,lng:pickupLoc.lng}),getRoute({lat:pickupLoc.lat,lng:pickupLoc.lng},{lat:destinationLoc.lat,lng:destinationLoc.lng})]);const pf=pickupFare(p.km),df=driveFare(d.km);lastCalc={pickupKm:p.km,driveKm:d.km,pickupDuration:p.duration,driveDuration:d.duration,pickupFare:pf,driveFare:df,total:pf+df};$('pickupDistance').textContent=distanceText(p.km);$('pickupDuration').textContent=durationText(p.duration);$('driveDistance').textContent=distanceText(d.km);$('driveDuration').textContent=durationText(d.duration);$('pickupFare').textContent=fmt(pf);$('driveFare').textContent=fmt(df);$('totalFare').textContent=fmt(pf+df);$('calcMessage').textContent='計算完了。道路ルートに基づく概算です。';$('calcMessage').className='info good';refreshSubmitState()}catch(e){console.error(e);$('calcMessage').textContent='計算できませんでした。地点選択・API設定を確認してください。';$('calcMessage').className='notice'}finally{$('calcBtn').disabled=false;$('calcBtn').textContent='距離・料金を自動計算'}}
+
+  $('saveApiKeyBtn').addEventListener('click',()=>{const k=$('apiKeyInput').value.trim();if(!k){alert('APIキーを入力してください');return}storeSet(KEY_API,k);$('apiKeyInput').value='';renderApiStatus();if(window.google && window.google.maps){location.reload()}else loadGoogleMaps()});
+  $('removeApiKeyBtn').addEventListener('click',()=>{storeRemove(KEY_API);alert('この端末からAPIキーを削除しました。ページを再読込します。');location.reload()});
+  $('driverGeoBtn').addEventListener('click',()=>{if(!navigator.geolocation){alert('このブラウザは位置情報に対応していません');return}$('driverGeoStatus').textContent='現在地を取得中…';navigator.geolocation.getCurrentPosition(pos=>{saveJSON(KEY_DRIVER,{lat:pos.coords.latitude,lng:pos.coords.longitude,updatedAt:new Date().toLocaleString('ja-JP')});renderDriverLocation();resetCalc()},err=>{$('driverGeoStatus').textContent='現在地を取得できませんでした：'+err.message},{enableHighAccuracy:true,timeout:10000,maximumAge:30000})});
+  $('pickupGeoBtn').addEventListener('click',()=>{if(!navigator.geolocation){alert('このブラウザは位置情報に対応していません');return}$('pickupSelected').textContent='現在地を取得中…';navigator.geolocation.getCurrentPosition(pos=>{pickupLoc={lat:pos.coords.latitude,lng:pos.coords.longitude,label:'現在地（GPS）'};$('pickupSelected').textContent='選択済み：現在地（GPS）';resetCalc()},err=>{$('pickupSelected').textContent='現在地を取得できませんでした：'+err.message},{enableHighAccuracy:true,timeout:10000,maximumAge:30000})});
+  $('pickupClearBtn').addEventListener('click',()=>{pickupLoc=null;$('pickupSelected').textContent='未選択';resetCalc()});
+  $('calcBtn').addEventListener('click',calculateRoutes);
+  $('acceptingToggle').addEventListener('change',e=>{setAccepting(e.target.checked);render()});
+  $('requestForm').addEventListener('submit',e=>{e.preventDefault();if(!isAccepting()){alert('現在は受付停止中です');return}if(!lastCalc||!pickupLoc||!destinationLoc){alert('先に距離・料金を自動計算してください');return}const req={id:(window.crypto&&typeof window.crypto.randomUUID==='function')?window.crypto.randomUUID():String(Date.now()),name:$('customerName').value.trim(),phone:$('customerPhone').value.trim(),pickup:pickupLoc.label,destination:destinationLoc.label,pickupKm:lastCalc.pickupKm,driveKm:lastCalc.driveKm,pickupDuration:lastCalc.pickupDuration,driveDuration:lastCalc.driveDuration,notes:$('notes').value.trim(),pickupFare:lastCalc.pickupFare,driveFare:lastCalc.driveFare,total:lastCalc.total,status:'pending',createdAt:new Date().toLocaleString('ja-JP')};const reqs=loadReq();reqs.push(req);saveReq(reqs);alert('依頼を作成しました');render()});
+  $('clearDone').addEventListener('click',()=>{saveReq(loadReq().filter(r=>r.status!=='completed'&&r.status!=='declined'));render()});
+  $('tabCustomer').addEventListener('click',()=>{$('customerView').classList.remove('hidden');$('driverView').classList.add('hidden');$('tabCustomer').classList.add('active');$('tabDriver').classList.remove('active')});
+  $('tabDriver').addEventListener('click',()=>{$('driverView').classList.remove('hidden');$('customerView').classList.add('hidden');$('tabDriver').classList.add('active');$('tabCustomer').classList.remove('active')});
+
+  try{render();$('startupNotice').textContent='操作準備OK。試作版のため、別端末同期はまだありません。';$('startupNotice').className='info good';loadGoogleMaps()}catch(e){console.error(e);$('startupNotice').textContent='初期化エラー：ページを再読み込みしてください。';$('startupNotice').className='notice'}
+})();
+</script>
+</body>
+</html>

@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Rainbow Driver MVP v5</title>
+<title>Rainbow Driver MVP v6</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--line:#e5e7eb;--text:#111827;--muted:#6b7280;--ok:#065f46;--okbg:#ecfdf5;--warn:#92400e;--warnbg:#fff7ed}
-*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);margin:0}.wrap{max-width:720px;margin:auto;padding:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tabs button,.btn{font-size:16px;border:0;border-radius:12px;padding:14px;font-weight:700}.tabs button{background:#fff;border:1px solid var(--line)}.tabs button.active{background:#111827;color:#fff}.btn{background:#111827;color:#fff;width:100%}.secondary{background:#e5e7eb;color:#111827}.hidden{display:none}.ok{padding:10px;border-radius:12px;background:var(--okbg);color:var(--ok);margin:10px 0}.warn{padding:10px;border-radius:12px;background:var(--warnbg);color:var(--warn);margin:10px 0}.muted{color:var(--muted);font-size:14px;line-height:1.45}label{display:block;font-weight:700;margin:12px 0 6px}input{font-size:16px;width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;background:#fff}.fare{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:10px 0}.fare:last-child{border-bottom:0}.total{font-size:24px;font-weight:800}.switchrow{display:flex;justify-content:space-between;align-items:center;gap:12px}.version{font-size:12px;color:var(--muted);text-align:center;margin-top:16px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.small{font-size:13px}.status{font-weight:800}.btn[disabled]{opacity:.45}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2ff;font-size:12px}
+:root{--bg:#f6f7f9;--card:#fff;--line:#e5e7eb;--text:#111827;--muted:#6b7280;--ok:#065f46;--okbg:#ecfdf5;--warn:#92400e;--warnbg:#fff7ed;--blue:#2563eb}
+*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);margin:0}.wrap{max-width:720px;margin:auto;padding:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tabs button,.btn{font-size:16px;border:0;border-radius:12px;padding:14px;font-weight:700}.tabs button{background:#fff;border:1px solid var(--line)}.tabs button.active{background:#111827;color:#fff}.btn{background:#111827;color:#fff;width:100%}.secondary{background:#e5e7eb;color:#111827}.hidden{display:none}.ok{padding:10px;border-radius:12px;background:var(--okbg);color:var(--ok);margin:10px 0}.warn{padding:10px;border-radius:12px;background:var(--warnbg);color:var(--warn);margin:10px 0}.muted{color:var(--muted);font-size:14px;line-height:1.45}label{display:block;font-weight:700;margin:12px 0 6px}input{font-size:16px;width:100%;padding:12px;border:1px solid #d1d5db;border-radius:12px;background:#fff}.fare{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:10px 0}.fare:last-child{border-bottom:0}.total{font-size:24px;font-weight:800}.switchrow{display:flex;justify-content:space-between;align-items:center;gap:12px}.version{font-size:12px;color:var(--muted);text-align:center;margin-top:16px}.small{font-size:13px}.btn[disabled]{opacity:.45}.address-wrap{position:relative}.suggestions{display:none;margin-top:4px;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}.suggestions.show{display:block}.suggestion{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:#fff;padding:12px;font-size:15px;color:var(--text)}.suggestion:last-child{border-bottom:0}.suggestion small{display:block;color:var(--muted);margin-top:3px}.suggestion:active{background:#f3f4f6}.place-selected{font-size:13px;color:var(--ok);margin-top:5px}.loading-line{font-size:13px;color:var(--muted);padding:10px 12px}.clear-place{font-size:13px;color:var(--blue);border:0;background:transparent;padding:6px 0;margin:0}
 </style>
 </head>
 <body>
 <div class="wrap">
 <h1>Rainbow Driver</h1>
-<div class="ok">V5 起動OK — GitHub Pages用</div>
+<div class="ok">V6 起動OK — 住所候補対応</div>
 <div class="tabs">
 <button id="customerTab" class="active" type="button">お客様画面</button>
 <button id="driverTab" type="button">ドライバー管理</button>
@@ -21,13 +21,21 @@
 <section id="customerView">
   <div class="card"><strong id="acceptStatus">受付停止中</strong><div class="muted">受付状態はこのページ内のテスト用です。</div></div>
   <div class="card">
-    <label>お迎え場所</label>
-    <input id="pickupAddress" type="text" placeholder="例：埼玉県越谷市〇〇 / 駅名・施設名">
+    <label for="pickupAddress">お迎え場所</label>
+    <div class="address-wrap">
+      <input id="pickupAddress" type="text" autocomplete="off" placeholder="例：越谷駅 / 伊奈町小室1805">
+      <div id="pickupSuggestions" class="suggestions"></div>
+    </div>
+    <div id="pickupSelected" class="place-selected"></div>
     <button class="btn secondary" id="customerLocBtn" type="button" style="margin-top:8px">現在地をお迎え場所に使う</button>
-    <div id="customerLocStatus" class="muted" style="margin-top:6px">住所入力でも現在地でもOKです。</div>
+    <div id="customerLocStatus" class="muted" style="margin-top:6px">住所を入力するとGoogleの候補が出ます。現在地でもOKです。</div>
 
-    <label>目的地</label>
-    <input id="destinationAddress" type="text" placeholder="例：さいたま新都心駅">
+    <label for="destinationAddress">目的地</label>
+    <div class="address-wrap">
+      <input id="destinationAddress" type="text" autocomplete="off" placeholder="例：越谷市役所 / 大宮駅">
+      <div id="destinationSuggestions" class="suggestions"></div>
+    </div>
+    <div id="destinationSelected" class="place-selected"></div>
 
     <button class="btn" id="autoCalcBtn" type="button" style="margin-top:14px">距離・料金を自動計算</button>
     <div id="calcStatus" class="muted" style="margin-top:8px">Google Maps接続後に使えます。</div>
@@ -49,8 +57,8 @@
   </div>
   <div class="card">
     <strong>Google Maps接続</strong>
-    <div class="muted">制限済みの「Maps Platform API Key」をここに入力します。チャットには貼らなくてOK。</div>
-    <label>APIキー</label>
+    <div class="muted">制限済みの「Maps Platform API Key」を入力します。チャットには貼らなくてOK。</div>
+    <label for="apiKey">APIキー</label>
     <input id="apiKey" type="password" autocomplete="off" placeholder="AIza...">
     <button class="btn" id="connectMaps" type="button" style="margin-top:10px">Google Mapsに接続</button>
     <div id="mapsStatus" class="muted" style="margin-top:8px">未接続</div>
@@ -61,9 +69,9 @@
     <button class="btn secondary" id="driverLocBtn" type="button" style="margin-top:10px">現在地を更新</button>
     <div id="driverLocStatus" class="muted" style="margin-top:8px">未登録</div>
   </div>
-  <div class="warn small">このV5ではAPIキーや位置情報を端末保存しません。ページを再読み込みしたら再入力・再取得してください。まず安定動作を優先しています。</div>
+  <div class="warn small">V6ではAPIキーや位置情報を端末保存しません。再読み込み後は再入力・再取得してください。</div>
 </section>
-<div class="version">Rainbow Driver MVP v5 — stable routes test</div>
+<div class="version">Rainbow Driver MVP v6 — Places autocomplete + Routes</div>
 </div>
 <script>
 (function(){
@@ -73,7 +81,17 @@
   var driverPos=null;
   var customerPos=null;
   var routeClass=null;
+  var AutocompleteSuggestion=null;
+  var AutocompleteSessionToken=null;
   var loadingMaps=false;
+  var pickupPlace=null;
+  var destinationPlace=null;
+  var pickupToken=null;
+  var destinationToken=null;
+  var pickupTimer=null;
+  var destinationTimer=null;
+  var pickupRequestId=0;
+  var destinationRequestId=0;
 
   function yen(n){return '¥'+Math.round(n).toLocaleString('ja-JP')}
   function pickupFare(km){km=Number(km)||0;if(km<=5)return 1000;if(km<=10)return 1500;if(km<=15)return 2000;if(km<=20)return 2500;return 2500+Math.ceil((km-20)/5)*500}
@@ -92,18 +110,73 @@
 
   window.__rdMapsLoaded=async function(){
     try{
-      var lib=await google.maps.importLibrary('routes');
-      routeClass=lib.Route;
+      var libs=await Promise.all([google.maps.importLibrary('routes'),google.maps.importLibrary('places')]);
+      routeClass=libs[0].Route;
+      AutocompleteSuggestion=libs[1].AutocompleteSuggestion;
+      AutocompleteSessionToken=libs[1].AutocompleteSessionToken;
+      pickupToken=new AutocompleteSessionToken();
+      destinationToken=new AutocompleteSessionToken();
       mapsReady=true;loadingMaps=false;
-      el('mapsStatus').textContent='Google Maps接続済み';
+      el('mapsStatus').textContent='Google Maps接続済み（住所候補も利用できます）';
       el('mapsStatus').className='ok';
-      el('calcStatus').textContent='住所または現在地を指定して自動計算できます。';
-    }catch(err){loadingMaps=false;el('mapsStatus').textContent='Routesライブラリ読込エラー: '+(err&&err.message?err.message:err);el('mapsStatus').className='warn'}
+      el('calcStatus').textContent='住所を入力すると候補が表示されます。候補を選ぶと精度が上がります。';
+    }catch(err){loadingMaps=false;el('mapsStatus').textContent='Google Maps読込エラー: '+(err&&err.message?err.message:err);el('mapsStatus').className='warn'}
   };
+
+  function clearSuggestions(box){box.className='suggestions';box.innerHTML=''}
+
+  async function selectPrediction(kind,prediction){
+    try{
+      var place=prediction.toPlace();
+      await place.fetchFields({fields:['displayName','formattedAddress','location']});
+      var address=place.formattedAddress||place.displayName||prediction.text.toString();
+      if(kind==='pickup'){
+        pickupPlace=place;customerPos=null;el('pickupAddress').value=address;el('pickupSelected').textContent='✓ '+address;el('customerLocStatus').textContent='Googleの候補からお迎え場所を選択しました';el('customerLocStatus').className='ok';pickupToken=new AutocompleteSessionToken();clearSuggestions(el('pickupSuggestions'));
+      }else{
+        destinationPlace=place;el('destinationAddress').value=address;el('destinationSelected').textContent='✓ '+address;destinationToken=new AutocompleteSessionToken();clearSuggestions(el('destinationSuggestions'));
+      }
+    }catch(e){el('calcStatus').textContent='住所候補の確定に失敗しました: '+(e.message||e);el('calcStatus').className='warn'}
+  }
+
+  async function fetchSuggestions(kind){
+    if(!mapsReady||!AutocompleteSuggestion)return;
+    var input=kind==='pickup'?el('pickupAddress'):el('destinationAddress');
+    var box=kind==='pickup'?el('pickupSuggestions'):el('destinationSuggestions');
+    var text=input.value.trim();
+    if(text.length<2){clearSuggestions(box);return}
+    var requestId=kind==='pickup'?++pickupRequestId:++destinationRequestId;
+    box.innerHTML='<div class="loading-line">候補を検索中…</div>';box.className='suggestions show';
+    try{
+      var request={input:text,includedRegionCodes:['jp'],region:'jp',language:'ja',sessionToken:kind==='pickup'?pickupToken:destinationToken};
+      var result=await AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+      var newest=kind==='pickup'?pickupRequestId:destinationRequestId;
+      if(requestId!==newest)return;
+      box.innerHTML='';
+      var suggestions=result.suggestions||[];
+      if(!suggestions.length){box.innerHTML='<div class="loading-line">候補が見つかりません。住所をそのまま入力して計算もできます。</div>';return}
+      suggestions.slice(0,6).forEach(function(s){
+        if(!s.placePrediction)return;
+        var btn=document.createElement('button');btn.type='button';btn.className='suggestion';
+        btn.textContent=s.placePrediction.text.toString();
+        btn.addEventListener('click',function(){selectPrediction(kind,s.placePrediction)});
+        box.appendChild(btn);
+      });
+    }catch(e){box.innerHTML='<div class="loading-line">候補検索に失敗しました。手入力のままでも計算できます。</div>'}
+  }
+
+  function scheduleSuggestions(kind){
+    if(kind==='pickup'){
+      pickupPlace=null;customerPos=null;el('pickupSelected').textContent='';clearTimeout(pickupTimer);pickupTimer=setTimeout(function(){fetchSuggestions('pickup')},300);
+    }else{
+      destinationPlace=null;el('destinationSelected').textContent='';clearTimeout(destinationTimer);destinationTimer=setTimeout(function(){fetchSuggestions('destination')},300);
+    }
+  }
 
   el('customerTab').onclick=showCustomer;
   el('driverTab').onclick=showDriver;
   el('toggleAccept').onclick=function(){accepting=!accepting;renderAccept()};
+  el('pickupAddress').addEventListener('input',function(){scheduleSuggestions('pickup')});
+  el('destinationAddress').addEventListener('input',function(){scheduleSuggestions('destination')});
 
   el('connectMaps').onclick=function(){
     var key=el('apiKey').value.trim();
@@ -125,7 +198,7 @@
 
   el('customerLocBtn').onclick=function(){
     el('customerLocStatus').textContent='現在地を取得中…';
-    getPosition(function(pos){customerPos=pos;el('pickupAddress').value='';el('customerLocStatus').textContent='現在地をお迎え場所として使用します';el('customerLocStatus').className='ok'},function(e){el('customerLocStatus').textContent='位置情報を取得できません: '+(e.message||'許可設定を確認してください');el('customerLocStatus').className='warn'})
+    getPosition(function(pos){customerPos=pos;pickupPlace=null;el('pickupAddress').value='';el('pickupSelected').textContent='✓ 現在地を使用';clearSuggestions(el('pickupSuggestions'));el('customerLocStatus').textContent='現在地をお迎え場所として使用します';el('customerLocStatus').className='ok'},function(e){el('customerLocStatus').textContent='位置情報を取得できません: '+(e.message||'許可設定を確認してください');el('customerLocStatus').className='warn'})
   };
 
   async function compute(origin,destination){
@@ -140,11 +213,13 @@
       if(!driverPos){throw new Error('先にドライバー管理でドライバー現在地を更新してください')}
       var pickupText=el('pickupAddress').value.trim();
       var destText=el('destinationAddress').value.trim();
-      var pickup=customerPos||pickupText;
-      if(!pickup){throw new Error('お迎え場所を入力するか「現在地を使う」を押してください')}
-      if(!destText){throw new Error('目的地を入力してください')}
+      var pickup=customerPos||pickupPlace||pickupText;
+      var destination=destinationPlace||destText;
+      if(!pickup){throw new Error('お迎え場所を入力・選択するか「現在地を使う」を押してください')}
+      if(!destination){throw new Error('目的地を入力または候補から選択してください')}
+      clearSuggestions(el('pickupSuggestions'));clearSuggestions(el('destinationSuggestions'));
       el('calcStatus').textContent='道路ルートを計算中…';el('calcStatus').className='muted';
-      var results=await Promise.all([compute(driverPos,pickup),compute(pickup,destText)]);
+      var results=await Promise.all([compute(driverPos,pickup),compute(pickup,destination)]);
       var r1=results[0],r2=results[1];
       var pkm=km(r1.distanceMeters),dkm=km(r2.distanceMeters);
       var pf=pickupFare(pkm),df=driveFare(dkm);
@@ -154,6 +229,10 @@
       el('calcStatus').textContent='自動計算できました。';el('calcStatus').className='ok';
     }catch(e){el('calcStatus').textContent=(e&&e.message)?e.message:String(e);el('calcStatus').className='warn'}
   };
+
+  document.addEventListener('click',function(e){
+    if(!e.target.closest('.address-wrap')){clearSuggestions(el('pickupSuggestions'));clearSuggestions(el('destinationSuggestions'))}
+  });
 
   renderAccept();
 })();

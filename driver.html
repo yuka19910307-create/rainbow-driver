@@ -188,8 +188,8 @@
 
   function b64u(s){var p="=".repeat((4-s.length%4)%4);var b=(s+p).replace(/-/g,"+").replace(/_/g,"/");var raw=atob(b);return Uint8Array.from(Array.from(raw).map(function(x){return x.charCodeAt(0)}))}
   async function setupPush(){var st=el("pushStatus");try{if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window))throw new Error("この端末ではWeb通知を利用できません");st.textContent="通知を設定中…";var reg=await navigator.serviceWorker.register("/sw.js");await navigator.serviceWorker.ready;var perm=await Notification.requestPermission();if(perm!=="granted")throw new Error("通知が許可されていません");var cfg=await driverPost({action:"push_config"});var sub=await reg.pushManager.getSubscription();if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(cfg.vapid_public_key)});await driverPost({action:"push_subscribe",subscription:sub.toJSON()});st.textContent="通知ON — 新しい依頼をiPhoneに通知します";st.className="ok";el("enablePushBtn").textContent="通知ON";el("testPushBtn").classList.remove("hidden")}catch(e){st.textContent=e.message||String(e);st.className="warn"}}
-  el("enablePushBtn").onclick=setupPush;
-  el("testPushBtn").onclick=async function(){try{el("pushStatus").textContent="テスト通知を送信中…";var j=await driverPost({action:"push_test"});el("pushStatus").textContent=j.sent?"テスト通知を送信しました":"通知を送れませんでした";el("pushStatus").className=j.sent?"ok":"warn"}catch(e){el("pushStatus").textContent=e.message;el("pushStatus").className="warn"}};
+  if(el("enablePushBtn"))el("enablePushBtn").onclick=setupPush;
+  if(el("testPushBtn"))el("testPushBtn").onclick=async function(){try{el("pushStatus").textContent="テスト通知を送信中…";var j=await driverPost({action:"push_test"});el("pushStatus").textContent=j.sent?"テスト通知を送信しました":"通知を送れませんでした";el("pushStatus").className=j.sent?"ok":"warn"}catch(e){el("pushStatus").textContent=e.message;el("pushStatus").className="warn"}};
   if(DRIVER_MODE){
     showDriver();
     var savedMaps=safeGet('rd_maps_key');if(savedMaps){el('apiKey').value=savedMaps;setTimeout(function(){el('connectMaps').click()},100)}

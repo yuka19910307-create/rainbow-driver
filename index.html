@@ -116,7 +116,6 @@
   var DRIVER_MODE=QUERY.get('driver')==='1';
   var SANDBOX_PAYMENT_MODE=QUERY.get('sandbox')==='1';
   var PAYMENT_ENVIRONMENT=SANDBOX_PAYMENT_MODE?'sandbox':'production';
-  var PAYMENT_ENVIRONMENT=SANDBOX_PAYMENT_MODE?'sandbox':'production';
   function el(id){return document.getElementById(id)}
   function safeGet(k){try{return localStorage.getItem(k)||''}catch(e){return ''}}
   function safeSet(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}}
@@ -179,6 +178,8 @@
       var pc=lastCalc.pickup_coords,dc=lastCalc.destination_coords;
       el('submitStatus').textContent='サーバーで料金を最終確認中…';
       el('submitStatus').className='muted';
+      var sandboxHeaders=SANDBOX_PAYMENT_MODE?{'x-driver-key':safeGet('rd_driver_key')}:{};
+      if(SANDBOX_PAYMENT_MODE&&!sandboxHeaders['x-driver-key'])throw new Error('Sandboxテストには管理画面の接続が必要です。');
       var pj=await post(PAYMENT_API,{
         action:'create_checkout',
         environment:PAYMENT_ENVIRONMENT,
@@ -196,7 +197,7 @@
         trip_eta_min:lastCalc.trip_eta_min,
         quoted_total_fee:lastCalc.total_fee,
         notes:el('notes').value.trim()
-      });
+      },sandboxHeaders);
       safeSet('rd_payment_session_id',pj.payment_session_id||'');
       safeSet('rd_payment_session_token',pj.payment_session_token||'');
       safeSet('rd_customer_token_pending',pj.customer_token||'');

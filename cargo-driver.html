@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>軽貨物ドライバー｜Rainbow Driver（試作）</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172a41;background:#f2f5f8}
+*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0}header{background:#152f4b;color:white;padding:24px 18px}header>div,main{max-width:690px;margin:auto}header small{letter-spacing:.12em;opacity:.8}h1{font-size:23px;margin:5px 0}h2{font-size:17px;margin:0 0 12px}
+main{padding:16px}section{background:white;border:1px solid #d9e3ed;border-radius:16px;padding:18px;margin-bottom:14px}
+p{font-size:14px;line-height:1.5}label{display:block;font-size:13px;font-weight:700;margin:12px 0 5px}select,input,button{font:inherit}
+select,input:not([type=checkbox]){width:100%;padding:12px;font-size:16px;border:1px solid #bdcbd9;border-radius:9px;background:#fff}
+button{padding:12px 16px;border:0;border-radius:9px;background:#173a5e;color:#fff;font-weight:700;cursor:pointer;min-height:46px}
+button:disabled{opacity:.45}.sub{background:#e8f0f6;color:#173a5e}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.msg{background:#eef5ff;color:#17456e;border-radius:10px;padding:12px;margin:12px 0;font-size:13px;white-space:pre-wrap}
+.msg.error{background:#fff0ed;color:#9e3e32}.msg.ok{background:#eaf8f2;color:#176346}
+.muted,small{color:#65778b;font-size:12px}.warning{background:#fff6e5;color:#855214;border-radius:10px;padding:12px}
+.stat{background:#f3f7fa;border-radius:10px;padding:12px;font-size:23px;font-weight:800}
+footer{text-align:center;font-size:12px;color:#67798a;padding:8px 0 24px}
+@media(max-width:400px){.grid{grid-template-columns:1fr}}
+</style></head>
+<body><header><div><small>RAINBOW DRIVER / CARGO</small><h1>軽貨物ドライバー管理</h1><p>開発版｜現在地・稼働状況・回送時間</p></div></header>
+<main>
+<section><h2>稼働状況</h2><label for="status">現在の状態</label>
+<select id="status"><option value="offline">オフライン</option><option value="accepting">受付可能</option><option value="delivering">配送中</option><option value="break">休憩中</option></select>
+<div id="statusMessage" class="msg">オフライン</div><p class="warning">これは独立した試作画面です。ステータスや正確な現在地はサーバーへ送信せず、顧客にも表示しません。</p></section>
+<section><h2>現在地</h2><p class="muted">位置情報の許可が必要です。画面を閉じると位置更新を停止します。</p>
+<div class="grid"><button id="locate">GPSを取得・更新</button><button id="stop" class="sub" disabled>更新停止</button></div>
+<div id="locationMessage" class="msg">未取得</div><small id="gpsTime">最終取得：なし</small>
+</section>
+<section><h2>集荷先までの回送時間</h2>
+<p class="muted">既存システムで利用中の、利用ドメインを制限したブラウザ用Google Maps APIキーを使って試算できます。APIキーはこのページに保存しません。</p>
+<label for="key">Google Mapsブラウザ用APIキー</label><input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Maps Platform API Key">
+<button id="connect" class="sub" style="width:100%;margin-top:10px">Google Mapsに接続</button><div id="mapsMessage" class="msg">未接続</div>
+<label for="pickup">集荷先住所</label><input id="pickup" placeholder="例：群馬県前橋市大手町2丁目12-1">
+<label style="font-weight:normal"><input id="avoid" type="checkbox"> 高速道路・有料道路を避ける</label>
+<button id="calculate" style="width:100%" disabled>回送距離・所要時間を計算</button>
+<div id="routeMessage" class="msg">GPSとGoogle Mapsを接続してください。</div>
+<div id="result" class="grid" hidden><div><small>片道回送距離</small><div class="stat" id="km">--</div></div><div><small>交通状況込みの所要時間</small><div class="stat" id="mins">--</div></div></div>
+<p class="muted" id="estimated"></p>
+</section>
+<section><h2>今後の実装</h2><p>最低受注額の自動判定・ドライバー認証・お客様の即時依頼画面は次段階です。予約の自動受付は実装せず、LINE・メールで個別相談とします。</p></section>
+</main><footer>Rainbow Driver / Cargo prototype</footer>
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)},watch=null,location=null,Route=null,loading=false,nonce=0;
+function message(id,text,kind){var e=$(id);e.textContent=text;e.className="msg"+(kind?" "+kind:"")}
+function ready(){var ok=Boolean(location&&Route&&$("pickup").value.trim());$("calculate").disabled=!ok;return ok}
+function invalidate(){nonce++;$("result").hidden=true;ready()}
+function stop(){if(watch!==null&&navigator.geolocation)navigator.geolocation.clearWatch(watch);watch=null;$("locate").disabled=false;$("stop").disabled=true}
+function status(){var s=$("status").value;var labels={offline:"オフライン：依頼不可",accepting:"受付可能（端末内表示のみ）",delivering:"配送中：依頼不可",break:"休憩中：依頼不可"};message("statusMessage",labels[s],s==="accepting"?"ok":"");if(s==="offline")stop()}
+$("status").onchange=status;status();
+$("locate").onclick=function(){
+if(!navigator.geolocation||!window.isSecureContext){message("locationMessage","HTTPSで開き、GPSに対応した端末を利用してください。","error");return}
+stop();$("locate").disabled=true;$("stop").disabled=false;message("locationMessage","GPS取得中…");
+watch=navigator.geolocation.watchPosition(function(p){
+location={lat:p.coords.latitude,lng:p.coords.longitude};
+message("locationMessage","現在地を取得しました。サーバーへは送信していません。","ok");
+$("gpsTime").textContent="取得時刻："+new Date(p.timestamp).toLocaleString("ja-JP")+"／推定精度±"+Math.round(p.coords.accuracy)+"m";invalidate();
+},function(err){message("locationMessage","GPS取得エラー：位置情報へのアクセス許可・電波状態を確認してください。","error");stop()},
+{enableHighAccuracy:true,maximumAge:15000,timeout:15000});
+};
+$("stop").onclick=function(){stop();message("locationMessage","GPS更新を停止しました。")};
+$("pickup").oninput=invalidate;$("avoid").onchange=invalidate;
+window.__cargoMapsLoaded=async function(){try{var lib=await google.maps.importLibrary("routes");Route=lib.Route;message("mapsMessage","Google Maps接続済み","ok");ready()}catch(e){message("mapsMessage","Google Mapsライブラリの読込に失敗しました。","error")}finally{loading=false}};
+$("connect").onclick=function(){var key=$("key").value.trim();if(!key){message("mapsMessage","APIキーを入力してください。","error");return}if(Route||loading)return;loading=true;message("mapsMessage","接続中…");var s=document.createElement("script");s.async=true;s.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(key)+"&v=weekly&callback=__cargoMapsLoaded";s.onerror=function(){loading=false;message("mapsMessage","接続失敗。APIキーの利用可能ドメイン・API設定を確認してください。","error")};document.head.appendChild(s);$("key").value=""};
+$("calculate").onclick=async function(){
+if(!ready())return;var id=++nonce,origin={lat:location.lat,lng:location.lng},target=$("pickup").value.trim(),avoid=$("avoid").checked;$("calculate").disabled=true;message("routeMessage","回送時間を計算中…");
+try{var r=await Route.computeRoutes({origin:origin,destination:target,travelMode:"DRIVING",routingPreference:"TRAFFIC_AWARE",routeModifiers:{avoidHighways:avoid,avoidTolls:avoid},fields:["distanceMeters","durationMillis"]});
+if(id!==nonce)return;var data=r.routes&&r.routes[0];if(!data||!Number.isFinite(data.distanceMeters)||!Number.isFinite(data.durationMillis))throw Error("no route");
+$("km").textContent=(data.distanceMeters/1000).toFixed(1)+"km";$("mins").textContent=Math.ceil(data.durationMillis/60000)+"分";$("result").hidden=false;$("estimated").textContent="計算日時："+new Date().toLocaleString("ja-JP")+"／所要時間は予測値です。運賃・受注可否は未判定。";message("routeMessage","経路計算が完了しました。","ok")
+}catch(e){if(id===nonce)message("routeMessage","経路を計算できませんでした。住所またはMapsの設定を確認してください。","error")}finally{ready()}
+};
+document.addEventListener("visibilitychange",function(){if(document.hidden&&watch!==null){stop();message("locationMessage","画面が非表示になったためGPSを停止しました。")}});
+window.addEventListener("pagehide",stop);
+})();
+</script></body></html>

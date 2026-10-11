@@ -23,6 +23,14 @@
           "locationAlwaysAndWhenInUsePermission": "稼働中、ほかのアプリを開いている間も集荷までの距離と位置の更新状況を確認するために使用します。業務を終了すると停止します。",
           "isIosBackgroundLocationEnabled": true
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
       ]
     ],
     "extra": {

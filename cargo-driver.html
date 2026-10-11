@@ -20,8 +20,8 @@ footer{text-align:center;font-size:12px;color:#67798a;padding:8px 0 24px}
 <main>
 <section><h2>稼働状況</h2><label for="status">現在の状態</label>
 <select id="status"><option value="offline">オフライン</option><option value="accepting">受付可能</option><option value="delivering">配送中</option><option value="break">休憩中</option></select>
-<div id="statusMessage" class="msg">オフライン</div><p class="warning">これは独立した試作画面です。ステータスや正確な現在地はサーバーへ送信せず、顧客にも表示しません。</p></section>
-<section><h2>現在地</h2><p class="muted">位置情報の許可が必要です。画面を閉じると位置更新を停止します。</p>
+<div id="statusMessage" class="msg">オフライン</div><p class="warning">これは独立した試作画面です。ステータスや正確な現在地はRainbow Driverサーバーへ送信せず、顧客にも表示しません。回送試算を実行したときだけGoogle Mapsへ位置情報を渡します。</p></section>
+<section><h2>現在地</h2><p class="muted">位置情報の許可が必要です。画面が非表示になると測位が止まります。表示を戻した際に再取得を試みます。iPhoneでのバックグラウンド測位には対応していません。</p>
 <div class="grid"><button id="locate">GPSを取得・更新</button><button id="stop" class="sub" disabled>更新停止</button></div>
 <div id="locationMessage" class="msg">未取得</div><small id="gpsTime">最終取得：なし</small>
 </section>
@@ -41,24 +41,26 @@ footer{text-align:center;font-size:12px;color:#67798a;padding:8px 0 24px}
 <script>
 (function(){
 "use strict";
-var $=function(id){return document.getElementById(id)},watch=null,location=null,Route=null,loading=false,nonce=0;
+var $=function(id){return document.getElementById(id)},watch=null,location=null,Route=null,loading=false,nonce=0,trackingWanted=false,lastFixAt=0;
+function fresh(){return Boolean(watch!==null&&!document.hidden&&lastFixAt&&Date.now()-lastFixAt<120000)}
 function message(id,text,kind){var e=$(id);e.textContent=text;e.className="msg"+(kind?" "+kind:"")}
-function ready(){var ok=Boolean(location&&Route&&$("pickup").value.trim());$("calculate").disabled=!ok;return ok}
+function ready(){var ok=Boolean(location&&fresh()&&Route&&$("pickup").value.trim());$("calculate").disabled=!ok;return ok}
 function invalidate(){nonce++;$("result").hidden=true;ready()}
 function stop(){if(watch!==null&&navigator.geolocation)navigator.geolocation.clearWatch(watch);watch=null;$("locate").disabled=false;$("stop").disabled=true}
-function status(){var s=$("status").value;var labels={offline:"オフライン：依頼不可",accepting:"受付可能（端末内表示のみ）",delivering:"配送中：依頼不可",break:"休憩中：依頼不可"};message("statusMessage",labels[s],s==="accepting"?"ok":"");if(s==="offline")stop()}
+function status(){var s=$("status").value;var labels={offline:"オフライン：依頼不可",accepting:fresh()?"受付可能（端末表示のみ・GPS取得中）":"受付可能を選択中：GPS停止・位置情報未更新",delivering:"配送中：依頼不可",break:"休憩中：依頼不可"};if(s==="offline"){trackingWanted=false;stop()}message("statusMessage",labels[s],s==="accepting"&&fresh()?"ok":"")}
 $("status").onchange=status;status();
-$("locate").onclick=function(){
-if(!navigator.geolocation||!window.isSecureContext){message("locationMessage","HTTPSで開き、GPSに対応した端末を利用してください。","error");return}
-stop();$("locate").disabled=true;$("stop").disabled=false;message("locationMessage","GPS取得中…");
+function startTracking(){
+if(!navigator.geolocation||!window.isSecureContext){trackingWanted=false;message("locationMessage","HTTPSで開き、GPSに対応した端末を利用してください。","error");return}
+stop();trackingWanted=true;lastFixAt=0;invalidate();status();$("locate").disabled=true;$("stop").disabled=false;message("locationMessage","GPS取得中…");
 watch=navigator.geolocation.watchPosition(function(p){
-location={lat:p.coords.latitude,lng:p.coords.longitude};
-message("locationMessage","現在地を取得しました。サーバーへは送信していません。","ok");
+location={lat:p.coords.latitude,lng:p.coords.longitude};lastFixAt=Date.now();
+message("locationMessage","現在地を取得しました。Rainbow Driverのサーバーへは送信していません。","ok");status();
 $("gpsTime").textContent="取得時刻："+new Date(p.timestamp).toLocaleString("ja-JP")+"／推定精度±"+Math.round(p.coords.accuracy)+"m";invalidate();
-},function(err){message("locationMessage","GPS取得エラー：位置情報へのアクセス許可・電波状態を確認してください。","error");stop()},
+},function(err){trackingWanted=false;lastFixAt=0;message("locationMessage","GPS取得エラー：位置情報へのアクセス許可・電波状態を確認してください。","error");stop();invalidate();status()},
 {enableHighAccuracy:true,maximumAge:15000,timeout:15000});
-};
-$("stop").onclick=function(){stop();message("locationMessage","GPS更新を停止しました。")};
+}
+$("locate").onclick=function(){startTracking()};
+$("stop").onclick=function(){trackingWanted=false;lastFixAt=0;stop();invalidate();status();message("locationMessage","GPS更新を停止しました。")};
 $("pickup").oninput=invalidate;$("avoid").onchange=invalidate;
 window.__cargoMapsLoaded=async function(){try{var lib=await google.maps.importLibrary("routes");Route=lib.Route;message("mapsMessage","Google Maps接続済み","ok");ready()}catch(e){message("mapsMessage","Google Mapsライブラリの読込に失敗しました。","error")}finally{loading=false}};
 $("connect").onclick=function(){var key=$("key").value.trim();if(!key){message("mapsMessage","APIキーを入力してください。","error");return}if(Route||loading)return;loading=true;message("mapsMessage","接続中…");var s=document.createElement("script");s.async=true;s.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(key)+"&v=weekly&callback=__cargoMapsLoaded";s.onerror=function(){loading=false;message("mapsMessage","接続失敗。APIキーの利用可能ドメイン・API設定を確認してください。","error")};document.head.appendChild(s);$("key").value=""};
@@ -69,7 +71,8 @@ if(id!==nonce)return;var data=r.routes&&r.routes[0];if(!data||!Number.isFinite(d
 $("km").textContent=(data.distanceMeters/1000).toFixed(1)+"km";$("mins").textContent=Math.ceil(data.durationMillis/60000)+"分";$("result").hidden=false;$("estimated").textContent="計算日時："+new Date().toLocaleString("ja-JP")+"／所要時間は予測値です。運賃・受注可否は未判定。";message("routeMessage","経路計算が完了しました。","ok")
 }catch(e){if(id===nonce)message("routeMessage","経路を計算できませんでした。住所またはMapsの設定を確認してください。","error")}finally{ready()}
 };
-document.addEventListener("visibilitychange",function(){if(document.hidden&&watch!==null){stop();message("locationMessage","画面が非表示になったためGPSを停止しました。")}});
-window.addEventListener("pagehide",stop);
+document.addEventListener("visibilitychange",function(){if(document.hidden){if(watch!==null){stop();lastFixAt=0;invalidate();status();message("locationMessage","バックグラウンド中はGPS停止・位置情報更新待ちです。")}return}if(trackingWanted){startTracking()}else{status();invalidate()}});
+window.addEventListener("pagehide",function(){trackingWanted=false;stop()});
+setInterval(function(){if(!document.hidden&&watch!==null&&!fresh()){invalidate();status();message("locationMessage","位置情報の更新が2分以上ありません。古い現在地で回送計算はできません。再取得してください。","error")}},15000);
 })();
 </script></body></html>

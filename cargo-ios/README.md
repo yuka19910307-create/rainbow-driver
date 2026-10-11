@@ -32,6 +32,6 @@
 ## 備考
 本コードは静的レビュー用としてGitHubへ保存した試作であり、**iPhoneネイティブアプリのビルド・署名・インストール実行はまだ**です。端末でのバックグラウンド動作を保証していません。
 
-SDK 58 / React 19.3 / React Native 0.88 を採用。 \`npm install\` で生成される \`package-lock.json\` をコミットして依存関係を固定してください。バージョン整合性は \`npx expo-doctor\` / \`npx expo install --check\` で確認してください。
+安定版 SDK 57 / React 19.2.3 / React Native 0.86.3 を採用（SDK 58は2026年10月時点でベータ）。Xcode 27対応のシーンライフサイクル設定済み。 \`npm install\` で生成される \`package-lock.json\` をコミットして依存関係を固定してください。バージョン整合性は \`npx expo-doctor\` / \`npx expo install --check\` で確認してください。
 
 参考: https://docs.expo.dev/versions/v58.0.0/sdk/location/ ; https://docs.expo.dev/build/setup/

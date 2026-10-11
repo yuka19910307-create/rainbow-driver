@@ -47,7 +47,7 @@ function message(id,text,kind){var e=$(id);e.textContent=text;e.className="msg"+
 function ready(){var ok=Boolean(location&&fresh()&&Route&&$("pickup").value.trim());$("calculate").disabled=!ok;return ok}
 function invalidate(){nonce++;$("result").hidden=true;ready()}
 function stop(){if(watch!==null&&navigator.geolocation)navigator.geolocation.clearWatch(watch);watch=null;$("locate").disabled=false;$("stop").disabled=true}
-function status(){var s=$("status").value;var labels={offline:"オフライン：依頼不可",accepting:fresh()?"受付可能（端末表示のみ・GPS取得中）":"受付可能を選択中：GPS停止・位置情報未更新",delivering:"配送中：依頼不可",break:"休憩中：依頼不可"};if(s==="offline"){trackingWanted=false;stop()}message("statusMessage",labels[s],s==="accepting"&&fresh()?"ok":"")}
+function status(){var s=$("status").value;var labels={offline:"オフライン：依頼不可",accepting:fresh()?"受付可能（端末表示のみ・GPS取得中）":"受付可能を選択中：GPS停止・位置情報未更新",delivering:"配送中：依頼不可",break:"休憩中：依頼不可"};message("statusMessage",labels[s],s==="accepting"&&fresh()?"ok":"")}
 $("status").onchange=status;status();
 function startTracking(){
 if(!navigator.geolocation||!window.isSecureContext){trackingWanted=false;message("locationMessage","HTTPSで開き、GPSに対応した端末を利用してください。","error");return}

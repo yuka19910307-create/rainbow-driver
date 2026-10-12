@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#1c3655">
+<title>軽貨物 Gmail本人確認テスト | Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1d344f;background:#f1f5fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.65}header{background:#1c3655;color:white;padding:24px 16px}
+header>div,main{max-width:720px;margin:auto}h1{font-size:23px;margin:7px 0}
+main{padding:16px}section{background:white;border:1px solid #d9e3ef;border-radius:13px;padding:20px;margin-bottom:14px}
+.notice{background:#fff3dd;color:#754f1d;border-radius:9px;padding:14px;font-size:14px}
+button{padding:13px 18px;border:0;border-radius:10px;background:#28496c;color:white;font:inherit;font-weight:700}
+button:disabled{opacity:.48}input{display:block;font:inherit;padding:13px;width:100%;border:1px solid #bdcddd;border-radius:9px;max-width:290px}
+a{color:#185b97}#result,#authState,#setupState{white-space:pre-wrap;overflow-wrap:anywhere}
+.small{font-size:14px;color:#5d7087}label{font-weight:700;display:block;margin-bottom:8px}
+</style></head><body>
+<header><div><small>RAINBOW DRIVER / CARGO / PRELAUNCH ONLY</small><h1>Gmail 本人確認テスト</h1></div></header>
+<main>
+<section>
+<p class="notice"><b>一般受付は停止中です。</b> この画面は軽貨物管理者の個人Gmail宛てのテスト専用です。お客様のメールアドレス・配送依頼・顧客情報は受け付けません。</p>
+<p><a href="./driver.html">軽貨物ドライバー画面へ戻る</a></p>
+<p id="authState" role="status">軽貨物管理者のログインを確認中…</p>
+</section>
+<section id="testing" hidden>
+<h2>1. Google連携設定の確認</h2>
+<p id="setupState" role="status">設定を確認しています…</p>
+<button id="reload" type="button">設定を再確認する</button>
+<p class="small">設定が完了していない間、メール送信はできません。Gmail送信先はGoogle Apps Scriptの所有者に固定しています。</p>
+</section>
+<section id="sendSection" hidden>
+<h2>2. テストコードを送る</h2>
+<p>Google Apps Scriptで送信を許可してから、管理者本人のGmailへ6桁の確認コードを送ります。1時間3回までの制限があります。</p>
+<button id="send" type="button" disabled>自分のGmailへテスト送信</button>
+<p id="sendState" role="status"></p>
+</section>
+<section id="verifySection" hidden>
+<h2>3. Gmailに届いたコードを確認</h2>
+<label for="otp">確認コード（6桁）</label>
+<input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000">
+<p><button id="verify" type="button">本人確認コードを照合する</button></p>
+<p id="result" role="status" aria-live="polite">未検証</p>
+<p class="small">有効期限10分、5回の誤入力でロックされます。照合成功後のコード再利用はできません。</p>
+</section>
+<section>
+<h2>公開前の制限</h2>
+<p>これは管理者自身への実メール送信を検証するものです。お客様向けの送信機能、正式依頼、Push通知、決済は行いません。各機能の統合試験と公開判断は別工程です。</p>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{"use strict";
+const $=id=>document.getElementById(id);
+const url="https://kvoaorzdewwirqryeizq.supabase.co";
+const publishableKey="sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms";
+let client=null,authorized=false,challenge=null,configured=false,expiresAt=0;
+const show=(id,s)=>{$(id).textContent=s};
+function errorText(error,operation){
+  if(error==="RATE_LIMITED")return "送信上限に達しました。約1時間後に再試行してください。";
+  if(error==="GOOGLE_SETUP_INCOMPLETE")return "Google Apps ScriptのURLまたは共有署名キーの設定が完了していません。";
+  if(error==="MAIL_DELIVERY_NOT_CONFIRMED")return "Gmail送信が確認できませんでした。Google側のデプロイ・許可設定を確認してください。";
+  if(error==="INVALID_CODE_OR_CHALLENGE")return "コードが正しくないか、入力期限を過ぎています。";
+  if(error==="OLDER_CODE_SUPERSEDED")return "古いコードは使用できません。最新のメールをご確認ください。";
+  if(error==="INVALID_SESSION"||error==="LOGIN_REQUIRED")return "軽貨物ドライバー画面でログインし直してください。";
+  return operation+"に失敗しました。設定・通信・ログイン状態を確認してください。";
+}
+async function call(action,params={}){
+ const {data,error}=await client.functions.invoke("cargo-gmail-otp-test",{body:{action,...params}});
+ // Supabase surfaces non-2xx as an error; read limited error JSON to show a safe code.
+ if(error){
+   let reason="";
+   try{
+     if(error.context && typeof error.context.json==="function"){
+       const obj=await error.context.json();
+       reason=typeof obj?.error==="string"?obj.error:"";
+     }
+   }catch{}
+   throw Error(reason||"REQUEST_FAILED");
+ }
+ if(!data||typeof data!=="object")throw Error("EMPTY_RESPONSE");
+ return data;
+}
+async function load(){
+ if(!authorized)return;
+ $("reload").disabled=true;show("setupState","Google連携設定を確認しています…");
+ try{
+  const c=await call("status");
+  configured=c.bridge_configured===true&&c.verification_hmac_configured===true;
+  show("setupState","Google Apps Script："+(c.bridge_configured===true?"URLと署名キーを認識済み":"未設定")
+    +"\n本人確認用HMAC："+(c.verification_hmac_configured===true?"設定済み":"未設定")
+    +"\n送信対象：管理者本人のGmailのみ\n一般受付：停止中"
+    +(configured?"\nGoogle側で送信を許可するとテストできます。":"\nGoogle Apps Scriptの設定完了後に再確認してください。"));
+  $("send").disabled=!configured;
+  $("sendSection").hidden=false;
+ }catch(e){configured=false;$("send").disabled=true;show("setupState",errorText(e.message,"設定確認"));}
+ finally{$("reload").disabled=false}
+}
+async function init(){
+ if(!window.supabase){show("authState","ログインライブラリを読み込めませんでした。");return}
+ client=window.supabase.createClient(url,publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}});
+ try{
+  const {data:{user},error}=await client.auth.getUser();
+  if(error||!user){show("authState","軽貨物ドライバー画面でログインしてください。");return}
+  const {data:membership,error:roleError}=await client.from("cargo_operator_accounts")
+    .select("user_id").eq("user_id",user.id).maybeSingle();
+  if(roleError||!membership){show("authState","軽貨物管理者権限がありません。");return}
+  authorized=true;$("testing").hidden=false;
+  show("authState","軽貨物管理者ログインを確認しました。本人宛テスト専用です。");
+  await load();
+ }catch{show("authState","管理者認証を確認できませんでした。")}
+}
+$("reload").onclick=load;
+$("send").onclick=async()=>{
+ if(!authorized||!configured)return;
+ $("send").disabled=true;
+ show("sendState","Gmailへのテスト送信を確認しています…");
+ try{
+   const v=await call("send_test");
+   if(v.ok!==true||typeof v.challenge_id!=="string")throw Error("SEND_FAILED");
+   challenge=v.challenge_id;expiresAt=Date.now()+600000;
+   $("verifySection").hidden=false;$("otp").value="";show("result","未検証");
+   show("sendState","管理者Gmail宛ての送信がGoogle側で確認されました。最新メールの6桁コードを入力してください。");
+ }catch(e){show("sendState",errorText(e.message,"送信"));}
+ finally{$("send").disabled=!configured}
+};
+$("verify").onclick=async()=>{
+ if(!authorized||!challenge)return;
+ const code=$("otp").value.trim();
+ if(!/^[0-9]{6}$/.test(code)){show("result","数字6桁で入力してください。");return}
+ if(Date.now()>expiresAt){show("result","コードの期限が過ぎました。新しいテストコードを取得してください。");return}
+ $("verify").disabled=true;show("result","Supabaseサーバーで照合しています…");
+ try{
+  const r=await call("verify",{challenge_id:challenge,code});
+  if(r.verified===true){
+   challenge=null;$("otp").value="";show("result","成功！Gmailで受信したコードをSupabaseが照合しました。\n管理者本人へのテスト完了。\n一般受付は停止中です。");
+  }else{
+   show("result","未認証：コードを確認してください。");
+  }
+ }catch(e){show("result",errorText(e.message,"コード照合"));}
+ finally{$("verify").disabled=false}
+};
+init();
+})();
+</script></body></html>

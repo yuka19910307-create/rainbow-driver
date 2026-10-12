@@ -123,14 +123,18 @@ $('submitTest').onclick=async()=>{
  if(![data.pickup,data.delivery,data.cargo].every(x=>x.startsWith('テスト'))){status.textContent='架空案件の安全確認：集荷地・配送先・荷物名はすべて「テスト」で始めてください。';return}
  button.disabled=true;status.textContent='管理者用のテストDBに登録しています…';
  try{
-  const {error}=await client.from('cargo_dispatch_requests').insert({
+  const {data:inserted,error}=await client.from('cargo_dispatch_requests').insert({
    operator_id:operator.id,pickup_address:data.pickup,delivery_address:data.delivery,
    cargo_description:data.cargo,pieces:Number(data.pieces),estimated_weight_kg:Number(data.weight),
    cargo_length_cm:Number(data.length),cargo_width_cm:Number(data.width),cargo_height_cm:Number(data.height),
    special_handling:data.handling!=='no',customer_note:data.note.slice(0,500)
-  });
-  if(error)throw Error('登録できませんでした。権限・通信・入力値を確認してください。');
-  status.textContent='架空のテスト依頼をDBに登録しました。実際のお客様からの受注ではありません。';
+  }).select('id').single();
+  if(error||!inserted?.id)throw Error('登録できませんでした。権限・通信・入力値を確認してください。');
+  status.textContent='架空のテスト依頼をDBに登録しました。実際のお客様からの受注ではありません。通知を確認中…';
+  try{
+    const {data:push,error:pushError}=await client.functions.invoke('cargo-push',{body:{action:'notify_test_request',request_id:inserted.id}});
+    status.textContent='架空のテスト依頼を登録しました。'+(pushError?'通知テストの呼び出しは失敗しました。':push?.already_notified?'通知は送信済みです。':push?.reason==='no_device'?'通知登録済み端末はありません。':('軽貨物端末へのPush送信成功：'+(push?.sent??0)+'件。'))+' 実際のお客様からの受注ではありません。';
+  }catch(e){status.textContent='架空のテスト依頼を登録しました。通知処理は確認できませんでした。実際の受注ではありません。'}
  }catch(e){status.textContent=e.message||'テスト登録に失敗しました。'}
  finally{button.disabled=false}
 };

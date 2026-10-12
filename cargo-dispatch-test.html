@@ -1,0 +1,70 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>軽貨物・即時依頼テスト｜Rainbow Driver</title><style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1c304b;background:#f1f5f9}*{box-sizing:border-box}body{margin:0}header{background:#1a3555;color:#fff;padding:24px 18px}header>div,main{max-width:720px;margin:auto}main{padding:16px}section{background:#fff;border:1px solid #dce4ee;padding:19px;border-radius:14px;margin-bottom:14px}h1{font-size:23px;margin:7px 0}h2{font-size:18px}label{font-size:14px;font-weight:650;display:block;margin:13px 0 5px}input,textarea{display:block;width:100%;font:inherit;padding:12px;border:1px solid #c1cedd;border-radius:9px;background:#fff}button{border:0;border-radius:9px;padding:12px 16px;background:#254466;color:white;font:inherit;font-weight:700;cursor:pointer;margin-top:10px}button:disabled{opacity:.5}.secondary{background:#e9eff6;color:#223e61}.danger{background:#813e47}.note{background:#fff3d9;border-radius:10px;padding:12px;color:#76501d;font-size:13px;line-height:1.6}.muted{color:#526983;font-size:13px;line-height:1.7}.row{display:flex;gap:9px;flex-wrap:wrap}.row>*{flex:1}.item{padding:14px;border:1px solid #dce5ef;border-radius:11px;margin:12px 0}.item p{overflow-wrap:anywhere;white-space:pre-wrap}a{color:#1763a1}#message{white-space:pre-wrap}</style></head>
+<body><header><div><small>RAINBOW DRIVER / CARGO / INTERNAL TEST</small><h1>即時配送依頼・管理者テスト</h1></div></header>
+<main><section id="gate"><h2>管理者認証を確認しています</h2><p id="authMessage">確認中…</p><a href="./cargo-operator-login.html">ログイン画面へ</a></section>
+<div id="app" hidden>
+<section><p class="note"><strong>開発用テストです。</strong> この画面で登録するのは架空案件のみ。お客様からの依頼を受け付けず、配車・通知・運賃確定・決済・業務上の受諾は行いません。実在の氏名・電話番号・住所・荷物情報を入力しないでください。</p><p class="muted">当日・即時集荷のみを想定。将来の日時指定予約はLINE等の個別相談です。</p><a href="./cargo-operator-login.html">ドライバー管理画面へ戻る</a></section>
+<section><h2>① 架空の即時配送依頼を作成</h2><form id="testForm"><label for="pickup">架空の集荷場所</label><input id="pickup" value="テスト集荷地・さいたま市" maxlength="250" required minlength="3"><label for="delivery">架空の配送先</label><input id="delivery" value="テスト配送先・東京都内" maxlength="250" required minlength="3"><label for="cargo">荷物内容（架空）</label><input id="cargo" value="テスト用・箱入り部品" maxlength="500" minlength="2" required><div class="row"><div><label for="pieces">個数</label><input id="pieces" type="number" min="1" max="99" step="1" value="1" required></div><div><label for="weight">重量の目安（kg・任意）</label><input id="weight" type="number" min="0.01" max="350" step="0.01" placeholder="例：5"></div></div><label for="note">メモ（任意・架空）</label><textarea id="note" maxlength="500" rows="2" placeholder="積載や受渡しのテスト条件"></textarea><button id="create" type="submit">架空のテスト依頼を登録</button></form></section>
+<section><h2>② テスト案件を確認・判断</h2><button class="secondary" id="reload" type="button">一覧を更新</button><p id="listStatus" class="muted"></p><div id="items"></div></section>
+</div><section><p id="message" role="status" class="muted"></p></section></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script><script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id);const say=m=>$('message').textContent=m;
+if(!window.supabase){$('authMessage').textContent='認証機能を読み込めませんでした。';return}
+const supa=window.supabase.createClient('https://kvoaorzdewwirqryeizq.supabase.co','sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:'rd-cargo-operator-auth-v1'}});
+let user=null;const labels={test_new:'未判断',test_accepted:'テスト受諾',test_declined:'テスト辞退'};
+async function authorize(){
+ try{
+  const {data:{user:u},error}=await supa.auth.getUser();
+  if(error||!u){$('authMessage').textContent='軽貨物管理者としてログインしてください。';return}
+  const {data,error:e}=await supa.from('cargo_operator_accounts').select('user_id').eq('user_id',u.id).maybeSingle();
+  if(e||!data){$('authMessage').textContent='このアカウントには軽貨物管理者の権限がありません。';return}
+  user=u;$('gate').hidden=true;$('app').hidden=false;await load();
+ }catch(e){$('authMessage').textContent='認証状態を確認できませんでした。'}
+}
+function render(rows){
+ const root=$('items');root.replaceChildren();
+ if(!rows.length){$('listStatus').textContent='テスト案件はまだありません。';return}
+ $('listStatus').textContent='最近のテスト案件 '+rows.length+'件（最大20件）';
+ for(const record of rows){
+  const article=document.createElement('article');article.className='item';
+  const h=document.createElement('strong');h.textContent='['+(labels[record.status]||'不明')+'] '+new Date(record.created_at).toLocaleString('ja-JP');article.append(h);
+  for(const [key,val] of [['集荷',record.pickup_address],['配送',record.delivery_address],['荷物',record.cargo_description],['個数',record.pieces+'個'],['重量',record.estimated_weight_kg==null?'未入力':record.estimated_weight_kg+'kg'],['メモ',record.customer_note||'なし']]){
+   const p=document.createElement('p');p.textContent=key+'：'+val;article.append(p);
+  }
+  if(record.status==='test_new'){
+   const buttons=document.createElement('div');buttons.className='row';
+   for(const [status,label] of [['test_accepted','テスト受諾'],['test_declined','テスト辞退']]){
+    const b=document.createElement('button');b.type='button';b.textContent=label;b.className=status==='test_declined'?'danger':'';
+    b.onclick=async()=>{b.disabled=true;await decide(record.id,status);};buttons.append(b);
+   }article.append(buttons);
+  }root.append(article);
+ }
+}
+async function load(){
+ if(!user)return;
+ $('listStatus').textContent='一覧を取得中…';
+ const {data,error}=await supa.from('cargo_dispatch_requests').select('id,created_at,status,pickup_address,delivery_address,cargo_description,pieces,estimated_weight_kg,customer_note').eq('operator_id',user.id).eq('origin','operator_test').order('created_at',{ascending:false}).limit(20);
+ if(error){$('listStatus').textContent='一覧を読み込めませんでした。';return}
+ render(data||[]);
+}
+async function decide(id,status){
+ const {data,error}=await supa.from('cargo_dispatch_requests').update({status,decision_at:new Date().toISOString()}).eq('id',id).eq('operator_id',user.id).eq('status','test_new').select('id');
+ if(error||!data?.length){say('テスト判断を保存できませんでした。別画面で既に判断された可能性があります。');await load();return}
+ say('テスト判断を更新しました。実際の配送受諾ではありません。');await load();
+}
+$('testForm').onsubmit=async e=>{
+ e.preventDefault();if(!user)return;
+ const btn=$('create');btn.disabled=true;say('架空案件を登録中です…');
+ try{
+  const payload={operator_id:user.id,pickup_address:$('pickup').value.trim(),delivery_address:$('delivery').value.trim(),cargo_description:$('cargo').value.trim(),pieces:Number($('pieces').value),estimated_weight_kg:$('weight').value?Number($('weight').value):null,customer_note:$('note').value.trim()};
+  const {error}=await supa.from('cargo_dispatch_requests').insert(payload);
+  if(error){say('登録に失敗しました。入力内容と権限をご確認ください。');return}
+  say('架空のテスト案件を登録しました。実際の受注や配車は行われません。');await load();
+ }catch(err){say('通信を確認してください。')}
+ finally{btn.disabled=false}
+};
+$('reload').onclick=load;
+authorize();
+})();
+</script></body></html>

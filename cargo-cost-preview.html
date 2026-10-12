@@ -307,7 +307,7 @@ $('returnPlan').addEventListener('change',syncReturn);
 $('demo').addEventListener('click',invalidate);
 $('reset').addEventListener('click',invalidate);
 function clearGPS(){
- gpsPoint=null;fixAt=0;invalidate();
+ gpsPoint=null;fixAt=0;invalidate();$('gps').checked=false;
  show('routeGPSStatus','現在地：未取得。位置情報は保存されません。',false);
 }
 $('routeGPSClear').addEventListener('click',clearGPS);
@@ -391,9 +391,10 @@ $('routeAutoCalculate').addEventListener('click',async()=>{
    put('bKm',Math.ceil(second.km*10)/10);put('bMin',second.min);
    if(third){put('cKm',Math.ceil(third.km*10)/10);put('cMin',third.min)}
    $('gps').checked=true;
-   $('route').checked=true;
+   // Calculation does not imply route verification.
+   $('route').checked=false;
    $('result').hidden=true;
-   show('routeAutoStatus','経路計算成功：回送 '+first.km.toFixed(1)+'km / '+first.min+'分、配送 '+second.km.toFixed(1)+'km / '+second.min+'分'+(third?'、配送後 '+third.km.toFixed(1)+'km / '+third.min+'分':'')+'。下の採算計算を実行してください。',false);
+   show('routeAutoStatus','経路計算成功：回送 '+first.km.toFixed(1)+'km / '+first.min+'分、配送 '+second.km.toFixed(1)+'km / '+second.min+'分'+(third?'、配送後 '+third.km.toFixed(1)+'km / '+third.min+'分':'')+'。経路と交通状況を目視確認し、下の確認欄にチェックしてから採算計算してください。',false);
  }catch(e){
    $('route').checked=false;
    show('routeAutoStatus','ルート計算を完了できませんでした。住所・API設定・通信状況を確認してください。'+(e&&e.message?'（'+String(e.message).slice(0,120)+'）':''),true);
@@ -402,6 +403,12 @@ $('routeAutoCalculate').addEventListener('click',async()=>{
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden){clearGPS();$('routeAutoStatus').textContent='画面を離れたため現在地を破棄しました。もう一度取得してください。'}
 });
+setInterval(()=>{
+ if(gpsPoint&&!fresh()){
+   clearGPS();
+   show('routeAutoStatus','GPSが2分以上古くなりました。再取得・経路再確認が必要です。',true);
+ }
+},15000);
 syncReturn();
 })();
 </script>

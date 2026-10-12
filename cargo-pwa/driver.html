@@ -127,26 +127,15 @@ async function refreshRequests(){
     paragraph('荷物：'+row.cargo_description+' ／ '+row.pieces+'個'+(row.estimated_weight_kg==null?'':' ／ '+row.estimated_weight_kg+'kg')));
   if(row.cargo_length_cm!=null&&row.cargo_width_cm!=null&&row.cargo_height_cm!=null)
     article.append(paragraph('寸法：'+row.cargo_length_cm+' × '+row.cargo_width_cm+' × '+row.cargo_height_cm+'cm'));
-  if(row.status==='test_new'){
-    const actions=document.createElement('div');actions.className='actions';
-    for(const [next,titleText] of [['test_accepted','テスト受諾'],['test_declined','テスト辞退']]){
-      const button=document.createElement('button');button.type='button';button.textContent=titleText;
-      button.className=next==='test_declined'?'danger':'';
-      button.onclick=async()=>{button.disabled=true;await decide(row.id,next)};
-      actions.append(button);
-    }
-    article.append(actions);
+  if(row.status==='test_new'||row.status==='test_accepted'){
+    const link=document.createElement('a');
+    link.href='/cargo-test-review.html?id='+encodeURIComponent(row.id);
+    link.textContent=row.status==='test_new'?'社内採算の確認・テスト判断へ':'審査記録・テストキャンセルへ';
+    link.style.display='inline-block';link.style.marginTop='9px';
+    article.append(link);
   }
   root.append(article);
  }
-}
-async function decide(id,next){
- if(!user)return;
- const {data,error}=await client.from('cargo_dispatch_requests')
-   .update({status:next,decision_at:new Date().toISOString()})
-   .eq('id',id).eq('operator_id',user.id).eq('status','test_new').select('id');
- log('pageState',error||!data?.length?'テスト判断を更新できませんでした。':'テスト判断を保存しました。実際の受注ではありません。');
- await refreshRequests();
 }
 async function refreshPushStatus(){
  if(!user)return;

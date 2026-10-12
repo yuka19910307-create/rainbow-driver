@@ -394,7 +394,7 @@ $('routeAutoCalculate').addEventListener('click',async()=>{
    // Calculation does not imply route verification.
    $('route').checked=false;
    $('result').hidden=true;
-   show('routeAutoStatus','経路計算成功：回送 '+first.km.toFixed(1)+'km / '+first.min+'分、配送 '+second.km.toFixed(1)+'km / '+second.min+'分'+(third?'、配送後 '+third.km.toFixed(1)+'km / '+third.min+'分':'')+'。経路と交通状況を目視確認し、下の確認欄にチェックしてから採算計算してください。',false);
+   show('routeAutoStatus','経路計算成功（採算計算用距離は0.1km単位で切上げ）：回送 '+$('aKm').value+'km / '+first.min+'分、配送 '+$('bKm').value+'km / '+second.min+'分'+(third?'、配送後 '+$('cKm').value+'km / '+third.min+'分':'')+'。経路と交通状況を目視確認し、下の確認欄にチェックしてから採算計算してください。',false);
  }catch(e){
    $('route').checked=false;
    show('routeAutoStatus','ルート計算を完了できませんでした。住所・API設定・通信状況を確認してください。'+(e&&e.message?'（'+String(e.message).slice(0,120)+'）':''),true);

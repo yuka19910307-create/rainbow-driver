@@ -271,7 +271,13 @@ $('saveCost').onclick=async()=>{
   if(!window.cargoProtected?.user||!window.cargoProtected?.client)throw Error('ログインが必要です');
   $('saveCost').disabled=true;
   const row={user_id:window.cargoProtected.user.id,hourly_target_yen:v.hourly,vehicle_yen_per_km:v.perKm,dispatch_cost_yen:v.dispatch,handling_buffer_minutes:v.buffer,risk_reserve_pct:v.risk,round_up_yen:v.round,updated_at:new Date().toISOString()};
-  const {error}=await window.cargoProtected.client.from('cargo_operator_cost_profiles').upsert(row,{onConflict:'user_id'});
+  const api=window.cargoProtected.client.from('cargo_operator_cost_profiles');
+  const {data:existing,error:lookupError}=await api.select('user_id').eq('user_id',row.user_id).maybeSingle();
+  if(lookupError)throw Error('保存前の権限確認に失敗しました。');
+  const {user_id,...fields}=row;
+  const {error}=existing
+    ?await api.update(fields).eq('user_id',user_id)
+    :await api.insert(row);
   if(error)throw Error('保存できませんでした。アクセス権限や通信を確認してください。');
   costNotice('基本原価6項目を管理者専用DBに保存しました。住所・GPS・案件情報は保存していません。',false);hideResults();
  }catch(e){costNotice(e.message||'保存に失敗しました',true)}

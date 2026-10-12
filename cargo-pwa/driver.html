@@ -121,7 +121,7 @@ async function refreshRequests(){
  for(const row of data||[]){
   const article=document.createElement('article');article.className='request';
   const title=document.createElement('strong');
-  const states={test_new:'未判断',test_accepted:'テスト受諾',test_declined:'テスト辞退'};
+  const states={test_new:'未判断',test_accepted:'テスト受諾',test_declined:'テスト辞退',test_cancelled:'テストキャンセル'};
   title.textContent='['+(states[row.status]||'要確認')+'] '+new Date(row.created_at).toLocaleString('ja-JP');
   article.append(title,paragraph('集荷：'+row.pickup_address),paragraph('配送：'+row.delivery_address),
     paragraph('荷物：'+row.cargo_description+' ／ '+row.pieces+'個'+(row.estimated_weight_kg==null?'':' ／ '+row.estimated_weight_kg+'kg')));

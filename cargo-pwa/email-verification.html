@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#1c3655">
+<title>軽貨物 メール本人確認の安全テスト | Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1d344f;background:#f1f5fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.65}
+header{background:#1c3655;color:white;padding:22px 16px}header>div,main{max-width:720px;margin:auto}
+h1{font-size:22px;margin:8px 0}h2{font-size:19px}
+main{padding:16px}section{background:white;border:1px solid #d9e3ef;border-radius:13px;padding:20px;margin-bottom:14px}
+.notice{background:#fff3dd;color:#754f1d;border-radius:9px;padding:14px;font-size:14px}
+button{padding:14px 18px;border:0;border-radius:10px;background:#28496c;color:white;font:inherit;font-weight:700}
+button:disabled{opacity:.55}a{color:#185b97}
+#result{white-space:pre-wrap;overflow-wrap:anywhere;font-weight:600}
+.small{font-size:14px;color:#5d7087}
+</style></head><body>
+<header><div><small>RAINBOW DRIVER / CARGO / PRELAUNCH ONLY</small>
+<h1>メール本人確認の安全テスト</h1></div></header>
+<main>
+<section>
+<p class="notice"><b>一般受付は停止中です。</b> 架空データだけで確認コードの安全性を検証します。実際のメールアドレス・氏名・電話番号は扱わず、メールも送信しません。</p>
+<p><a href="./driver.html">軽貨物ドライバー画面へ戻る</a></p>
+<p id="authState" role="status">管理者ログインを確認しています…</p>
+</section>
+<section id="testing" hidden>
+<h2>確認コードの安全チェック</h2>
+<p>確認コードの正解、使い回し禁止、期限切れ、5回の誤入力によるロック、4回誤入力後の正解を検証します。架空の検証データはテスト後に削除します。</p>
+<button id="run" type="button">架空の本人確認テストを実行</button>
+<p id="result" role="status" aria-live="polite">未実施</p>
+<p class="small">この画面は本人確認コードを実際に送信するものではありません。顧客受付や配送依頼の作成・Push通知もしません。</p>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{"use strict";
+const $=id=>document.getElementById(id);
+const URL="https://kvoaorzdewwirqryeizq.supabase.co";
+const PUBLIC_KEY="sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms";
+let client=null,authorized=false;
+function show(id,m){$(id).textContent=m}
+async function initialize(){
+ if(!window.supabase){show("authState","認証ライブラリを読み込めません。");return}
+ client=window.supabase.createClient(URL,PUBLIC_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}});
+ try{
+  const {data:{user},error}=await client.auth.getUser();
+  if(error||!user){show("authState","軽貨物ドライバー画面でログインしてください。");return}
+  const {data,error:roleError}=await client.from("cargo_operator_accounts").select("user_id").eq("user_id",user.id).maybeSingle();
+  if(roleError||!data){show("authState","軽貨物管理者権限がありません。");return}
+  authorized=true;$("testing").hidden=false;
+  show("authState","軽貨物管理者ログインを確認しました。安全テスト専用です。");
+ }catch{show("authState","管理者認証を確認できませんでした。")}
+}
+$("run").onclick=async()=>{
+ if(!authorized)return;
+ $("run").disabled=true;
+ show("result","サーバー側で架空の確認コードを検証しています…");
+ try{
+  const {data,error}=await client.functions.invoke("cargo-email-verification-test",{body:{action:"run"}});
+  if(error||!data){
+   show("result","テストを実行できませんでした。通信・認証を確認してください。正式受付は停止中です。");
+   return;
+  }
+  const passed=data.ok===true&&data.passed===true
+    &&data.test_record_cleanup===true&&data.actual_email_sent===false
+    &&data.customer_data_processed===false;
+  if(passed){
+   show("result","成功！\n正解コード：認証成功\n使い回し：拒否\n期限切れ：拒否\n5回の誤入力：ロック\n4回誤入力後の正解：成功\n架空データ：削除済み\n実メール送信：なし\n一般受付：停止中");
+  }else{
+   show("result","検証未完了。\n認証ルール："+(data.passed===true?"合格":"未確認")
+    +"\n架空データ削除："+(data.test_record_cleanup===true?"確認済み":"未確認")
+    +"\n一般受付：停止中");
+  }
+ }catch{show("result","通信エラーが発生しました。一般受付は停止中です。")}
+ finally{$("run").disabled=false}
+};
+initialize();
+})();
+</script></body></html>

@@ -28,7 +28,7 @@ button:disabled{opacity:.5;cursor:default}.secondary{background:#e8eef5;color:#2
 <main>
 <section><p class="note"><strong>現在は受付していません。</strong> この画面は開発中のプレビューです。「内容を確認」を押してもお客様からの依頼は送信されません。連絡・決済・運行依頼も発生しません。試す際は架空の情報をご利用ください。</p>
 <p>対象は<strong>今から対応を希望する即時・当日集荷</strong>です。日時を指定したご予約はアプリでは受け付けず、別途ご相談となります。</p></section>
-<form id="requestForm">
+<form id="requestForm"><section><p class="hint">実際の個人情報を入力せずに試す場合は、下のボタンを使用してください。</p><button type="button" class="secondary" id="fillDemo">架空のサンプル値を入力する</button></section>
 <section><h2>1. 集荷とお届け先</h2>
 <label for="pickup">集荷地（住所や施設名） <span aria-hidden="true">*</span></label>
 <input id="pickup" maxlength="250" minlength="3" required placeholder="例：テスト集荷地・さいたま市">
@@ -97,6 +97,13 @@ async function canTest(){
   if(!e&&data){operator=user;$('operatorTest').hidden=false}
  }catch(e){/* The public preview remains read-only if auth fails. */}
 }
+$('fillDemo').onclick=()=>{
+ const v={pickup:'テスト集荷地・さいたま市',delivery:'テスト配送先・東京都内',cargo:'テスト用・精密機器の箱',pieces:'2',weight:'8.5',length:'40',width:'30',height:'25',handling:'yes',readiness:'ready',note:'テスト専用の架空案件。積み降ろし補助を相談。',clientName:'テスト担当者',clientContact:''};
+ for(const [k,value] of Object.entries(v))$(k).value=value;
+ $('today').checked=true;$('reviewConfirm').checked=true;
+ verified=null;$('reviewPane').hidden=true;
+ $('status').textContent='架空のサンプル値をセットしました。内容を確認して「入力内容を確認する」を押してください。';
+};
 $('requestForm').onsubmit=e=>{
  e.preventDefault();
  try{

@@ -47,6 +47,7 @@ a{color:#185b97;overflow-wrap:anywhere}
 <p id="challengeState" role="status">CAPTCHAを読み込んでいます…</p>
 <button id="retryChallenge" type="button" class="outline">CAPTCHAを再読み込み</button>
 <button id="verify" type="button" disabled>サーバー側で検証する</button>
+<p id="serverResult" role="status" aria-live="polite" style="white-space:pre-wrap">サーバー側の検証結果：未実施</p>
 <p class="muted">サーバー側で、Cloudflareの判定とホスト名・アクションが一致するか確認します。配送案件の作成・Push通知・顧客情報の保存はしません。</p>
 </section>
 </div>
@@ -127,6 +128,7 @@ async function renderWidget(){
  message("challengeState","Cloudflareの判定を完了してください。");
 }
 async function loadConfig(){
+ message("serverResult","サーバー側の検証結果：未実施");
  $("reload").disabled=true;
  message("status","管理者専用サーバーの設定を確認しています…");
  try{
@@ -148,6 +150,7 @@ async function loadConfig(){
 $("reload").onclick=loadConfig;
 $("retryChallenge").onclick=async()=>{
  const button=$("retryChallenge");button.disabled=true;
+ message("serverResult","サーバー側の検証結果：未実施");
  message("challengeState","CAPTCHAを再読み込みしています…");
  try{await renderWidget()}catch(e){message("challengeState","CAPTCHAの再読み込みに失敗しました。Safariで直接開いてください。"+(e.message||""))}
  finally{button.disabled=false}
@@ -157,10 +160,15 @@ $("verify").onclick=async()=>{
  const btn=$("verify");btn.disabled=true;
  const value=token;token=null;
  message("challengeState","サーバーがCloudflareに確認しています…");
+ message("serverResult","サーバー側の検証結果：確認中…");
  try{
   const v=await call("verify",{token:value});
-  message("challengeState",v.verified?"成功！サーバーでCAPTCHAを検証しました。実際のお客様からの受付はまだ停止中です。":"CAPTCHAを承認できませんでした。ホスト名やウィジェット設定を確認してください。");
- }catch(e){message("challengeState","検証は成功していません。トークンの期限、Cloudflare設定、通信状況を確認してください。");}
+  message("serverResult",v.verified===true
+   ?"サーバー側の検証結果：成功！ Cloudflareの判定・ホスト名・アクション名を確認しました。一般受付は停止中です。"
+   :"サーバー側の検証結果：失敗。Cloudflareの判定、ホスト名、アクション名を確認してください。");
+ }catch(e){
+  message("serverResult","サーバー側の検証結果：失敗または通信エラー。期限切れ・設定・通信状態を確認し、新しいCAPTCHAでやり直してください。");
+ }
  finally{await resetWidget()}
 };
 (async()=>{if(await adminCheck())await loadConfig()})();

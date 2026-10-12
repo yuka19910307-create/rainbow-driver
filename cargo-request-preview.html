@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>軽貨物・即時配送依頼プレビュー｜Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#213551;background:#f2f6fa}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;line-height:1.65}header{background:#1c3655;color:white;padding:27px 16px}
+header>div,main{max-width:740px;margin:auto}header .eyebrow{font-size:12px;letter-spacing:.1em;color:#bfd4e6}
+h1{font-size:23px;margin:6px 0}h2{font-size:19px;margin:0 0 13px}h3{font-size:16px;margin:10px 0}
+main{padding:16px}section{background:white;border:1px solid #dce5ee;border-radius:14px;padding:20px;margin-bottom:14px}
+label{display:block;font-weight:700;font-size:14px;margin:15px 0 5px}
+input,select,textarea{display:block;width:100%;min-height:47px;border:1px solid #c2d0dd;border-radius:9px;padding:11px;font:inherit;background:white;color:#213551}
+input[type=checkbox]{width:21px;min-height:0;height:21px;flex:none;margin:3px 0}
+.check{display:flex;align-items:flex-start;gap:10px;font-size:14px;font-weight:500}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid label{margin-top:10px}
+button{background:#244566;color:white;border:0;border-radius:10px;padding:14px 18px;font:inherit;font-weight:750;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}.secondary{background:#e8eef5;color:#244566}.actions{display:flex;gap:11px;flex-wrap:wrap}.actions button{flex:1;min-width:150px}
+.note{background:#fff3df;border-radius:10px;padding:12px;color:#82541c;font-size:13px}
+.hint{font-size:12px;color:#677991}.summary{background:#f1f5fa;border-radius:10px;padding:14px}
+.summary>div{display:flex;gap:12px;align-items:flex-start;border-bottom:1px solid #dbe5ee;padding:8px 0}
+.summary>div:last-child{border:0}.summary span{min-width:120px;color:#667890;font-size:13px}.summary strong{overflow-wrap:anywhere;white-space:pre-wrap}
+#status{white-space:pre-wrap;color:#344e67}a{color:#235b8b}
+@media(max-width:460px){.grid{grid-template-columns:1fr}.summary>div{display:block}.summary span{display:block}}
+</style></head>
+<body><header><div><div class="eyebrow">RAINBOW DRIVER / CARGO / PREVIEW</div><h1>軽貨物・即時配送依頼</h1><p style="margin:0;font-size:13px;color:#dce9f3">お客様向け画面の公開前プレビュー</p></div></header>
+<main>
+<section><p class="note"><strong>現在は受付していません。</strong> この画面は開発中のプレビューです。「内容を確認」を押してもお客様からの依頼は送信されません。連絡・決済・運行依頼も発生しません。試す際は架空の情報をご利用ください。</p>
+<p>対象は<strong>今から対応を希望する即時・当日集荷</strong>です。日時を指定したご予約はアプリでは受け付けず、別途ご相談となります。</p></section>
+<form id="requestForm">
+<section><h2>1. 集荷とお届け先</h2>
+<label for="pickup">集荷地（住所や施設名） <span aria-hidden="true">*</span></label>
+<input id="pickup" maxlength="250" minlength="3" required placeholder="例：テスト集荷地・さいたま市">
+<label for="delivery">配送先（住所や施設名） *</label>
+<input id="delivery" maxlength="250" minlength="3" required placeholder="例：テスト配送先・東京都内">
+<label class="check"><input id="today" type="checkbox" required><span>即時・当日集荷を希望します（未来の日付指定予約ではありません）</span></label>
+<label for="readiness">荷物の準備状況</label>
+<select id="readiness"><option value="ready">すでに集荷可能</option><option value="preparing">現在準備中</option><option value="unknown">要確認</option></select>
+</section>
+<section><h2>2. お荷物の内容</h2>
+<label for="cargo">品名・内容 *</label><input id="cargo" minlength="2" maxlength="500" required placeholder="例：テスト用・精密機器の箱">
+<div class="grid"><div><label for="pieces">個数 *</label><input id="pieces" type="number" min="1" max="99" step="1" value="1" required></div><div><label for="weight">総重量（kg） *</label><input id="weight" type="number" min="0.01" max="350" step="0.01" placeholder="例：10" required></div></div>
+<p class="hint">寸法は代表的な1個の外寸です。大きさが異なる荷物は備考に内訳をご記入ください。上限値は画面の入力制限であり、積載可能の保証ではありません。</p>
+<div class="grid"><div><label for="length">長さ（cm） *</label><input id="length" type="number" min="0.1" max="500" step="0.1" required placeholder="例：40"></div><div><label for="width">幅（cm） *</label><input id="width" type="number" min="0.1" max="500" step="0.1" required placeholder="例：30"></div><div><label for="height">高さ（cm） *</label><input id="height" type="number" min="0.1" max="500" step="0.1" required placeholder="例：20"></div><div><label for="handling">積み降ろし補助</label><select id="handling"><option value="no">不要</option><option value="yes">希望する</option><option value="unknown">要相談</option></select></div></div>
+<label for="note">受渡し・駐車・荷扱い等の補足（任意）</label><textarea id="note" rows="3" maxlength="500" placeholder="例：エレベーターあり、割れ物、複数サイズなど"></textarea>
+</section>
+<section><h2>3. ご連絡方法（プレビューのみ）</h2>
+<p class="hint">以下の連絡先はこの画面から送信・保存されません。プレビューでは実名や実際の連絡先を入力しないでください。</p>
+<label for="clientName">ご担当者名（任意）</label><input id="clientName" maxlength="80" autocomplete="off" placeholder="例：テスト担当者">
+<label for="clientContact">連絡先（電話またはメール・任意）</label><input id="clientContact" maxlength="120" autocomplete="off" placeholder="例：架空の連絡先">
+<label class="check"><input id="reviewConfirm" type="checkbox" required><span>入力内容は現時点で配送依頼として送信されないことを理解しました。</span></label>
+<button id="review" type="submit" style="width:100%;margin-top:16px">入力内容を確認する</button>
+</section></form>
+<section id="reviewPane" hidden aria-live="polite"><h2>4. 内容の確認（未送信）</h2>
+<p class="note">これは依頼の下書き確認です。送信・予約・受諾・料金確定は行われていません。</p>
+<div class="summary" id="summary"></div>
+<div class="actions"><button class="secondary" id="edit" type="button">入力内容を修正</button></div>
+<div id="operatorTest" hidden>
+<h3>管理者限定・架空データ登録テスト</h3><p class="hint">管理者でログイン中の場合のみ利用可能。集荷地・配送先・荷物名がすべて「テスト」で始まる架空案件だけをテストDBへ登録します。連絡先はDBに保存しません。</p>
+<button type="button" id="submitTest">架空案件としてテスト登録</button>
+<p id="testStatus" role="status"></p>
+<p><a href="./cargo-dispatch-test.html">ドライバー側のテスト案件一覧を開く</a></p>
+</div></section>
+<section><p id="status" role="status">入力内容の確認まで試すことができます。正式な依頼送信はまだ提供していません。</p>
+<p><a href="./cargo-operator-login.html">軽貨物ドライバー管理画面（管理者専用）</a></p></section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id),fields=['pickup','delivery','cargo','pieces','weight','length','width','height','handling','note','clientName','clientContact','readiness'];
+let operator=null,client=null,verified=null;
+const samples=[['pickup','集荷地'],['delivery','配送先'],['cargo','荷物内容'],['pieces','個数'],['weight','総重量（kg）'],['length','長さ（cm）'],['width','幅（cm）'],['height','高さ（cm）'],['handling','積み降ろし補助'],['readiness','集荷準備'],['note','補足'],['clientName','ご担当者'],['clientContact','連絡先']];
+const handlingNames={no:'不要',yes:'希望する',unknown:'要相談'},readinessNames={ready:'集荷可能',preparing:'準備中',unknown:'要確認'};
+function snapshot(){
+ const raw=Object.fromEntries(fields.map(k=>[k,$(k).value.trim()]));
+ if(!$('today').checked||!$('reviewConfirm').checked)throw Error('確認事項への同意が必要です。');
+ const p=Number(raw.pieces),weight=Number(raw.weight),l=Number(raw.length),w=Number(raw.width),h=Number(raw.height);
+ if(!Number.isInteger(p)||p<1||p>99||![weight,l,w,h].every(v=>Number.isFinite(v)&&v>0))throw Error('個数・重量・寸法を確認してください。');
+ return raw;
+}
+function draw(data){
+ const node=$('summary');node.replaceChildren();
+ for(const [key,label] of samples){
+  const row=document.createElement('div'),head=document.createElement('span'),value=document.createElement('strong');
+  head.textContent=label;value.textContent=key==='handling'?handlingNames[data[key]]:key==='readiness'?readinessNames[data[key]]:(data[key]||'未入力');
+  row.append(head,value);node.append(row);
+ }
+}
+async function canTest(){
+ if(!window.supabase)return;
+ client=window.supabase.createClient('https://kvoaorzdewwirqryeizq.supabase.co','sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:'rd-cargo-operator-auth-v1'}});
+ try{
+  const {data:{user},error}=await client.auth.getUser();
+  if(error||!user)return;
+  const {data,error:e}=await client.from('cargo_operator_accounts').select('user_id').eq('user_id',user.id).maybeSingle();
+  if(!e&&data){operator=user;$('operatorTest').hidden=false}
+ }catch(e){/* The public preview remains read-only if auth fails. */}
+}
+$('requestForm').onsubmit=e=>{
+ e.preventDefault();
+ try{
+  if(!$('requestForm').reportValidity())return;
+  verified=snapshot();draw(verified);$('reviewPane').hidden=false;
+  $('status').textContent='下書き内容を画面に表示しました。まだ送信されていません。';
+  $('reviewPane').scrollIntoView({behavior:'smooth',block:'start'});
+ }catch(err){$('status').textContent=err.message||'入力を確認してください。'}
+};
+$('edit').onclick=()=>{$('reviewPane').hidden=true;$('requestForm').scrollIntoView({behavior:'smooth',block:'start'})};
+fields.forEach(id=>$(id).addEventListener('input',()=>{verified=null;$('reviewPane').hidden=true}));
+for(const id of ['today','reviewConfirm'])$(id).addEventListener('change',()=>{verified=null;$('reviewPane').hidden=true});
+$('submitTest').onclick=async()=>{
+ const status=$('testStatus'),button=$('submitTest');
+ if(!operator||!client||!verified){status.textContent='管理者としてログインし、内容を再確認してください。';return}
+ const data=verified;
+ if(![data.pickup,data.delivery,data.cargo].every(x=>x.startsWith('テスト'))){status.textContent='架空案件の安全確認：集荷地・配送先・荷物名はすべて「テスト」で始めてください。';return}
+ button.disabled=true;status.textContent='管理者用のテストDBに登録しています…';
+ try{
+  const {error}=await client.from('cargo_dispatch_requests').insert({
+   operator_id:operator.id,pickup_address:data.pickup,delivery_address:data.delivery,
+   cargo_description:data.cargo,pieces:Number(data.pieces),estimated_weight_kg:Number(data.weight),
+   cargo_length_cm:Number(data.length),cargo_width_cm:Number(data.width),cargo_height_cm:Number(data.height),
+   special_handling:data.handling!=='no',customer_note:data.note.slice(0,500)
+  });
+  if(error)throw Error('登録できませんでした。権限・通信・入力値を確認してください。');
+  status.textContent='架空のテスト依頼をDBに登録しました。実際のお客様からの受注ではありません。';
+ }catch(e){status.textContent=e.message||'テスト登録に失敗しました。'}
+ finally{button.disabled=false}
+};
+canTest();
+})();
+</script></body></html>

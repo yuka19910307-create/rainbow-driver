@@ -29,7 +29,7 @@ function render(rows){
  for(const record of rows){
   const article=document.createElement('article');article.className='item';
   const h=document.createElement('strong');h.textContent='['+(labels[record.status]||'不明')+'] '+new Date(record.created_at).toLocaleString('ja-JP');article.append(h);
-  for(const [key,val] of [['集荷',record.pickup_address],['配送',record.delivery_address],['荷物',record.cargo_description],['個数',record.pieces+'個'],['重量',record.estimated_weight_kg==null?'未入力':record.estimated_weight_kg+'kg'],['メモ',record.customer_note||'なし']]){
+  for(const [key,val] of [['集荷',record.pickup_address],['配送',record.delivery_address],['荷物',record.cargo_description],['個数',record.pieces+'個'],['重量',record.estimated_weight_kg==null?'未入力':record.estimated_weight_kg+'kg'],['寸法',record.cargo_length_cm==null||record.cargo_width_cm==null||record.cargo_height_cm==null?'未入力':record.cargo_length_cm+' × '+record.cargo_width_cm+' × '+record.cargo_height_cm+'cm'],['荷役補助',record.special_handling?'要相談':'不要'],['メモ',record.customer_note||'なし']]){
    const p=document.createElement('p');p.textContent=key+'：'+val;article.append(p);
   }
   if(record.status==='test_new'){
@@ -44,7 +44,7 @@ function render(rows){
 async function load(){
  if(!user)return;
  $('listStatus').textContent='一覧を取得中…';
- const {data,error}=await supa.from('cargo_dispatch_requests').select('id,created_at,status,pickup_address,delivery_address,cargo_description,pieces,estimated_weight_kg,customer_note').eq('operator_id',user.id).eq('origin','operator_test').order('created_at',{ascending:false}).limit(20);
+ const {data,error}=await supa.from('cargo_dispatch_requests').select('id,created_at,status,pickup_address,delivery_address,cargo_description,pieces,estimated_weight_kg,cargo_length_cm,cargo_width_cm,cargo_height_cm,special_handling,customer_note').eq('operator_id',user.id).eq('origin','operator_test').order('created_at',{ascending:false}).limit(20);
  if(error){$('listStatus').textContent='一覧を読み込めませんでした。';return}
  render(data||[]);
 }

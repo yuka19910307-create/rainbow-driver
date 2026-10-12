@@ -58,9 +58,13 @@ $('testForm').onsubmit=async e=>{
  const btn=$('create');btn.disabled=true;say('架空案件を登録中です…');
  try{
   const payload={operator_id:user.id,pickup_address:$('pickup').value.trim(),delivery_address:$('delivery').value.trim(),cargo_description:$('cargo').value.trim(),pieces:Number($('pieces').value),estimated_weight_kg:$('weight').value?Number($('weight').value):null,customer_note:$('note').value.trim()};
-  const {error}=await supa.from('cargo_dispatch_requests').insert(payload);
-  if(error){say('登録に失敗しました。入力内容と権限をご確認ください。');return}
-  say('架空のテスト案件を登録しました。実際の受注や配車は行われません。');await load();
+  const {data:inserted,error}=await supa.from('cargo_dispatch_requests').insert(payload).select('id').single();
+  if(error||!inserted?.id){say('登録に失敗しました。入力内容と権限をご確認ください。');return}
+  say('架空のテスト案件を登録しました。通知処理を確認中です…');await load();
+  try{
+    const {data:push,error:pushError}=await supa.functions.invoke('cargo-push',{body:{action:'notify_test_request',request_id:inserted.id}});
+    say('架空のテスト案件を登録しました。'+(pushError?'Push通知の確認に失敗しました。':push?.reason==='no_device'?'軽貨物通知の登録端末はありません。':push?.already_notified?'通知は既に送信済みです。':'Push送信成功：'+(push?.sent??0)+'端末。')+' 実際の受注や配車は行われません。');
+  }catch(err){say('架空案件の登録は成功しましたが、通知の確認はできませんでした。実際の受注ではありません。')}
  }catch(err){say('通信を確認してください。')}
  finally{btn.disabled=false}
 };

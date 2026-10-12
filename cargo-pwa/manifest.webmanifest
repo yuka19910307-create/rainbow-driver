@@ -1,0 +1,23 @@
+{
+  "id": "/cargo-pwa/",
+  "name": "Rainbow Driver 軽貨物ドライバー",
+  "short_name": "RD 軽貨物",
+  "description": "Rainbow Driver 軽貨物・ドライバー専用（開発テスト）",
+  "start_url": "/cargo-pwa/driver.html",
+  "scope": "/cargo-pwa/",
+  "display": "standalone",
+  "background_color": "#f2f6fb",
+  "theme_color": "#1c3655",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

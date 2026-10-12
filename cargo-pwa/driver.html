@@ -69,7 +69,7 @@ a{color:#1f5e91}.badge{font-size:11px;background:#e8eef5;padding:4px 8px;border-
 </section>
 <section><h2>4. 正式受付前の安全診断（管理者専用）</h2>
 <p class="muted">暗号化鍵・本人確認・不正送信対策の準備状況を確認します。個人情報や実際の配送依頼は送信しません。</p>
-<div class="actions"><button class="secondary" id="intakeDiagnose">安全設定を確認</button><button class="secondary" id="cryptoTest">架空データの暗号化テスト</button></div>
+<div class="actions"><button class="secondary" id="intakeDiagnose">安全設定を確認</button><button class="secondary" id="cryptoTest">架空データの暗号化テスト</button><button class="secondary" id="productionKeyTest">本番鍵の安全確認（未設定時は停止）</button></div>
 <p id="intakeSafety" class="state" role="status">未確認。一般のお客様の正式受付は停止中です。</p>
 </section><section><h2>5. 関連画面</h2><p><a href="./review.html">採算審査・受諾前確認・キャンセル管理（PWA内）</a></p>
 <p><a href="/cargo-request-preview.html">お客様向け入力フォーム（公開前プレビュー）</a></p>
@@ -157,12 +157,14 @@ $('presenceOffline').onclick=()=>setPresence('offline');
 $('presenceRefresh').onclick=loadPresence;
 async function safetyCheck(action){
  if(!user){log('intakeSafety','管理者ログインが必要です。');return}
- const buttons=['intakeDiagnose','cryptoTest'];buttons.forEach(id=>$(id).disabled=true);
+ const buttons=['intakeDiagnose','cryptoTest','productionKeyTest'];buttons.forEach(id=>$(id).disabled=true);
  try{
   log('intakeSafety','サーバー側の安全設定を確認中です…');
   const {data,error}=await client.functions.invoke('cargo-intake-readiness',{body:{action}});
   if(error||!data)throw Error('サーバー診断が取得できませんでした。');
-  if(action==='synthetic_crypto_test'){
+  if(action==='configured_crypto_test'){
+   log('intakeSafety',data.ok?'本番用サーバー鍵で架空データの暗号化・改ざん検知・HMAC確認成功。保存0件。正式受付は停止中です。':'本番用鍵が未設定、または安全診断に失敗しました。正式受付は停止中です。');
+  }else if(action==='synthetic_crypto_test'){
    log('intakeSafety',data.ok?'架空データの一時的なAES-GCM暗号化・復号テスト成功。保存0件。正式な連絡先暗号化はまだ未構成です。':'テスト失敗：実運用できません。');
   }else{
    log('intakeSafety',[
@@ -174,11 +176,12 @@ async function safetyCheck(action){
     '正式公開準備：未完了'
    ].join(' ／ '));
   }
- }catch(e){log('intakeSafety',e.message||'安全診断に失敗しました。')}
+ }catch(e){log('intakeSafety',action==='configured_crypto_test'?'本番鍵は未設定、または検証に失敗しました。顧客情報は送信せず、正式受付は停止したままです。':(e.message||'安全診断に失敗しました。'))}
  finally{buttons.forEach(id=>$(id).disabled=false)}
 }
 $('intakeDiagnose').onclick=()=>safetyCheck('diagnose');
 $('cryptoTest').onclick=()=>safetyCheck('synthetic_crypto_test');
+$('productionKeyTest').onclick=()=>safetyCheck('configured_crypto_test');
 function paragraph(text){
  const p=document.createElement('p');p.textContent=text;return p;
 }

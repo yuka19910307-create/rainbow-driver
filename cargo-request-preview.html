@@ -69,7 +69,7 @@ button:disabled{opacity:.5;cursor:default}.secondary{background:#e8eef5;color:#2
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id),fields=['pickup','delivery','cargo','pieces','weight','length','width','height','handling','note','clientName','clientContact','readiness'];
-let operator=null,client=null,verified=null;
+let operator=null,client=null,verified=null,requestKey=crypto.randomUUID(),testSaved=false;
 const samples=[['pickup','集荷地'],['delivery','配送先'],['cargo','荷物内容'],['pieces','個数'],['weight','総重量（kg）'],['length','長さ（cm）'],['width','幅（cm）'],['height','高さ（cm）'],['handling','積み降ろし補助'],['readiness','集荷準備'],['note','補足'],['clientName','ご担当者'],['clientContact','連絡先']];
 const handlingNames={no:'不要',yes:'希望する',unknown:'要相談'},readinessNames={ready:'集荷可能',preparing:'準備中',unknown:'要確認'};
 function snapshot(){
@@ -101,7 +101,7 @@ $('fillDemo').onclick=()=>{
  const v={pickup:'テスト集荷地・さいたま市',delivery:'テスト配送先・東京都内',cargo:'テスト用・精密機器の箱',pieces:'2',weight:'8.5',length:'40',width:'30',height:'25',handling:'yes',readiness:'ready',note:'テスト専用の架空案件。積み降ろし補助を相談。',clientName:'テスト担当者',clientContact:''};
  for(const [k,value] of Object.entries(v))$(k).value=value;
  $('today').checked=true;$('reviewConfirm').checked=true;
- verified=null;$('reviewPane').hidden=true;
+ verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true;
  $('status').textContent='架空のサンプル値をセットしました。内容を確認して「入力内容を確認する」を押してください。';
 };
 $('requestForm').onsubmit=e=>{
@@ -114,29 +114,38 @@ $('requestForm').onsubmit=e=>{
  }catch(err){$('status').textContent=err.message||'入力を確認してください。'}
 };
 $('edit').onclick=()=>{$('reviewPane').hidden=true;$('requestForm').scrollIntoView({behavior:'smooth',block:'start'})};
-fields.forEach(id=>$(id).addEventListener('input',()=>{verified=null;$('reviewPane').hidden=true}));
-for(const id of ['today','reviewConfirm'])$(id).addEventListener('change',()=>{verified=null;$('reviewPane').hidden=true});
+fields.forEach(id=>$(id).addEventListener('input',()=>{verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true}));
+for(const id of ['today','reviewConfirm'])$(id).addEventListener('change',()=>{verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true});
 $('submitTest').onclick=async()=>{
  const status=$('testStatus'),button=$('submitTest');
  if(!operator||!client||!verified){status.textContent='管理者としてログインし、内容を再確認してください。';return}
+ if(testSaved){status.textContent='この架空案件は登録済みです。別案件は内容を変更して再確認してください。';return}
  const data=verified;
  if(![data.pickup,data.delivery,data.cargo].every(x=>x.startsWith('テスト'))){status.textContent='架空案件の安全確認：集荷地・配送先・荷物名はすべて「テスト」で始めてください。';return}
  button.disabled=true;status.textContent='管理者用のテストDBに登録しています…';
  try{
   const {data:inserted,error}=await client.from('cargo_dispatch_requests').insert({
-   operator_id:operator.id,pickup_address:data.pickup,delivery_address:data.delivery,
+   operator_id:operator.id,client_request_key:requestKey,pickup_address:data.pickup,delivery_address:data.delivery,
    cargo_description:data.cargo,pieces:Number(data.pieces),estimated_weight_kg:Number(data.weight),
    cargo_length_cm:Number(data.length),cargo_width_cm:Number(data.width),cargo_height_cm:Number(data.height),
    special_handling:data.handling!=='no',customer_note:data.note.slice(0,500)
   }).select('id').single();
-  if(error||!inserted?.id)throw Error('登録できませんでした。権限・通信・入力値を確認してください。');
+  let id=inserted?.id;
+  if(error?.code==='23505'){
+   // Reuse the same case only when our own idempotency key already exists.
+   const {data:existing,error:lookupError}=await client.from('cargo_dispatch_requests')
+     .select('id').eq('operator_id',operator.id).eq('client_request_key',requestKey).maybeSingle();
+   if(lookupError||!existing?.id)throw Error('重複検知後の確認に失敗しました。管理者の案件一覧を確認してください。');
+   id=existing.id;
+  }else if(error||!id)throw Error('登録できませんでした。権限・通信・入力値を確認してください。');
+  testSaved=true;
   status.textContent='架空のテスト依頼をDBに登録しました。実際のお客様からの受注ではありません。通知を確認中…';
   try{
-    const {data:push,error:pushError}=await client.functions.invoke('cargo-push',{body:{action:'notify_test_request',request_id:inserted.id}});
+    const {data:push,error:pushError}=await client.functions.invoke('cargo-push',{body:{action:'notify_test_request',request_id:id}});
     status.textContent='架空のテスト依頼を登録しました。'+(pushError?'通知テストの呼び出しは失敗しました。':push?.already_notified?'通知は送信済みです。':push?.reason==='no_device'?'通知登録済み端末はありません。':('軽貨物端末へのPush送信成功：'+(push?.sent??0)+'件。'))+' 実際のお客様からの受注ではありません。';
   }catch(e){status.textContent='架空のテスト依頼を登録しました。通知処理は確認できませんでした。実際の受注ではありません。'}
  }catch(e){status.textContent=e.message||'テスト登録に失敗しました。'}
- finally{button.disabled=false}
+ finally{button.disabled=testSaved}
 };
 canTest();
 })();

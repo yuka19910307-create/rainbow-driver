@@ -5,6 +5,7 @@ on:
       - feature/cargo-driver-mvp-20261012
     paths:
       - 'cargo-ios/**'
+      - 'cargo-cost-preview.html'
       - '.github/workflows/cargo-ios-check.yml'
   workflow_dispatch:
 jobs:
@@ -22,6 +23,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Unit-test cargo internal cost calculator
         run: node --test src/pricing.test.js
+      - name: Verify cargo Google Maps simulator source
+        run: node --test src/cost-preview.test.js
       - name: Expo dependency compatibility
         run: npx expo install --check
       - name: Export iOS JavaScript bundle without macOS

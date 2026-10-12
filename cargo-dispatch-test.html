@@ -32,12 +32,12 @@ function render(rows){
   for(const [key,val] of [['集荷',record.pickup_address],['配送',record.delivery_address],['荷物',record.cargo_description],['個数',record.pieces+'個'],['重量',record.estimated_weight_kg==null?'未入力':record.estimated_weight_kg+'kg'],['寸法',record.cargo_length_cm==null||record.cargo_width_cm==null||record.cargo_height_cm==null?'未入力':record.cargo_length_cm+' × '+record.cargo_width_cm+' × '+record.cargo_height_cm+'cm'],['荷役補助',record.special_handling?'要相談':'不要'],['メモ',record.customer_note||'なし']]){
    const p=document.createElement('p');p.textContent=key+'：'+val;article.append(p);
   }
-  if(record.status==='test_new'){
-   const buttons=document.createElement('div');buttons.className='row';
-   for(const [status,label] of [['test_accepted','テスト受諾'],['test_declined','テスト辞退']]){
-    const b=document.createElement('button');b.type='button';b.textContent=label;b.className=status==='test_declined'?'danger':'';
-    b.onclick=async()=>{b.disabled=true;await decide(record.id,status);};buttons.append(b);
-   }article.append(buttons);
+  if(record.status==='test_new'||record.status==='test_accepted'){
+   const link=document.createElement('a');
+   link.href='./cargo-test-review.html?id='+encodeURIComponent(record.id);
+   link.textContent=record.status==='test_new'?'採算確認・テスト受諾／辞退へ':'テストキャンセル／審査記録へ';
+   link.style.display='inline-block';link.style.marginTop='12px';
+   article.append(link);
   }root.append(article);
  }
 }
@@ -47,11 +47,6 @@ async function load(){
  const {data,error}=await supa.from('cargo_dispatch_requests').select('id,created_at,status,pickup_address,delivery_address,cargo_description,pieces,estimated_weight_kg,cargo_length_cm,cargo_width_cm,cargo_height_cm,special_handling,customer_note').eq('operator_id',user.id).eq('origin','operator_test').order('created_at',{ascending:false}).limit(20);
  if(error){$('listStatus').textContent='一覧を読み込めませんでした。';return}
  render(data||[]);
-}
-async function decide(id,status){
- const {data,error}=await supa.from('cargo_dispatch_requests').update({status,decision_at:new Date().toISOString()}).eq('id',id).eq('operator_id',user.id).eq('status','test_new').select('id');
- if(error||!data?.length){say('テスト判断を保存できませんでした。別画面で既に判断された可能性があります。');await load();return}
- say('テスト判断を更新しました。実際の配送受諾ではありません。');await load();
 }
 $('testForm').onsubmit=async e=>{
  e.preventDefault();if(!user)return;

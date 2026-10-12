@@ -10,7 +10,7 @@
   'use strict';
 
   function number(value, label, min, max) {
-    if (value === null || value === undefined || value === '' ||
+    if (value === null || value === undefined || typeof value === 'boolean' || value === '' ||
         (typeof value === 'string' && !value.trim())) {
       throw new Error(label + 'が未入力です');
     }
@@ -90,5 +90,22 @@
     };
   }
 
-  return {calculate:calculate};
+  function extraTimeFee(minutes) {
+    var n = number(minutes, '待機・追加荷役時間', 0, 14400);
+    if (n <= 5) return 0;
+    if (n <= 15) return 500;
+    return 1000 + Math.ceil((n - 30) / 15) * 500;
+  }
+  function supplementaryFees(waitMinutes, handlingMinutes) {
+    var waitFee = extraTimeFee(waitMinutes);
+    var handlingFee = extraTimeFee(handlingMinutes);
+    return {
+      waitingYen: waitFee,
+      additionalHandlingYen: handlingFee,
+      subtotalYen: waitFee + handlingFee,
+      notice:'通常の荷渡しは基本作業内。待機と追加荷役は重複しない実測時間で算定し、課税区分・契約条件は要確認。'
+    };
+  }
+
+  return {calculate:calculate,extraTimeFee:extraTimeFee,supplementaryFees:supplementaryFees};
 });

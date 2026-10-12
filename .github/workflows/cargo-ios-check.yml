@@ -1,0 +1,28 @@
+name: Cargo iOS source validation
+on:
+  push:
+    branches:
+      - feature/cargo-driver-mvp-20261012
+    paths:
+      - 'cargo-ios/**'
+      - '.github/workflows/cargo-ios-check.yml'
+  workflow_dispatch:
+jobs:
+  javascript-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cargo-ios
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Unit-test cargo internal cost calculator
+        run: node --test src/pricing.test.js
+      - name: Expo dependency compatibility
+        run: npx expo install --check
+      - name: Export iOS JavaScript bundle without macOS
+        run: npx expo export --platform ios --output-dir dist

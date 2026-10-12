@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Rainbow Driver 軽貨物",
+    "slug": "rainbow-driver-cargo-driver",
+    "scheme": "rainbowcargo",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.rainbowdriver.cargo.driver",
+      "supportsTablet": false,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location"
+        ]
+      }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "軽貨物配送の稼働中に、ドライバー本人の現在地と集荷までの距離を確認するために使用します。",
+          "locationAlwaysAndWhenInUsePermission": "稼働中、ほかのアプリを開いている間も集荷までの距離と位置の更新状況を確認するために使用します。業務を終了すると停止します。",
+          "isIosBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "purpose": "single_driver_private_test_no_backend",
+      "eas": {
+        "projectId": "5c7c33f1-8f3e-420a-a74b-32c3ea9faf55"
+      }
+    },
+    "owner": "rainbow-driver-cargo"
+  }
+}

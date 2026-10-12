@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#1c3655">
+<title>軽貨物 連絡先暗号化テスト | Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1d344f;background:#f1f5fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.65}
+header{background:#1c3655;color:white;padding:22px 16px}header>div,main{max-width:720px;margin:auto}
+h1{font-size:22px;margin:8px 0}h2{font-size:19px}
+main{padding:16px}section{background:white;border:1px solid #d9e3ef;border-radius:13px;padding:20px;margin-bottom:14px}
+.notice{background:#fff3dd;color:#754f1d;border-radius:9px;padding:14px;font-size:14px}
+button{padding:14px 18px;border:0;border-radius:10px;background:#28496c;color:white;font:inherit;font-weight:700}
+button:disabled{opacity:.55}a{color:#185b97}
+#result{white-space:pre-wrap;overflow-wrap:anywhere;font-weight:600}
+.small{font-size:14px;color:#5d7087}
+</style></head><body>
+<header><div><small>RAINBOW DRIVER / CARGO / PRELAUNCH ONLY</small>
+<h1>連絡先の暗号化・保存・削除テスト</h1></div></header>
+<main>
+<section>
+<p class="notice"><b>一般受付は停止中です。</b> 架空の連絡先識別子だけを使用します。実際の氏名・住所・電話番号・メールアドレスは入力せず、配送依頼も作成しません。</p>
+<p><a href="./driver.html">軽貨物ドライバー画面へ戻る</a></p>
+<p id="authState" role="status">管理者ログインを確認しています…</p>
+</section>
+<section id="testing" hidden>
+<h2>AES-256-GCM 保管テスト</h2>
+<p>架空データを暗号化して専用DBに保存し、復号できるか確認します。改ざん・別の認証文脈による復号失敗、検索用HMAC、テスト行の削除も検証します。</p>
+<button id="run" type="button">架空データの暗号化テストを実行</button>
+<p id="result" role="status" aria-live="polite">未実施</p>
+<p class="small">秘密鍵・平文のデータは画面に表示しません。実際のお客様の連絡先は保存しません。正式な受付への接続は別工程です。</p>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{"use strict";
+const $=id=>document.getElementById(id);
+const URL="https://kvoaorzdewwirqryeizq.supabase.co";
+const PUBLIC_KEY="sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms";
+let client=null,authorized=false;
+function show(id,m){$(id).textContent=m}
+async function initialize(){
+ if(!window.supabase){show("authState","認証ライブラリを読み込めません。");return}
+ client=window.supabase.createClient(URL,PUBLIC_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}});
+ try{
+  const {data:{user},error}=await client.auth.getUser();
+  if(error||!user){show("authState","軽貨物ドライバー画面でログインしてください。");return}
+  const {data,error:roleError}=await client.from("cargo_operator_accounts").select("user_id").eq("user_id",user.id).maybeSingle();
+  if(roleError||!data){show("authState","軽貨物管理者権限がありません。");return}
+  authorized=true;$("testing").hidden=false;
+  show("authState","軽貨物管理者ログインを確認しました。架空テスト専用です。");
+ }catch{show("authState","管理者認証を確認できませんでした。")}
+}
+$("run").onclick=async()=>{
+ if(!authorized)return;
+ $("run").disabled=true;
+ show("result","サーバーで暗号化・DB保存・復号・削除を検証しています…");
+ try{
+  const {data,error}=await client.functions.invoke("cargo-contact-crypto-test",{body:{action:"run"}});
+  if(error||!data){show("result","テストを実行できませんでした。通信・ログイン状態を確認してください。正式受付は停止中です。");return}
+  const expected=["synthetic_inserted","decrypted_roundtrip","tampering_rejected","wrong_context_rejected","hmac_lookup_verified","test_record_deleted"];
+  const passed=data.ok===true&&expected.every(k=>data[k]===true)
+    &&data.actual_customer_data_processed===false&&data.real_intake_enabled===false;
+  if(passed){
+   show("result","成功！\n架空データの暗号化保存：成功\n保存データの復号：成功\n改ざん：拒否\n異なる文脈での復号：拒否\n検索用HMAC：照合成功\n架空データ：削除済み\n実際の顧客情報：処理なし\n一般受付：停止中");
+  }else{
+   show("result","検証未完了。\n暗号化保存："+(data.synthetic_inserted===true?"確認済み":"未確認")
+   +"\n復号："+(data.decrypted_roundtrip===true?"確認済み":"未確認")
+   +"\n改ざん拒否："+(data.tampering_rejected===true?"確認済み":"未確認")
+   +"\nテストデータ削除："+(data.test_record_deleted===true?"確認済み":"未確認")
+   +"\n正式受付は停止したままです。");
+  }
+ }catch{show("result","サーバーとの通信に失敗しました。正式受付は停止中です。")}
+ finally{$("run").disabled=false}
+};
+initialize();
+})();
+</script></body></html>

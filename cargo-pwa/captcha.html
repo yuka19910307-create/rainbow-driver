@@ -45,6 +45,7 @@ a{color:#185b97;overflow-wrap:anywhere}
 <p class="muted">下のウィジェットで確認を完了した後、「サーバー側で検証」を押してください。トークンは一度しか使えません。検証後は再度チャレンジを行ってください。</p>
 <div id="wrapper"><div id="widget"></div></div>
 <p id="challengeState" role="status">CAPTCHAを読み込んでいます…</p>
+<button id="retryChallenge" type="button" class="outline">CAPTCHAを再読み込み</button>
 <button id="verify" type="button" disabled>サーバー側で検証する</button>
 <p class="muted">サーバー側で、Cloudflareの判定とホスト名・アクションが一致するか確認します。配送案件の作成・Push通知・顧客情報の保存はしません。</p>
 </section>
@@ -92,6 +93,23 @@ async function resetWidget(){
  token=null;$("verify").disabled=true;
  if(window.turnstile&&widgetId!==null){try{window.turnstile.reset(widgetId)}catch(_){}}
 }
+function turnstileErrorMessage(code){
+ const c=String(code===undefined?"":code).replace(/[^0-9]/g,"").slice(0,10);
+ const causes={
+  "110100":"Site Keyが正しくありません。",
+  "110110":"Site Keyが見つかりません。",
+  "110200":"このドメインがCloudflareで許可されていません。",
+  "110600":"認証が時間切れになりました。",
+  "110620":"操作が時間切れになりました。",
+  "200100":"端末の時刻またはキャッシュに問題があります。",
+  "200500":"Cloudflareの認証画面を読み込めません。通信・ブラウザの制限を確認してください。",
+  "400020":"Site Keyが無効です。",
+  "400021":"Site Keyとドメインの設定が一致していません。",
+  "400070":"Site Keyが無効化されています。"
+ };
+ const reason=causes[c]||(c.startsWith("300")||c.startsWith("600")?"Cloudflareの認証チャレンジに失敗しました。":"通信環境またはCloudflareの設定を確認してください。");
+ return "CAPTCHA認証エラー"+(c?"（コード："+c+"）":"")+"。"+reason+"\n下の「CAPTCHAを再読み込み」をお試しください。改善しない場合はSafariで直接開いて確認してください。";
+}
 async function renderWidget(){
  await loadScript();
  if(!window.turnstile)throw Error("CAPTCHAライブラリがありません");
@@ -101,7 +119,9 @@ async function renderWidget(){
   sitekey:siteKey,action:"cargo_prelaunch_test",theme:"auto",
   callback:(value)=>{token=value;message("challengeState","CAPTCHAの確認が完了しました。サーバー側の検証を実行できます。");$("verify").disabled=false;},
   "expired-callback":()=>{token=null;$("verify").disabled=true;message("challengeState","CAPTCHAの期限が切れました。もう一度確認してください。");},
-  "error-callback":()=>{token=null;$("verify").disabled=true;message("challengeState","CAPTCHAの表示または認証に失敗しました。通信状況とCloudflare設定を確認してください。");}
+  "error-callback":(code)=>{token=null;$("verify").disabled=true;message("challengeState",turnstileErrorMessage(code));return true;},
+  "timeout-callback":()=>{token=null;$("verify").disabled=true;message("challengeState","CAPTCHAの操作が時間切れになりました。再読み込みしてください。");},
+  "unsupported-callback":()=>{token=null;$("verify").disabled=true;message("challengeState","このブラウザでCAPTCHAを利用できません。Safariで直接ページを開いてください。");}
  });
  if(widgetId==null)throw Error("CAPTCHAを描画できませんでした");
  message("challengeState","Cloudflareの判定を完了してください。");
@@ -126,6 +146,12 @@ async function loadConfig(){
  }finally{$("reload").disabled=false}
 }
 $("reload").onclick=loadConfig;
+$("retryChallenge").onclick=async()=>{
+ const button=$("retryChallenge");button.disabled=true;
+ message("challengeState","CAPTCHAを再読み込みしています…");
+ try{await renderWidget()}catch(e){message("challengeState","CAPTCHAの再読み込みに失敗しました。Safariで直接開いてください。"+(e.message||""))}
+ finally{button.disabled=false}
+};
 $("verify").onclick=async()=>{
  if(!token)return;
  const btn=$("verify");btn.disabled=true;

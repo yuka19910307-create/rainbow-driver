@@ -25,6 +25,8 @@ jobs:
         run: node --test src/pricing.test.js
       - name: Verify cargo Google Maps simulator source
         run: node --test src/cost-preview.test.js
+      - name: Verify local-only cost setting behavior
+        run: node --test src/cost-settings.test.js
       - name: Expo dependency compatibility
         run: npx expo install --check
       - name: Export iOS JavaScript bundle without macOS

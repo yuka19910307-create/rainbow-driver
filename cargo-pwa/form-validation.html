@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#1c3655">
+<title>軽貨物 入力項目検証テスト | Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1d344f;background:#f1f5fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.65}
+header{background:#1c3655;color:white;padding:22px 16px}header>div,main{max-width:720px;margin:auto}
+h1{font-size:22px;margin:8px 0}h2{font-size:19px}
+main{padding:16px}section{background:white;border:1px solid #d9e3ef;border-radius:13px;padding:20px;margin-bottom:14px}
+.notice{background:#fff3dd;color:#754f1d;border-radius:9px;padding:14px;font-size:14px}
+button{padding:14px 18px;border:0;border-radius:10px;background:#28496c;color:white;font:inherit;font-weight:700}
+button:disabled{opacity:.55}a{color:#185b97}
+#result{white-space:pre-wrap;overflow-wrap:anywhere;font-weight:600}
+.small{font-size:14px;color:#5d7087}
+</style></head><body>
+<header><div><small>RAINBOW DRIVER / CARGO / PRELAUNCH ONLY</small>
+<h1>顧客入力フォームの安全検証</h1></div></header>
+<main>
+<section>
+<p class="notice"><b>一般のお客様からの受付は停止中です。</b> サーバーに組み込んだ26種類の架空入力を検証します。実在の住所・連絡先・配送依頼は送信しません。</p>
+<p><a href="./driver.html">軽貨物ドライバー画面へ戻る</a></p>
+<p id="authState" role="status">管理者ログインを確認しています…</p>
+</section>
+<section id="testing" hidden>
+<h2>必須項目・個数・重量・寸法・不正入力</h2>
+<p>入力漏れ、重量・寸法の制限値、不正な数値、想定外の項目、連絡先の混入、HTML文字列など26ケースをサーバー側で検査します。</p>
+<button id="run" type="button">架空の26件テストを実行</button>
+<p id="result" role="status" aria-live="polite">未実施</p>
+<p class="small">この検証は管理者専用で、入力値はサーバーが用意した架空データのみです。DBへの保存・配送依頼作成・Push通知は行いません。正式受付への適用は別工程です。</p>
+</section></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{"use strict";
+const $=id=>document.getElementById(id);
+const URL="https://kvoaorzdewwirqryeizq.supabase.co";
+const PUBLIC_KEY="sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms";
+let client=null,authorized=false;
+function show(id,m){$(id).textContent=m}
+async function initialize(){
+ if(!window.supabase){show("authState","認証ライブラリを読み込めません。");return}
+ client=window.supabase.createClient(URL,PUBLIC_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}});
+ try{
+  const {data:{user},error}=await client.auth.getUser();
+  if(error||!user){show("authState","軽貨物ドライバー画面でログインしてください。");return}
+  const {data,error:roleError}=await client.from("cargo_operator_accounts").select("user_id").eq("user_id",user.id).maybeSingle();
+  if(roleError||!data){show("authState","軽貨物管理者権限がありません。");return}
+  authorized=true;$("testing").hidden=false;
+  show("authState","軽貨物管理者ログインを確認しました。架空テスト専用です。");
+ }catch{show("authState","管理者認証を確認できませんでした。")}
+}
+$("run").onclick=async()=>{
+ if(!authorized)return;
+ $("run").disabled=true;
+ show("result","サーバーで26件の架空入力を検証しています…");
+ try{
+  const {data,error}=await client.functions.invoke("cargo-form-validation-test",{body:{action:"run"}});
+  if(error||!data){show("result","テストを実行できませんでした。通信・ログイン状態を確認してください。一般受付は停止中です。");return}
+  const passed=data.ok===true
+    &&data.cases_checked===26
+    &&data.cases_passed===26
+    &&Array.isArray(data.checks)&&data.checks.length===0
+    &&data.customer_data_processed===false
+    &&data.dispatch_created===false
+    &&data.no_storage===true
+    &&data.public_intake_enabled===false;
+  if(passed){
+   show("result","成功！\n架空入力26件：すべて合格\n必須項目の欠落：拒否\n重量・寸法・個数の不正値：拒否\n未対応項目・連絡先の混入：拒否\n予約希望の混入：拒否\n実際の配送依頼：作成なし\n個人情報の保存：なし\n一般受付：停止中");
+  }else{
+   show("result","検証未完了。\n実施件数："+String(data.cases_checked??"不明")
+     +"\n合格件数："+String(data.cases_passed??"不明")
+     +"\n一般受付：停止中");
+  }
+ }catch{show("result","通信エラーが発生しました。正式受付は停止中です。")}
+ finally{$("run").disabled=false}
+};
+initialize();
+})();
+</script></body></html>

@@ -113,11 +113,12 @@ async function loadConfig(){
   const v=await call("settings");
   if(!v.configured||typeof v.site_key!=="string"){
    $("instructions").hidden=false;$("testing").hidden=true;
-   message("status","CAPTCHA用のSite KeyとSecret Keyがまだ両方認識されていません。CloudflareとSupabaseで設定してください。正式受付は停止したままです。");return
+   const describe=s=>s==="valid"?"形式正常":s==="missing"?"未設定":s==="invalid_format"?"形式不正":"状態を取得できません";
+   message("status","Site Key："+describe(v.site_key_status)+"\nSecret Key："+describe(v.secret_key_status)+"\n\n鍵の設定状況を確認してください。正式受付は停止したままです。");return
   }
   if(siteKey!==v.site_key){widgetId=null;siteKey=v.site_key;}
   $("instructions").hidden=true;$("testing").hidden=false;
-  message("status","CAPTCHA用の鍵を認識しました。iPhoneでウィジェットの動作テストができます。正式受付は停止中です。");
+  message("status","Site Key：形式正常\nSecret Key：形式正常\n\n鍵の形式を確認しました。次にCloudflareの認証テストを行ってください。正式受付は停止中です。");
   await renderWidget();
  }catch(e){
   $("instructions").hidden=false;$("testing").hidden=true;

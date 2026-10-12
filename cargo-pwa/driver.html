@@ -1,0 +1,221 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#1c3655">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="RD 軽貨物">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<title>Rainbow Driver 軽貨物｜ドライバー</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1b304e;background:#eef3f8}
+*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;line-height:1.6}
+header{background:#1c3655;color:white;padding:28px 16px 21px}
+header>div,main{max-width:740px;margin:auto}
+header .small{font-size:12px;letter-spacing:.1em;color:#c4d8ea}
+h1{font-size:23px;margin:8px 0 0}h2{font-size:19px;margin:0 0 12px}h3{font-size:16px;margin:13px 0 8px}
+main{padding:16px 14px 50px}section{background:white;border:1px solid #dce5ed;border-radius:14px;padding:19px;margin-bottom:13px}
+label{font-weight:700;display:block;font-size:14px;margin:12px 0 6px}
+input{width:100%;border:1px solid #bdcddd;padding:12px;border-radius:9px;font:inherit}
+button{font:inherit;font-weight:750;padding:13px 15px;border:0;border-radius:10px;background:#244567;color:white;cursor:pointer}
+button:disabled{opacity:.55}.secondary{background:#e5edf5;color:#244567}.danger{background:#80414b}
+.actions{display:flex;gap:9px;flex-wrap:wrap}.actions>*{flex:1;min-width:125px}
+.note{background:#fff5e4;color:#815418;padding:12px;border-radius:10px;font-size:13px}
+.muted{font-size:13px;color:#62768e;line-height:1.75}
+.state{font-size:13px;color:#205a53;white-space:pre-wrap;overflow-wrap:anywhere}
+.request{padding:14px;border:1px solid #dce5ed;border-radius:11px;margin:10px 0}
+.request strong{display:block;font-size:15px}.request p{font-size:13px;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+a{color:#1f5e91}.badge{font-size:11px;background:#e8eef5;padding:4px 8px;border-radius:7px}
+</style></head><body>
+<header><div><div class="small">RAINBOW DRIVER / CARGO / DRIVER TEST</div><h1>軽貨物 ドライバー管理</h1></div></header>
+<main>
+<section><p class="note"><strong>開発中のテスト画面です。</strong> 通知対象は架空の即時配送依頼のみ。実際のお客様からの受付・配車・運賃確定・決済は稼働していません。運転請負の通知とは分離しています。</p></section>
+<section id="authGate"><h2>管理者ログイン</h2><p id="authState" class="muted">ログイン状態を確認中…</p>
+<form id="loginForm" hidden>
+<label for="email">登録メールアドレス</label><input id="email" type="email" autocomplete="username" required>
+<label for="password">パスワード</label><input id="password" type="password" autocomplete="current-password" required>
+<button id="loginBtn" type="submit" style="margin-top:14px;width:100%">ログイン</button>
+</form>
+</section>
+<div id="dashboard" hidden>
+<section><h2>ログイン済み</h2><p id="operator" class="muted"></p>
+<p class="muted">この軽貨物用ホーム画面は、運転請負の管理画面とは別のアプリとして使います。</p>
+<button type="button" class="secondary" id="logout">ログアウト</button></section>
+<section><h2>1. 軽貨物のPush通知</h2>
+<p class="muted">iPhoneではSafariの共有メニューから<strong>「ホーム画面に追加」</strong>し、追加した軽貨物アプリを開いて通知を許可してください。ブラウザ内では通知登録できない場合があります。</p>
+<p id="installState" class="state">利用環境を確認中…</p>
+<div class="actions">
+<button id="enablePush" type="button">軽貨物通知をON</button>
+<button id="testPush" class="secondary" type="button">通知を1件テスト</button>
+</div>
+<div class="actions" style="margin-top:8px"><button id="pushStatusRefresh" class="secondary" type="button">通知登録状況を更新</button><button id="unsubscribe" class="secondary" type="button">この端末の通知を解除</button></div>
+<p id="pushState" class="state" role="status">通知は未設定です。</p>
+<p class="note">iPhoneの通知が届くことは、現時点では未検証です。通知テストは1分に1回・1時間に10回までです。</p>
+</section>
+<section><h2>2. 即時配送テスト案件</h2><button id="refresh" class="secondary" type="button">案件一覧を更新</button>
+<p id="listState" class="state">案件を確認中…</p><div id="requests"></div>
+</section>
+<section><h2>3. 関連画面</h2>
+<p><a href="/cargo-request-preview.html">お客様向け入力フォーム（公開前プレビュー）</a></p>
+<p><a href="/cargo-operator-cost.html">認証付き採算計算（社内用）</a></p>
+<p><a href="/cargo-dispatch-test.html">管理者用のテスト案件一覧</a></p>
+<p class="muted">iPhoneの通知をタップすると、この軽貨物専用画面が開きます。</p></section>
+</div>
+<section><p class="muted">安全のため、住所・GPS・個人連絡先はPush通知の本文に含めません。通知の購読情報は軽貨物専用DBで管理されます。</p><p id="pageState" role="status" class="state"></p></section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id);
+const project='https://kvoaorzdewwirqryeizq.supabase.co';
+const publishable='sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms';
+let client,user=null,subscription=null,requestId=0;
+const showLogin=(reason)=>{
+ user=null;$('dashboard').hidden=true;$('authGate').hidden=false;$('loginForm').hidden=false;
+ $('authState').textContent=reason||'軽貨物管理者としてログインしてください。';
+};
+const log=(id,value)=>$(id).textContent=value;
+function standalone(){
+ return window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;
+}
+async function api(action,extra={}){
+ if(!user)throw Error('軽貨物管理者のログインが必要です');
+ const {data:{session},error}=await client.auth.getSession();
+ if(error||!session?.access_token)throw Error('ログイン期限が切れています。再ログインしてください');
+ const res=await fetch(project+'/functions/v1/cargo-push',{
+   method:'POST',headers:{'Authorization':'Bearer '+session.access_token,'apikey':publishable,'Content-Type':'application/json'},
+   body:JSON.stringify({action,...extra})
+ });
+ const obj=await res.json().catch(()=>({}));
+ if(!res.ok)throw Error(obj.error||'通知サーバーからエラーが返りました（'+res.status+'）');
+ return obj;
+}
+async function checkAuth(){
+ const check=++requestId;
+ try{
+  const {data:{user:u},error}=await client.auth.getUser();
+  if(check!==requestId)return;
+  if(error||!u){showLogin('ログインしてください。');return}
+  const {data,error:e}=await client.from('cargo_operator_accounts').select('user_id').eq('user_id',u.id).maybeSingle();
+  if(check!==requestId)return;
+  if(e||!data){showLogin('このアカウントは軽貨物の管理者ではありません。');return}
+  user=u;$('authGate').hidden=true;$('dashboard').hidden=false;
+  log('operator','ログイン中：'+(u.email||'登録済みユーザー'));
+  log('installState',standalone()?'ホーム画面アプリとして起動中です。':'ブラウザで表示中です。iPhoneはホーム画面に追加してから通知登録してください。');
+  await Promise.allSettled([refreshRequests(),refreshPushStatus()]);
+ }catch(e){showLogin('ログインの確認に失敗しました。ネットワークを確認してください。')}
+}
+function paragraph(text){
+ const p=document.createElement('p');p.textContent=text;return p;
+}
+async function refreshRequests(){
+ if(!user)return;
+ log('listState','架空のテスト案件を読み込み中…');
+ const {data,error}=await client.from('cargo_dispatch_requests')
+   .select('id,status,created_at,pickup_address,delivery_address,cargo_description,pieces,estimated_weight_kg,cargo_length_cm,cargo_width_cm,cargo_height_cm,special_handling')
+   .eq('operator_id',user.id).eq('origin','operator_test').order('created_at',{ascending:false}).limit(20);
+ if(error){log('listState','テスト案件を読み込めませんでした。');return}
+ const root=$('requests');root.replaceChildren();
+ log('listState','テスト案件：'+(data||[]).length+'件（最大20件）。実案件は表示されません。');
+ for(const row of data||[]){
+  const article=document.createElement('article');article.className='request';
+  const title=document.createElement('strong');
+  const states={test_new:'未判断',test_accepted:'テスト受諾',test_declined:'テスト辞退'};
+  title.textContent='['+(states[row.status]||'要確認')+'] '+new Date(row.created_at).toLocaleString('ja-JP');
+  article.append(title,paragraph('集荷：'+row.pickup_address),paragraph('配送：'+row.delivery_address),
+    paragraph('荷物：'+row.cargo_description+' ／ '+row.pieces+'個'+(row.estimated_weight_kg==null?'':' ／ '+row.estimated_weight_kg+'kg')));
+  if(row.cargo_length_cm!=null&&row.cargo_width_cm!=null&&row.cargo_height_cm!=null)
+    article.append(paragraph('寸法：'+row.cargo_length_cm+' × '+row.cargo_width_cm+' × '+row.cargo_height_cm+'cm'));
+  if(row.status==='test_new'){
+    const actions=document.createElement('div');actions.className='actions';
+    for(const [next,titleText] of [['test_accepted','テスト受諾'],['test_declined','テスト辞退']]){
+      const button=document.createElement('button');button.type='button';button.textContent=titleText;
+      button.className=next==='test_declined'?'danger':'';
+      button.onclick=async()=>{button.disabled=true;await decide(row.id,next)};
+      actions.append(button);
+    }
+    article.append(actions);
+  }
+  root.append(article);
+ }
+}
+async function decide(id,next){
+ if(!user)return;
+ const {data,error}=await client.from('cargo_dispatch_requests')
+   .update({status:next,decision_at:new Date().toISOString()})
+   .eq('id',id).eq('operator_id',user.id).eq('status','test_new').select('id');
+ log('pageState',error||!data?.length?'テスト判断を更新できませんでした。':'テスト判断を保存しました。実際の受注ではありません。');
+ await refreshRequests();
+}
+async function refreshPushStatus(){
+ if(!user)return;
+ try{
+  const out=await api('status');
+  log('pushState','軽貨物用登録端末：'+out.registered_devices+'件／この端末の許可状態：'+(('Notification' in window)?Notification.permission:'非対応'));
+ }catch(e){log('pushState','通知登録状況の取得に失敗しました：'+e.message)}
+}
+function base64Bytes(s){
+ const base=s.replace(/-/g,'+').replace(/_/g,'/');
+ const binary=atob(base+'='.repeat((4-base.length%4)%4));
+ return Uint8Array.from(binary,x=>x.charCodeAt(0));
+}
+$('enablePush').onclick=async()=>{
+ const btn=$('enablePush');btn.disabled=true;
+ try{
+  if(!standalone()&&/iPhone|iPad|iPod/i.test(navigator.userAgent))throw Error('iPhoneはSafariの共有メニューで「ホーム画面に追加」し、追加した軽貨物アプリ内から操作してください。');
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))throw Error('このブラウザはWeb Pushに対応していません。');
+  // Ask from this direct button tap; do not delay user activation behind other async steps.
+  const permissionPromise=Notification.permission==='granted'?Promise.resolve('granted'):Notification.requestPermission();
+  log('pushState','通知の許可と登録を確認しています…');
+  const permission=await permissionPromise;
+  if(permission!=='granted')throw Error('通知が許可されませんでした。iPhoneの通知設定を確認してください。');
+  const sw=await navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'});
+  await navigator.serviceWorker.ready;
+  const config=await api('config');
+  subscription=await sw.pushManager.getSubscription();
+  if(!subscription)subscription=await sw.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:base64Bytes(config.vapid_public_key)});
+  await api('subscribe',{subscription:subscription.toJSON()});
+  log('pushState','この端末の軽貨物専用通知を登録しました。次に「通知を1件テスト」を押してください。');
+ }catch(e){log('pushState','設定に失敗しました：'+e.message)}
+ finally{btn.disabled=false}
+};
+$('testPush').onclick=async()=>{
+ const btn=$('testPush');btn.disabled=true;
+ try{
+  log('pushState','軽貨物のテスト通知を送信しています…');
+  const result=await api('test');
+  log('pushState','送信結果：'+result.sent+'端末へのPush送信に成功、失敗 '+result.failed+'。画面外での実機受信は別途確認してください。');
+ }catch(e){log('pushState','通知テストに失敗しました：'+e.message)}
+ finally{btn.disabled=false}
+};
+$('unsubscribe').onclick=async()=>{
+ try{
+  const registration=await navigator.serviceWorker.getRegistration('./');
+  const sub=await registration?.pushManager?.getSubscription();
+  if(sub){await api('unsubscribe',{endpoint:sub.endpoint});await sub.unsubscribe()}
+  subscription=null;log('pushState','この端末の軽貨物通知を解除しました。');
+ }catch(e){log('pushState','解除に失敗しました：'+e.message)}
+};
+$('pushStatusRefresh').onclick=refreshPushStatus;
+$('refresh').onclick=refreshRequests;
+$('logout').onclick=async()=>{
+ ++requestId;await client.auth.signOut();showLogin('ログアウトしました。');$('password').value='';
+};
+$('loginForm').onsubmit=async event=>{
+ event.preventDefault();
+ const btn=$('loginBtn');btn.disabled=true;log('authState','ログイン中…');
+ try{
+  const {error}=await client.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
+  $('password').value='';
+  if(error)throw Error('メールアドレスまたはパスワードを確認してください。');
+  await checkAuth();
+ }catch(e){log('authState','ログインに失敗しました：'+e.message)}
+ finally{btn.disabled=false}
+};
+if(!window.supabase){showLogin('認証ライブラリの読み込みに失敗しました。再読み込みしてください。');$('loginForm').hidden=true;return}
+client=window.supabase.createClient(project,publishable,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:'rd-cargo-operator-auth-v1'}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&user)refreshRequests()});
+checkAuth();
+})();
+</script></body></html>

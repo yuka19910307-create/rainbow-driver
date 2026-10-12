@@ -1,0 +1,225 @@
+<!doctype html><html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>軽貨物・採算審査／取消テスト｜Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#213551;background:#f2f6fa}
+*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;line-height:1.6}
+header{background:#1c3655;color:white;padding:24px 17px}header>div,main{max-width:740px;margin:auto}
+header h1{font-size:22px;margin:7px 0 0}header small{font-size:12px;color:#c5d7e8}
+main{padding:16px}section{background:white;border:1px solid #dce5ee;padding:20px;border-radius:14px;margin-bottom:14px}
+h2{font-size:19px;margin:0 0 14px}h3{font-size:16px;margin:20px 0 6px}
+label{display:block;font-weight:700;font-size:14px;margin:14px 0 5px}
+input,textarea{width:100%;font:inherit;padding:12px;border:1px solid #bfcfdf;border-radius:9px}
+input[type=checkbox]{width:21px;height:21px;flex:none;margin-top:3px}
+.check{display:flex;gap:10px;align-items:flex-start;font-weight:500}
+button{border:0;border-radius:9px;background:#264668;color:white;font-weight:750;font:inherit;padding:13px 18px;cursor:pointer}
+button:disabled{opacity:.48;cursor:not-allowed}
+.secondary{background:#e7eef5;color:#1e3959}.cancel{background:#88454d}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.muted{color:#60748b;font-size:13px}.notice{background:#fff5e2;border-radius:10px;padding:13px;color:#79521c;font-size:13px}
+.item{border:1px solid #dae3ed;border-radius:10px;padding:13px;margin:12px 0}
+.item p{margin:8px 0;overflow-wrap:anywhere;white-space:pre-wrap}
+a{color:#27618d}.actions{display:flex;gap:9px;flex-wrap:wrap}.actions>*{flex:1;min-width:145px}
+#saveStatus,#decisionStatus{white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:440px){.grid{grid-template-columns:1fr}}
+</style></head><body>
+<header><div><small>RAINBOW DRIVER / CARGO / OPERATOR TEST</small><h1>採算審査・キャンセル管理</h1></div></header>
+<main>
+<section><div class="notice"><b>管理者限定・架空案件専用</b>です。実際の配送依頼、運賃提示、業務受諾、キャンセル料の請求は行いません。社内最低受注額は自動取得しないので、必ず別の採算計算画面で検討してから入力してください。</div>
+<p><a href="/cargo-pwa/driver.html">軽貨物ドライバーアプリへ戻る</a> ／ <a href="/cargo-operator-cost.html">認証付き社内採算計算を開く</a></p></section>
+<section id="gate"><h2>管理者認証を確認中</h2><p id="authStatus" class="muted">接続を確認しています…</p><p><a href="./cargo-operator-login.html">ログイン画面へ</a></p></section>
+<div id="app" hidden>
+<section><h2>1. 対象案件</h2><p id="listStatus" class="muted"></p><div id="requestList"></div></section>
+<section id="selected" hidden><h2>2. 選択したテスト案件</h2><div id="details" class="item"></div>
+<div id="reviewWrap" hidden>
+<h3>社内採算の確認</h3><p class="muted">社内試算の「最低受注額」「高速・駐車費」「検討金額」を転記してください。下の額はお客様には通知・提示されません。実際の運賃や消費税の確定ではありません。</p>
+<form id="reviewForm">
+<div class="grid">
+<div><label for="floor">社内最低受注額（円）</label><input id="floor" type="number" step="1" min="500" max="5000000" required></div>
+<div><label for="toll">高速・駐車費概算（円）</label><input id="toll" type="number" step="1" min="0" max="1000000" required></div>
+</div>
+<label for="proposed">費用込みの検討金額（円）</label><input id="proposed" type="number" step="1" min="500" max="6000000" required>
+<p id="minimum" class="muted">最低額と高速・駐車費を入力してください。</p><button type="button" class="secondary" id="testAmounts" style="margin:8px 0">架空のテスト金額を入力する（8,000円＋1,500円）</button>
+<h3>受諾前の安全確認</h3>
+<label class="check"><input id="route" type="checkbox">道路経路・交通状況・実際の所要時間を確認した</label>
+<label class="check"><input id="cargo" type="checkbox">荷物の内容・寸法・重量・積載可否を確認した</label>
+<label class="check"><input id="sameDay" type="checkbox">即時・当日集荷に対応可能（前日出発は不要）</label>
+<label class="check"><input id="returnCost" type="checkbox">配送後の回送・帰路・次の稼働場所の費用を確認した</label>
+<label class="check"><input id="tollCheck" type="checkbox">高速・駐車費と追加荷役の扱いを確認した</label>
+<label for="notes">審査メモ（任意・架空）</label><textarea id="notes" maxlength="700" rows="3" placeholder="採算計算の前提、復路、条件など"></textarea>
+<button id="saveReview" type="submit">社内採算と確認事項を保存</button>
+</form>
+<p id="saveStatus" role="status" class="muted"></p>
+<div class="actions">
+<button type="button" id="accept" disabled>確認済みのためテスト受諾</button>
+<button type="button" class="secondary" id="decline">テスト辞退</button>
+</div>
+<p class="muted">受諾は管理画面のボタンだけでなく、DB側でも採算審査の記録と5項目の確認を必須としています。</p>
+</div>
+<div id="postDecision" hidden><p id="postStatus"></p></div>
+<div id="cancelWrap" hidden>
+<h3>テスト案件のキャンセル</h3>
+<p class="notice">キャンセル理由を保存します。キャンセル料は決めず、請求もしません。顧客連絡は発生しません。</p>
+<label for="cancelReason">キャンセル理由（8〜500文字）</label><textarea id="cancelReason" minlength="8" maxlength="500" rows="3" placeholder="例：テストのため、案件確認後に依頼を取消"></textarea>
+<button type="button" id="cancel" class="cancel">理由を保存してテストキャンセル</button>
+</div>
+<p id="decisionStatus" role="status" class="muted"></p>
+</section>
+</div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script><script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id);
+const supabaseUrl='https://kvoaorzdewwirqryeizq.supabase.co';
+const publishableKey='sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms';
+const checks={route:'route_checked',cargo:'cargo_checked',sameDay:'same_day_checked',returnCost:'return_cost_checked',tollCheck:'toll_checked'};
+let client=null,user=null,current=null,saved=false,listing=[];
+const text=(id,message)=>$(id).textContent=message;
+const labels={test_new:'未判断',test_accepted:'テスト受諾',test_declined:'テスト辞退',test_cancelled:'テストキャンセル'};
+function rowItem(parent,title,value){
+ const p=document.createElement('p');const strong=document.createElement('strong');
+ strong.textContent=title+'：';p.append(strong,document.createTextNode(String(value??'未設定')));parent.append(p);
+}
+function validId(id){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id||'')}
+function basicValues(){
+ const f=Number($('floor').value),t=Number($('toll').value),p=Number($('proposed').value);
+ if($('floor').value.trim()===''||$('toll').value.trim()===''||$('proposed').value.trim()==='')throw Error('3つの金額をすべて入力してください。');
+ if(![f,t,p].every(Number.isInteger)||f<500||f>5000000||t<0||t>1000000||p<500||p>6000000)throw Error('金額は有効な整数（円）を入力してください。');
+ if(p<f+t)throw Error('検討金額は、社内最低受注額と高速・駐車費の合計以上にしてください。');
+ if(!Object.keys(checks).every(k=>$(k).checked))throw Error('受諾前の確認5項目をすべてチェックしてください。');
+ return {internal_floor_yen:f,expected_toll_yen:t,proposed_total_yen:p,route_checked:true,cargo_checked:true,same_day_checked:true,return_cost_checked:true,toll_checked:true,review_notes:$('notes').value.trim().slice(0,700),reviewed_at:new Date().toISOString()};
+}
+$('testAmounts').onclick=()=>{
+  $('floor').value='8000';$('toll').value='1500';$('proposed').value='9500';
+  text('minimum','最低検討額：9,500円（架空のテスト数値）');
+  markUnsaved();
+  text('saveStatus','架空のテスト数値を入力しました。5項目を確認し、DBに保存してからテスト受諾してください。実際の運賃ではありません。');
+};
+function markUnsaved(){
+ saved=false;$('accept').disabled=true;
+ text('saveStatus','確認内容を変更しました。受諾前にもう一度保存してください。');
+}
+Object.keys(checks).forEach(k=>$(k).addEventListener('change',markUnsaved));
+for(const k of ['floor','toll','proposed','notes'])$(k).addEventListener('input',markUnsaved);
+for(const k of ['floor','toll','proposed']){
+ $(k).addEventListener('input',()=>{
+  const f=Number($('floor').value),t=Number($('toll').value),p=Number($('proposed').value);
+  if($('floor').value&&$('toll').value&&Number.isFinite(f+t))text('minimum','最低検討額：'+(f+t).toLocaleString('ja-JP')+'円'+(p<f+t?'（入力額が不足しています）':''));
+ });
+}
+async function authenticate(){
+ if(!window.supabase){text('authStatus','認証ライブラリを読み込めませんでした。');return}
+ client=window.supabase.createClient(supabaseUrl,publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:'rd-cargo-operator-auth-v1'}});
+ try{
+  const {data:{user:u},error}=await client.auth.getUser();
+  if(error||!u){text('authStatus','ログインしてからこの画面を開いてください。');return}
+  const {data,error:memberError}=await client.from('cargo_operator_accounts').select('user_id').eq('user_id',u.id).maybeSingle();
+  if(memberError||!data){text('authStatus','軽貨物の管理者権限がありません。');return}
+  user=u;$('gate').hidden=true;$('app').hidden=false;await refresh();
+ }catch(e){text('authStatus','認証に失敗しました。通信状況をご確認ください。')}
+}
+async function refresh(){
+ if(!user)return;
+ const {data,error}=await client.from('cargo_dispatch_requests').select('id,operator_id,created_at,status,pickup_address,delivery_address,cargo_description,pieces,estimated_weight_kg,cargo_length_cm,cargo_width_cm,cargo_height_cm,special_handling,cancel_reason,cancelled_at')
+ .eq('operator_id',user.id).eq('origin','operator_test').order('created_at',{ascending:false}).limit(20);
+ if(error){text('listStatus','案件一覧を取得できませんでした。');return}
+ listing=data||[];text('listStatus','架空のテスト案件 '+listing.length+'件（最大20件）');
+ const root=$('requestList');root.replaceChildren();
+ for(const row of listing){
+  const button=document.createElement('button');button.type='button';button.className='secondary';
+  button.style.margin='4px';button.style.maxWidth='100%';button.style.overflowWrap='anywhere';
+  button.textContent='['+(labels[row.status]||'不明')+'] '+new Date(row.created_at).toLocaleString('ja-JP')+' — '+row.cargo_description;
+  button.onclick=()=>select(row.id);
+  root.append(button);
+ }
+ const wanted=new URLSearchParams(location.search).get('id');
+ if(wanted&&validId(wanted)&&listing.some(r=>r.id===wanted)){await select(wanted)}
+ else if(current&&listing.some(r=>r.id===current.id)){await select(current.id)}
+ else if(listing[0])await select(listing[0].id);
+}
+async function select(id){
+ const next=listing.find(x=>x.id===id);
+ if(!next)return;
+ current=next;saved=false;
+ $('selected').hidden=false;
+ const root=$('details');root.replaceChildren();
+ rowItem(root,'状態',labels[next.status]||next.status);
+ rowItem(root,'登録',new Date(next.created_at).toLocaleString('ja-JP'));
+ rowItem(root,'集荷地',next.pickup_address);rowItem(root,'配送先',next.delivery_address);
+ rowItem(root,'荷物',next.cargo_description);
+ rowItem(root,'個数・重量',next.pieces+'個 / '+(next.estimated_weight_kg==null?'不明':next.estimated_weight_kg+'kg'));
+ rowItem(root,'寸法',next.cargo_length_cm==null?'未登録':next.cargo_length_cm+' × '+next.cargo_width_cm+' × '+next.cargo_height_cm+'cm');
+ rowItem(root,'荷役補助',next.special_handling?'要相談':'不要');
+ if(next.cancel_reason)rowItem(root,'取消理由',next.cancel_reason);
+ if(next.cancelled_at)rowItem(root,'取消日時',new Date(next.cancelled_at).toLocaleString('ja-JP'));
+ $('reviewWrap').hidden=next.status!=='test_new';
+ $('postDecision').hidden=next.status==='test_new';
+ $('cancelWrap').hidden=!['test_new','test_accepted'].includes(next.status);
+ $('accept').disabled=true;text('saveStatus','');text('decisionStatus','');
+ text('postStatus',next.status==='test_accepted'?'テスト受諾済みです。実際の運行や決済は発生しません。':next.status==='test_declined'?'テスト辞退済みです。':next.status==='test_cancelled'?'テストキャンセル済みです。':'');
+ if(next.status==='test_new'){
+  const {data,error}=await client.from('cargo_dispatch_reviews').select('*').eq('request_id',next.id).eq('operator_id',user.id).maybeSingle();
+  if(error){text('saveStatus','保存済みの審査条件を取得できませんでした。');return}
+  if(data){
+   $('floor').value=String(data.internal_floor_yen);
+   $('toll').value=String(data.expected_toll_yen);
+   $('proposed').value=String(data.proposed_total_yen);
+   $('notes').value=data.review_notes||'';
+   for(const [id,column] of Object.entries(checks))$(id).checked=Boolean(data[column]);
+   saved=Object.keys(checks).every(k=>$(k).checked)&&Number(data.proposed_total_yen)>=Number(data.internal_floor_yen)+Number(data.expected_toll_yen);
+   $('accept').disabled=!saved;
+   text('saveStatus',saved?'社内採算の審査記録を読み込みました。受諾する場合は確認ボタンを押してください。':'審査の確認事項が不足しています。');
+  }else{
+   $('reviewForm').reset();saved=false;text('saveStatus','社内採算と5項目の確認を保存すると受諾できます。');
+  }
+ }
+}
+$('reviewForm').onsubmit=async event=>{
+ event.preventDefault();if(!current||current.status!=='test_new'||!user)return;
+ const button=$('saveReview');button.disabled=true;
+ try{
+  const values=basicValues();const base=client.from('cargo_dispatch_reviews');
+  const {data,error:lookupErr}=await base.select('request_id').eq('request_id',current.id).eq('operator_id',user.id).maybeSingle();
+  if(lookupErr)throw Error('既存の審査記録を確認できませんでした。');
+  const {error}=data
+   ?await base.update(values).eq('request_id',current.id).eq('operator_id',user.id)
+   :await base.insert({request_id:current.id,operator_id:user.id,...values});
+  if(error)throw Error('DBへ審査を保存できませんでした。通信状態と入力値を確認してください。');
+  saved=true;$('accept').disabled=false;
+  text('saveStatus','採算審査を保存しました。テスト受諾が可能になりました（実受注ではありません）。');
+ }catch(e){saved=false;$('accept').disabled=true;text('saveStatus',e.message||'審査の保存に失敗しました。')}
+ finally{button.disabled=false}
+};
+$('accept').onclick=async()=>{
+ if(!saved||!current||current.status!=='test_new')return;
+ if(!confirm('審査済みの架空案件をテスト受諾しますか？実際の配送は発生しません。'))return;
+ const btn=$('accept');btn.disabled=true;
+ const {data,error}=await client.from('cargo_dispatch_requests').update({status:'test_accepted'}).eq('id',current.id).eq('operator_id',user.id).eq('status','test_new').select('id');
+ text('decisionStatus',error||!data?.length?'受諾できませんでした。採算の保存状況を確認してください。':'テスト受諾を保存しました。実際の配送受諾ではありません。');
+ await refresh();
+};
+$('decline').onclick=async()=>{
+ if(!current||current.status!=='test_new')return;
+ if(!confirm('この架空案件をテスト辞退しますか？'))return;
+ const {data,error}=await client.from('cargo_dispatch_requests').update({status:'test_declined'}).eq('id',current.id).eq('operator_id',user.id).eq('status','test_new').select('id');
+ text('decisionStatus',error||!data?.length?'辞退できませんでした。':'テスト辞退を保存しました。');
+ await refresh();
+};
+$('cancel').onclick=async()=>{
+ if(!current||!['test_new','test_accepted'].includes(current.status))return;
+ const reason=$('cancelReason').value.trim();
+ if(reason.length<8||reason.length>500){text('decisionStatus','キャンセル理由を8〜500文字で入力してください。');return}
+ if(!confirm('この架空案件をテストキャンセルしますか？取り消し後に戻す機能はありません。'))return;
+ const button=$('cancel');button.disabled=true;
+ try{
+  const {data,error}=await client.from('cargo_dispatch_requests')
+    .update({status:'test_cancelled',cancel_reason:reason})
+    .eq('id',current.id).eq('operator_id',user.id).eq('status',current.status).select('id');
+  if(error||!data?.length)throw Error('キャンセルを保存できませんでした。');
+  $('cancelReason').value='';text('decisionStatus','テストキャンセルを保存しました。料金請求・通知は発生しません。');
+  await refresh();
+ }catch(e){text('decisionStatus',e.message)}
+ finally{button.disabled=false}
+};
+authenticate();
+})();
+</script></body></html>

@@ -12,7 +12,7 @@
 const $=id=>document.getElementById(id);const say=m=>$('message').textContent=m;
 if(!window.supabase){$('authMessage').textContent='認証機能を読み込めませんでした。';return}
 const supa=window.supabase.createClient('https://kvoaorzdewwirqryeizq.supabase.co','sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:'rd-cargo-operator-auth-v1'}});
-let user=null;const labels={test_new:'未判断',test_accepted:'テスト受諾',test_declined:'テスト辞退'};
+let user=null;const labels={test_new:'未判断',test_accepted:'テスト受諾',test_declined:'テスト辞退',test_cancelled:'テストキャンセル'};
 async function authorize(){
  try{
   const {data:{user:u},error}=await supa.auth.getUser();

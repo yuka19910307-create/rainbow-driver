@@ -34,7 +34,11 @@
       ]
     ],
     "extra": {
-      "purpose": "single_driver_private_test_no_backend"
-    }
+      "purpose": "single_driver_private_test_no_backend",
+      "eas": {
+        "projectId": "5c7c33f1-8f3e-420a-a74b-32c3ea9faf55"
+      }
+    },
+    "owner": "rainbow-driver-cargo"
   }
 }

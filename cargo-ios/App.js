@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { CARGO_TASK, CARGO_ACTIVE_KEY, CARGO_FIX_META_KEY } from './src/locationTask';
+import PricingPanel from './src/PricingPanel';
 
 const C = {
   navy: '#192f4c',
@@ -266,6 +267,8 @@ export default function App() {
         </TouchableOpacity>
         <Text style={styles.hint}>iPhoneのホーム画面に戻すか別アプリを使用し、数分後に戻って更新時刻と件数を確認します。停止・省電力モード・位置情報権限の変更などで更新が遅れる場合があります。</Text>
       </View>
+
+      <PricingPanel driverStatus={status} locationFresh={tracking && age < 120000} />
 
       <View style={styles.card}>
         <Text style={styles.title}>個人情報とテスト範囲</Text>

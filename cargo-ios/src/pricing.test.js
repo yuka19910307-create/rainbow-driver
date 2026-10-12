@@ -57,3 +57,17 @@ test('reject missing, invalid and negative costs',()=>{
   assert.throws(()=>calculate(baseline({parameters:{...p,riskReservePct:101}})),/リスク/);
   assert.throws(()=>calculate(baseline({parameters:{...p,hourlyTargetYen:''}})),/時間単価/);
 });
+
+test('waiting and additional handling use independent buckets',()=>{
+  const {extraTimeFee,supplementaryFees}=require('./pricing.js');
+  assert.equal(extraTimeFee(5),0);
+  assert.equal(extraTimeFee(6),500);
+  assert.equal(extraTimeFee(15),500);
+  assert.equal(extraTimeFee(16),1000);
+  assert.equal(extraTimeFee(30),1000);
+  assert.equal(extraTimeFee(31),1500);
+  assert.equal(extraTimeFee(46),2000);
+  assert.equal(supplementaryFees(6,10).subtotalYen,1000);
+  assert.equal(supplementaryFees(6,6).waitingYen,500);
+  assert.throws(()=>extraTimeFee(-1),/範囲外/);
+});

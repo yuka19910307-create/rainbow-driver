@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#1c3655">
+<title>軽貨物 二重送信防止テスト | Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1d344f;background:#f1f5fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.65}
+header{background:#1c3655;color:white;padding:22px 16px}header>div,main{max-width:720px;margin:auto}
+h1{font-size:22px;margin:8px 0}h2{font-size:19px}
+main{padding:16px}section{background:white;border:1px solid #d9e3ef;border-radius:13px;padding:20px;margin-bottom:14px}
+.notice{background:#fff3dd;color:#754f1d;border-radius:9px;padding:14px;font-size:14px}
+button{padding:14px 18px;border:0;border-radius:10px;background:#28496c;color:white;font:inherit;font-weight:700}
+button:disabled{opacity:.55}a{color:#185b97}
+#result{white-space:pre-wrap;overflow-wrap:anywhere;font-weight:600}
+.small{font-size:14px;color:#5d7087}
+</style></head><body>
+<header><div><small>RAINBOW DRIVER / CARGO / PRELAUNCH ONLY</small>
+<h1>二重送信防止の安全テスト</h1></div></header>
+<main>
+<section>
+<p class="notice"><b>一般受付は停止中です。</b> 架空の識別子・依頼ハッシュだけで処理を確認します。実際の配送依頼は作成しません。</p>
+<p><a href="./driver.html">軽貨物ドライバー画面へ戻る</a></p>
+<p id="authState" role="status">管理者ログインを確認しています…</p>
+</section>
+<section id="testing" hidden>
+<h2>重複・内容不一致・同時送信を検証</h2>
+<p>同じ依頼の再送、同じ識別キーで内容を変えた送信、異常な入力、同時に3回送信した場合を調べます。終了後は架空データを削除します。</p>
+<button id="run" type="button">架空の二重送信テストを実行</button>
+<p id="result" role="status" aria-live="polite">未実施</p>
+<p class="small">これは重複判定のみの技術テストです。正式な依頼作成、受諾、Push通知、顧客データの登録はしません。</p>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{"use strict";
+const $=id=>document.getElementById(id);
+const URL="https://kvoaorzdewwirqryeizq.supabase.co";
+const PUBLIC_KEY="sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms";
+let client=null,authorized=false;
+function show(id,m){$(id).textContent=m}
+async function initialize(){
+ if(!window.supabase){show("authState","認証ライブラリを読み込めません。");return}
+ client=window.supabase.createClient(URL,PUBLIC_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}});
+ try{
+  const {data:{user},error}=await client.auth.getUser();
+  if(error||!user){show("authState","軽貨物ドライバー画面でログインしてください。");return}
+  const {data,error:roleError}=await client.from("cargo_operator_accounts").select("user_id").eq("user_id",user.id).maybeSingle();
+  if(roleError||!data){show("authState","軽貨物管理者権限がありません。");return}
+  authorized=true;$("testing").hidden=false;
+  show("authState","軽貨物管理者ログインを確認しました。架空テスト専用です。");
+ }catch{show("authState","管理者認証を確認できませんでした。")}
+}
+$("run").onclick=async()=>{
+ if(!authorized)return;
+ $("run").disabled=true;
+ show("result","サーバーで架空の識別キーを検証しています…");
+ try{
+  const {data,error}=await client.functions.invoke("cargo-idempotency-test",{body:{action:"run"}});
+  if(error||!data){show("result","テスト実行に失敗しました。通信状態とログインを確認してください。一般受付は停止中です。");return}
+  const passed=data.ok===true
+    &&data.first_request==="NEW"
+    &&data.same_request_retry==="REPLAY"
+    &&data.changed_payload==="PAYLOAD_CONFLICT"
+    &&data.invalid_input==="INVALID_INPUT"
+    &&data.parallel_new_count===1
+    &&data.parallel_duplicate_count===2
+    &&data.test_records_deleted===true
+    &&data.real_dispatch_created===false
+    &&data.public_intake_enabled===false;
+  if(passed){
+   show("result","成功！\n初回の架空依頼：新規として判定\n同じ依頼の再送：重複判定\n識別キーを再利用した内容変更：拒否\n不正な入力：拒否\n同時に3回の送信：新規1件・重複2件\n架空データ：削除済み\n実際の配送依頼：作成なし\n一般受付：停止中");
+  }else{
+   show("result","検証未完了。\n初回："+String(data.first_request??"不明")
+     +"\n同じ依頼の再送："+String(data.same_request_retry??"不明")
+     +"\n内容を変更した送信："+String(data.changed_payload??"不明")
+     +"\n同時送信の新規判定："+String(data.parallel_new_count??"不明")
+     +"\n架空データ削除："+(data.test_records_deleted===true?"確認済み":"未確認")
+     +"\n一般受付：停止中");
+  }
+ }catch{show("result","通信エラーが発生しました。正式受付は停止中です。")}
+ finally{$("run").disabled=false}
+};
+initialize();
+})();
+</script></body></html>

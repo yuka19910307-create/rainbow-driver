@@ -27,7 +27,7 @@ button{font:inherit;font-weight:700;border:0;border-radius:11px;padding:13px 14p
 <body><header><div><div class="eyebrow">RAINBOW DRIVER / CARGO / TEST</div><h1>軽貨物の採算計算</h1><p>ドライバー内部試算・無料テスト版</p></div></header>
 <main>
 <section>
-<div class="warning"><strong>開発中の試算画面です。</strong> このURLを知っていれば誰でも画面を開けます。社内の実単価・実案件の機密情報は入力しないでください。原価計算の値は保存・送信しませんが、Google Maps経路試算を押したときは住所とGPS位置情報をGoogleへ送ります。料金は顧客見積や確定運賃ではありません。</div>
+<div class="warning"><strong>開発中の試算画面です。</strong> このURLを知っていれば誰でも画面を開けます。実単価・機密情報を入力しないでください。「仮条件を保存」を押した場合のみ基本原価6項目を端末のブラウザに保存します。住所やGPSは保存せず、Google Maps経路試算時は位置・住所をGoogleへ送ります。顧客見積・確定運賃ではありません。</div>
 <p>3つの走行区間と所要時間から最低受注額を検討します。Google Mapsによる自動ルート計算は次段階のため、この画面では交通状況を考慮した数値を手入力してください。</p>
 <div class="actions"><button type="button" class="secondary" id="demo">架空のサンプル値を入力</button><button type="button" class="secondary" id="reset">入力をすべて消す</button></div>
 </section>
@@ -73,6 +73,10 @@ button{font:inherit;font-weight:700;border:0;border-radius:11px;padding:13px 14p
 </section>
 <section><h2>2. 社内原価の条件（すべて仮定）</h2>
 <p>以下の入力値はRainbow Driverの確定料金ではありません。仮の数字で試せます。</p>
+<div class="warning">「仮条件を保存」を押すと、<strong>以下の基本原価6項目だけ</strong>が、このブラウザ内に保存されます。アカウント認証はなく、同じドメインの他のスクリプトからも参照可能です。機密の実単価や共有端末では使用しないでください。住所・GPS・高速費・待機時間・APIキーは保存しません。</div>
+<p id="costStatus" role="status">基本原価条件は未保存です。</p>
+<details id="costDetails" open>
+<summary style="padding:13px 10px;background:#edf2f7;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;color:#192f4c">基本原価6項目を確認・変更する</summary>
 <div class="grid">
 <div><label for="hourly">目標時間単価 (円/時間)</label><input id="hourly" type="number" min="0" placeholder="例：4000"></div>
 <div><label for="perKm">車両変動費 (円/km)</label><input id="perKm" type="number" min="0" placeholder="例：45"></div>
@@ -80,8 +84,15 @@ button{font:inherit;font-weight:700;border:0;border-radius:11px;padding:13px 14p
 <div><label for="buffer">作業予備時間 (分)</label><input id="buffer" type="number" min="0" placeholder="例：30"></div>
 <div><label for="risk">リスク余裕率 (%)</label><input id="risk" type="number" min="0" max="100" placeholder="例：15"></div>
 <div><label for="round">切り上げ単位 (円)</label><input id="round" type="number" min="1" value="500"></div>
-<div><label for="toll">高速・駐車費（概算・円）</label><input id="toll" type="number" min="0" value="0"></div>
 </div>
+<div class="actions">
+<button type="button" class="secondary" id="saveCost">仮条件をこの端末に保存</button>
+<button type="button" class="secondary" id="loadCost">保存した仮条件を呼び出す</button>
+</div>
+<button type="button" class="secondary" id="deleteCost" style="margin-top:10px;width:100%">保存済みの仮条件を削除する</button>
+</details>
+<h3>案件ごとの費用（保存されません）</h3>
+<div><label for="toll">高速・駐車費（概算・円）</label><input id="toll" type="number" min="0" value="0"></div>
 <h3>別途待機・追加荷役（仮ルール）</h3>
 <div class="grid"><div><label for="waiting">待機時間 (分)</label><input id="waiting" type="number" min="0" value="0"></div><div><label for="handling">追加荷役 (分)</label><input id="handling" type="number" min="0" value="0"></div></div>
 <p>通常の荷渡しは別途課金せず、待機と追加荷役は重複しない実測時間で計算。各5分まで無料、6～15分500円、16～30分1,000円、以降15分ごと500円加算（課税区分・契約条件は未確定）。</p>
@@ -232,6 +243,57 @@ const $=id=>document.getElementById(id),yen=n=>Math.round(n).toLocaleString('ja-
 const values=['aKm','aMin','bKm','bMin','cKm','cMin','hourly','perKm','dispatch','buffer','risk','round','toll','waiting','handling'];
 const flags=['gps','sameDay','route','cargo','tollCheck','prevDay','noReturnReason'];
 const demo={aKm:100,aMin:150,bKm:40,bMin:65,cKm:140,cMin:190,hourly:4000,perKm:45,dispatch:2000,buffer:30,risk:15,round:500,toll:1500,waiting:6,handling:10};
+
+// The user explicitly opts in. ONLY six hypothetical cost settings are stored.
+// Never store location, addresses, route details, API keys, or case-specific expenses.
+const COST_STORE_KEY='rd_cargo_demo_cost_settings_v1';
+const COST_KEYS=['hourly','perKm','dispatch','buffer','risk','round'];
+const COST_LIMITS={hourly:[0,100000],perKm:[0,2000],dispatch:[0,1000000],buffer:[0,1440],risk:[0,100],round:[1,100000]};
+function costNotice(text,isError){
+ const el=$('costStatus');el.textContent=text;el.style.color=isError?'#aa3941':'#245d50';
+}
+function checkCosts(values){
+ const out={};
+ for(const k of COST_KEYS){
+   const raw=values[k];
+   if(typeof raw!=='string'||raw.trim()==='')throw new Error('基本原価の6項目をすべて入力してください。');
+   const n=Number(raw),range=COST_LIMITS[k];
+   if(!Number.isFinite(n)||n<range[0]||n>range[1]||(k==='round'&&!Number.isInteger(n)))
+     throw new Error('「'+k+'」が不正な値です。');
+   out[k]=String(n);
+ }
+ return out;
+}
+function loadSaved(quiet){
+ try{
+   const raw=localStorage.getItem(COST_STORE_KEY);
+   if(!raw){if(!quiet)costNotice('保存済みの仮条件はありません。',true);return false}
+   const obj=JSON.parse(raw);
+   if(obj?.version!==1||!obj?.cost)throw new Error('保存形式が古い可能性があります。');
+   const v=checkCosts(obj.cost);
+   COST_KEYS.forEach(k=>$(k).value=v[k]);
+   hideResults();
+   $('costDetails').open=false;
+   costNotice('保存済みの基本原価6項目を読み込みました。今回の住所・GPS・高速費は保存されていません。',false);
+   return true;
+ }catch(e){costNotice('保存済み条件を読み込めません。入力し直してください。',true);$('costDetails').open=true;return false}
+}
+$('saveCost').onclick=()=>{
+ try{
+   const source=Object.fromEntries(COST_KEYS.map(k=>[k,$(k).value]));
+   const cost=checkCosts(source);
+   localStorage.setItem(COST_STORE_KEY,JSON.stringify({version:1,cost}));
+   hideResults();$('costDetails').open=false;
+   costNotice('基本原価6項目だけ、このブラウザに保存しました。次回は自動で読み込みます。',false);
+ }catch(e){costNotice('保存できません：'+(e.message||'ブラウザ設定を確認してください。'),true);$('costDetails').open=true}
+};
+$('loadCost').onclick=()=>loadSaved(false);
+$('deleteCost').onclick=()=>{
+ try{localStorage.removeItem(COST_STORE_KEY);costNotice('保存済みの仮条件を削除しました。現在画面の入力値はそのままです。',false)}
+ catch(e){costNotice('端末の保存領域を操作できませんでした。',true)}
+};
+loadSaved(true);
+
 function hideResults(){$('result').hidden=true;$('error').hidden=true}
 function planChange(){let hasRoute=$('returnPlan').value==='route';$('returnFields').hidden=!hasRoute;$('returnReasonWrap').hidden=hasRoute;hideResults()}
 $('returnPlan').onchange=planChange;

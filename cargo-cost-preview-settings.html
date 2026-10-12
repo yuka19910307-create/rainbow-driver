@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>軽貨物・採算計算試作｜Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#192a40;background:#f3f6f9}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;line-height:1.6}header{background:#182f4d;color:white;padding:28px 18px}
+header div,main{max-width:710px;margin:0 auto}header .eyebrow{font-size:12px;letter-spacing:.14em;color:#bacde0}h1{font-size:24px;margin:6px 0}
+header p{font-size:13px;margin:0;color:#dbe5ee}main{padding:16px}
+section{background:white;border:1px solid #dbe4ed;border-radius:15px;padding:18px;margin-bottom:14px}
+h2{font-size:17px;margin:0 0 9px}h3{font-size:15px;margin:16px 0 8px}
+p{font-size:13px;color:#65778a}label{display:block;font-size:13px;font-weight:700;margin:10px 0 5px}
+input:not([type=checkbox]),select{background:white;border:1px solid #c7d3df;border-radius:10px;padding:12px;width:100%;font:inherit;font-size:16px}
+input[type=checkbox]{width:20px;height:20px;flex-shrink:0}
+.check{display:flex;align-items:flex-start;gap:12px;padding:7px 0;font-size:13px;font-weight:500}
+.check input{margin:3px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+button{font:inherit;font-weight:700;border:0;border-radius:11px;padding:13px 14px;cursor:pointer}
+.primary{background:#1b4066;color:white}.secondary{background:#e8f0f7;color:#1b4066}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.warning{background:#fff7e8;color:#815216;border-radius:10px;padding:11px;font-size:12px;margin-bottom:13px}
+.result{background:#f2f7fb;border-radius:12px;padding:14px}.big{font-size:29px;font-weight:800}
+.line{display:flex;justify-content:space-between;gap:15px;border-bottom:1px solid #d9e3ed;padding:9px 0;font-size:13px}.line:last-child{border-bottom:0}
+.line b{text-align:right}.error{background:#fff0ed;color:#a32626;border-radius:9px;padding:12px;font-size:13px;margin-top:12px}
+.good{color:#126b49;font-weight:700}footer{text-align:center;padding:6px 0 30px;font-size:12px;color:#64748b}
+@media(max-width:410px){.actions{grid-template-columns:1fr}}
+</style>
+</head>
+<body><header><div><div class="eyebrow">RAINBOW DRIVER / CARGO / TEST</div><h1>軽貨物の採算計算</h1><p>ドライバー内部試算・無料テスト版</p></div></header>
+<main>
+<section>
+<div class="warning"><strong>開発中の試算画面です。</strong> このURLを知っていれば誰でも画面を開けます。実単価・機密情報を入力しないでください。「仮条件を保存」を押した場合のみ基本原価6項目を端末のブラウザに保存します。住所やGPSは保存せず、Google Maps経路試算時は位置・住所をGoogleへ送ります。顧客見積・確定運賃ではありません。</div>
+<p>3つの走行区間と所要時間から最低受注額を検討します。Google Mapsによる自動ルート計算は次段階のため、この画面では交通状況を考慮した数値を手入力してください。</p>
+<div class="actions"><button type="button" class="secondary" id="demo">架空のサンプル値を入力</button><button type="button" class="secondary" id="reset">入力をすべて消す</button></div>
+</section>
+<section id="mapsAutoSection">
+<h2>Google Mapsで走行距離を自動入力 <small>試験機能</small></h2>
+<div class="warning">現在地・集荷先・納品先・配送後の移動先は、<strong>「Google Mapsで経路を試算」</strong>を押したときにGoogle Mapsへ送られます。Rainbow Driverのサーバーには保存しません。Google Maps Platformの利用料金が発生する場合があります。</div>
+<p>ブラウザ用に制限された既存のGoogle Maps APIキーが必要です。キーはこのページに保存しません。住所は詳細に入力してください。計算結果が正しいルートか、最終的に目視確認が必要です。</p>
+<label for="routeKey">Google Maps ブラウザ用APIキー（入力は任意）</label>
+<input id="routeKey" type="password" autocomplete="off" spellcheck="false" placeholder="既存の制限済みAPIキーを入力">
+<div class="actions">
+<button type="button" class="secondary" id="routeUseOldKey">既存アプリの保存済みキーを使用</button>
+<button type="button" class="secondary" id="routeConnect">入力したキーで接続</button>
+</div>
+<p id="routeKeyStatus" role="status">Google Maps：未接続。既存の保存済みキーがない場合は手入力してください。</p>
+<div class="actions">
+<button type="button" class="secondary" id="routeGPS">現在地を取得（1回）</button>
+<button type="button" class="secondary" id="routeGPSClear">取得位置を破棄</button>
+</div>
+<p id="routeGPSStatus" role="status">現在地：未取得。移動中は安全な場所で操作してください。</p>
+<label for="routePickup">集荷先（住所または施設名）</label>
+<input id="routePickup" type="text" autocomplete="street-address" placeholder="例：群馬県前橋市大手町2丁目12-1">
+<label for="routeDestination">納品先（住所または施設名）</label>
+<input id="routeDestination" type="text" autocomplete="off" placeholder="例：群馬県高崎市○○">
+<div id="routeReturnControls">
+<label for="routeAfterDestination">納品後の移動先（帰路・次の現場）</label>
+<input id="routeAfterDestination" type="text" autocomplete="off" placeholder="例：埼玉県北足立郡伊奈町○○">
+<label class="check"><input type="checkbox" id="routeReturnGPS"><span>納品後は現在地の地点に戻る（本当に戻るときだけ選択）</span></label>
+</div>
+<label class="check"><input type="checkbox" id="routeAvoidTolls"><span>高速・有料道路を避けて試算（通常はチェックなし）</span></label>
+<button type="button" id="routeAutoCalculate" class="primary" style="width:100%;margin-top:10px">Google Mapsで経路を試算・距離と時間を自動入力</button>
+<div id="routeAutoStatus" class="warning" style="margin-top:12px" role="status">未計算です。GPS・集荷先・納品先を入力してください。</div>
+<p>※現在の交通状況に基づく目安です。<strong>配送中や配送後の道路状況は将来変わる</strong>ため、拘束時間・最低受注額の最終判断には余裕を持たせてください。これは即時配送の検討用であり、予約計算ではありません。</p>
+</section>
+<section><h2>1. 走行距離・移動時間</h2>
+<h3>① 現在地 → 集荷先（空車回送）</h3>
+<div class="grid"><div><label for="aKm">距離 (km)</label><input id="aKm" type="number" min="0" step="0.1" placeholder="例：100"></div><div><label for="aMin">時間 (分)</label><input id="aMin" type="number" min="0" step="1" placeholder="例：150"></div></div>
+<h3>② 集荷先 → 納品先（配送）</h3>
+<div class="grid"><div><label for="bKm">距離 (km)</label><input id="bKm" type="number" min="0" step="0.1" placeholder="例：40"></div><div><label for="bMin">時間 (分)</label><input id="bMin" type="number" min="0" step="1" placeholder="例：65"></div></div>
+<h3>③ 納品後の移動</h3><label for="returnPlan">配送後の予定</label>
+<select id="returnPlan"><option value="route">移動あり（帰路・次の現場への移動）</option><option value="not_required">移動費不要（理由の確認が必要）</option></select>
+<div class="grid" id="returnFields"><div><label for="cKm">距離 (km)</label><input id="cKm" type="number" min="0" step="0.1" placeholder="例：140"></div><div><label for="cMin">時間 (分)</label><input id="cMin" type="number" min="0" step="1" placeholder="例：190"></div></div>
+<label class="check" id="returnReasonWrap" hidden><input type="checkbox" id="noReturnReason"><span>配送後の移動費不要の理由を確認しました</span></label>
+</section>
+<section><h2>2. 社内原価の条件（すべて仮定）</h2>
+<p>以下の入力値はRainbow Driverの確定料金ではありません。仮の数字で試せます。</p>
+<div class="warning">「仮条件を保存」を押すと、<strong>以下の基本原価6項目だけ</strong>が、このブラウザ内に保存されます。アカウント認証はなく、同じドメインの他のスクリプトからも参照可能です。機密の実単価や共有端末では使用しないでください。住所・GPS・高速費・待機時間・APIキーは保存しません。</div>
+<p id="costStatus" role="status">基本原価条件は未保存です。</p>
+<details id="costDetails" open>
+<summary style="padding:13px 10px;background:#edf2f7;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;color:#192f4c">基本原価6項目を確認・変更する</summary>
+<div class="grid">
+<div><label for="hourly">目標時間単価 (円/時間)</label><input id="hourly" type="number" min="0" placeholder="例：4000"></div>
+<div><label for="perKm">車両変動費 (円/km)</label><input id="perKm" type="number" min="0" placeholder="例：45"></div>
+<div><label for="dispatch">出動固定費 (円)</label><input id="dispatch" type="number" min="0" placeholder="例：2000"></div>
+<div><label for="buffer">作業予備時間 (分)</label><input id="buffer" type="number" min="0" placeholder="例：30"></div>
+<div><label for="risk">リスク余裕率 (%)</label><input id="risk" type="number" min="0" max="100" placeholder="例：15"></div>
+<div><label for="round">切り上げ単位 (円)</label><input id="round" type="number" min="1" value="500"></div>
+</div>
+<div class="actions">
+<button type="button" class="secondary" id="saveCost">仮条件をこの端末に保存</button>
+<button type="button" class="secondary" id="loadCost">保存した仮条件を呼び出す</button>
+</div>
+<button type="button" class="secondary" id="deleteCost" style="margin-top:10px;width:100%">保存済みの仮条件を削除する</button>
+</details>
+<h3>案件ごとの費用（保存されません）</h3>
+<div><label for="toll">高速・駐車費（概算・円）</label><input id="toll" type="number" min="0" value="0"></div>
+<h3>別途待機・追加荷役（仮ルール）</h3>
+<div class="grid"><div><label for="waiting">待機時間 (分)</label><input id="waiting" type="number" min="0" value="0"></div><div><label for="handling">追加荷役 (分)</label><input id="handling" type="number" min="0" value="0"></div></div>
+<p>通常の荷渡しは別途課金せず、待機と追加荷役は重複しない実測時間で計算。各5分まで無料、6～15分500円、16～30分1,000円、以降15分ごと500円加算（課税区分・契約条件は未確定）。</p>
+</section>
+<section><h2>3. 受注判断の確認事項</h2>
+<label for="status">ドライバーの稼働状態</label>
+<select id="status"><option value="offline">オフライン（相談のみ）</option><option value="accepting">受付可能</option><option value="delivering">配送中（相談のみ）</option><option value="break">休憩中（相談のみ）</option></select>
+<label class="check"><input id="gps" type="checkbox"><span>現在地が最新と確認済み</span></label>
+<label class="check"><input id="sameDay" type="checkbox"><span>今から集荷対応できる即時・当日案件</span></label>
+<label class="check"><input id="route" type="checkbox"><span>道路経路と渋滞時間を確認済み</span></label>
+<label class="check"><input id="cargo" type="checkbox"><span>荷物の寸法・重量・個数・積載可否を確認済み</span></label>
+<label class="check"><input id="tollCheck" type="checkbox"><span>高速道路・駐車費の扱いを確認済み</span></label>
+<label class="check"><input id="prevDay" type="checkbox"><span>集荷のため前日出発が必要（原則受けない）</span></label>
+<button type="button" id="calc" class="primary" style="width:100%;margin-top:13px">社内最低受注額を計算</button>
+<div class="error" id="error" hidden role="alert"></div>
+</section>
+<section id="result" hidden aria-live="polite">
+<h2>社内試算の結果</h2>
+<div class="result">
+<div class="line"><span>最低受注額（高速・駐車費除く）</span><b id="floor" class="big">—</b></div>
+<div class="line"><span>高速・駐車費概算（別）</span><b id="tollResult">—</b></div>
+<div class="line"><span>費用込みの検討金額</span><b id="total">—</b></div>
+<div class="line"><span>待機・追加荷役（別途・参考）</span><b id="extra">—</b></div>
+<div class="line"><span>走行合計 / 拘束時間（作業予備含む）</span><b id="travel">—</b></div>
+</div><h3 id="decision">要確認</h3><div id="warnings" class="warning"></div>
+<p>この表示をもって顧客への運賃提示・受注確定・契約成立はしません。見積条件、税、高速実費、積載条件は個別確認です。</p>
+</section>
+<footer>Rainbow Driver / internal experimental cost calculator / optional local-only demo settings</footer>
+</main>
+<script>
+/* Rainbow Driver Cargo: INTERNAL preliminary acceptance floor only.
+ * Never use this output to auto-accept an order, charge a customer, or issue a quote.
+ * No fixed public rates are embedded. Operator must enter cost assumptions.
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.CargoPricing = api;
+})(typeof window !== 'undefined' ? window : null, function () {
+  'use strict';
+
+  function number(value, label, min, max) {
+    if (value === null || value === undefined || typeof value === 'boolean' || value === '' ||
+        (typeof value === 'string' && !value.trim())) {
+      throw new Error(label + 'が未入力です');
+    }
+    var n = Number(value);
+    if (!Number.isFinite(n) || n < min || n > max) {
+      throw new Error(label + 'の数値が範囲外です');
+    }
+    return n;
+  }
+
+  function route(value, label) {
+    if (!value) throw new Error(label + 'の距離・時間が未入力です');
+    return {
+      km: number(value.km, label + '距離(km)', 0, 5000),
+      minutes: number(value.minutes, label + '所要時間(分)', 0, 14400)
+    };
+  }
+
+  function calculate(input) {
+    if (!input || typeof input !== 'object') throw new Error('計算条件が未入力です');
+    var empty = route(input.toPickup, '回送');
+    var loaded = route(input.delivery, '配送');
+    if (input.returnPlan !== 'route' && input.returnPlan !== 'not_required') {
+      throw new Error('配送後の移動予定を選択してください');
+    }
+    var back = input.returnPlan === 'route'
+      ? route(input.afterDelivery, '配送後の移動') : {km: 0, minutes: 0};
+
+    var p = input.parameters || {};
+    var hourly = number(p.hourlyTargetYen, '目標時間単価', 0, 100000);
+    var yenPerKm = number(p.vehicleYenPerKm, '車両変動コスト', 0, 2000);
+    var fixed = number(p.dispatchCostYen, '出動固定コスト', 0, 1000000);
+    var bufferMin = number(p.handlingBufferMinutes, '準備・荷扱い予備時間', 0, 1440);
+    var riskPercent = number(p.riskReservePct, 'リスク留保率', 0, 100);
+    var roundYen = number(p.roundUpYen, '切り上げ単位', 1, 100000);
+    var toll = number(p.expectedTollParkingYen, '高速・駐車費概算', 0, 1000000);
+    if (!Number.isInteger(roundYen)) throw new Error('切り上げ単位は整数にしてください');
+
+    var totalKm = empty.km + loaded.km + back.km;
+    var totalMinutes = empty.minutes + loaded.minutes + back.minutes + bufferMin;
+    var timeCost = hourly * totalMinutes / 60;
+    var vehicleCost = yenPerKm * totalKm;
+    var operatingCost = timeCost + vehicleCost + fixed;
+    var floor = Math.ceil(operatingCost * (1 + riskPercent / 100) / roundYen) * roundYen;
+
+    var warnings = [];
+    if (input.driverStatus !== 'accepting') warnings.push('現在の稼働状態は受付可能ではありません');
+    if (input.locationFresh !== true) warnings.push('GPS位置情報の更新確認が必要です');
+    if (input.sameDayPickup !== true) warnings.push('即時・当日集荷以外はアプリで受付しません');
+    if (input.needsPreviousDayDeparture === true) warnings.push('前日出発が必要な案件は原則受けません');
+    if (input.routeVerified !== true) warnings.push('道路経路・渋滞時間の実確認が必要です');
+    if (input.cargoConfirmed !== true) warnings.push('荷姿・重量・積載可否の確認が必要です');
+    if (input.tollConfirmed !== true) warnings.push('高速・駐車費の扱いが未確定です');
+    if (input.returnPlan === 'not_required' && input.noReturnReasonConfirmed !== true) {
+      warnings.push('配送後の移動費不要の根拠を確認してください');
+    }
+
+    return {
+      internalFloorYen: floor,
+      tollParkingEstimatedYen: toll,
+      provisionalCostWithExpensesYen: floor + toll,
+      sumKm: Math.round(totalKm * 100) / 100,
+      sumMinutes: Math.round(totalMinutes * 100) / 100,
+      breakdown: {
+        toPickup: empty,
+        delivery: loaded,
+        afterDelivery: back,
+        bufferMinutes: bufferMin,
+        timeCostYen: Math.ceil(timeCost),
+        vehicleCostYen: Math.ceil(vehicleCost),
+        dispatchCostYen: fixed,
+        riskReservePct: riskPercent
+      },
+      reviewState: warnings.length ? 'consultation_only' : 'manual_review',
+      warnings: warnings,
+      disclaimer: '社内の採算判断用・仮計算です。顧客見積、確定運賃、課税区分、決済額、受注確定ではありません。'
+    };
+  }
+
+  function extraTimeFee(minutes) {
+    var n = number(minutes, '待機・追加荷役時間', 0, 14400);
+    if (n <= 5) return 0;
+    if (n <= 15) return 500;
+    return 1000 + Math.ceil((n - 30) / 15) * 500;
+  }
+  function supplementaryFees(waitMinutes, handlingMinutes) {
+    var waitFee = extraTimeFee(waitMinutes);
+    var handlingFee = extraTimeFee(handlingMinutes);
+    return {
+      waitingYen: waitFee,
+      additionalHandlingYen: handlingFee,
+      subtotalYen: waitFee + handlingFee,
+      notice:'通常の荷渡しは基本作業内。待機と追加荷役は重複しない実測時間で算定し、課税区分・契約条件は要確認。'
+    };
+  }
+
+  return {calculate:calculate,extraTimeFee:extraTimeFee,supplementaryFees:supplementaryFees};
+});
+
+</script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id),yen=n=>Math.round(n).toLocaleString('ja-JP')+'円';
+const values=['aKm','aMin','bKm','bMin','cKm','cMin','hourly','perKm','dispatch','buffer','risk','round','toll','waiting','handling'];
+const flags=['gps','sameDay','route','cargo','tollCheck','prevDay','noReturnReason'];
+const demo={aKm:100,aMin:150,bKm:40,bMin:65,cKm:140,cMin:190,hourly:4000,perKm:45,dispatch:2000,buffer:30,risk:15,round:500,toll:1500,waiting:6,handling:10};
+
+// The user explicitly opts in. ONLY six hypothetical cost settings are stored.
+// Never store location, addresses, route details, API keys, or case-specific expenses.
+const COST_STORE_KEY='rd_cargo_demo_cost_settings_v1';
+const COST_KEYS=['hourly','perKm','dispatch','buffer','risk','round'];
+const COST_LIMITS={hourly:[0,100000],perKm:[0,2000],dispatch:[0,1000000],buffer:[0,1440],risk:[0,100],round:[1,100000]};
+function costNotice(text,isError){
+ const el=$('costStatus');el.textContent=text;el.style.color=isError?'#aa3941':'#245d50';
+}
+function checkCosts(values){
+ const out={};
+ for(const k of COST_KEYS){
+   const raw=values[k];
+   if(typeof raw!=='string'||raw.trim()==='')throw new Error('基本原価の6項目をすべて入力してください。');
+   const n=Number(raw),range=COST_LIMITS[k];
+   if(!Number.isFinite(n)||n<range[0]||n>range[1]||(k==='round'&&!Number.isInteger(n)))
+     throw new Error('「'+k+'」が不正な値です。');
+   out[k]=String(n);
+ }
+ return out;
+}
+function loadSaved(quiet){
+ try{
+   const raw=localStorage.getItem(COST_STORE_KEY);
+   if(!raw){if(!quiet)costNotice('保存済みの仮条件はありません。',true);return false}
+   const obj=JSON.parse(raw);
+   if(obj?.version!==1||!obj?.cost)throw new Error('保存形式が古い可能性があります。');
+   const v=checkCosts(obj.cost);
+   COST_KEYS.forEach(k=>$(k).value=v[k]);
+   hideResults();
+   $('costDetails').open=false;
+   costNotice('保存済みの基本原価6項目を読み込みました。今回の住所・GPS・高速費は保存されていません。',false);
+   return true;
+ }catch(e){costNotice('保存済み条件を読み込めません。入力し直してください。',true);$('costDetails').open=true;return false}
+}
+$('saveCost').onclick=()=>{
+ try{
+   const source=Object.fromEntries(COST_KEYS.map(k=>[k,$(k).value]));
+   const cost=checkCosts(source);
+   localStorage.setItem(COST_STORE_KEY,JSON.stringify({version:1,cost}));
+   hideResults();$('costDetails').open=false;
+   costNotice('基本原価6項目だけ、このブラウザに保存しました。次回は自動で読み込みます。',false);
+ }catch(e){costNotice('保存できません：'+(e.message||'ブラウザ設定を確認してください。'),true);$('costDetails').open=true}
+};
+$('loadCost').onclick=()=>loadSaved(false);
+$('deleteCost').onclick=()=>{
+ try{localStorage.removeItem(COST_STORE_KEY);costNotice('保存済みの仮条件を削除しました。現在画面の入力値はそのままです。',false)}
+ catch(e){costNotice('端末の保存領域を操作できませんでした。',true)}
+};
+loadSaved(true);
+
+function hideResults(){$('result').hidden=true;$('error').hidden=true}
+function planChange(){let hasRoute=$('returnPlan').value==='route';$('returnFields').hidden=!hasRoute;$('returnReasonWrap').hidden=hasRoute;hideResults()}
+$('returnPlan').onchange=planChange;
+values.forEach(id=>$(id).addEventListener('input',hideResults));
+flags.forEach(id=>$(id).addEventListener('change',hideResults));
+$('status').addEventListener('change',hideResults);
+$('demo').onclick=()=>{values.forEach(id=>$(id).value=Object.prototype.hasOwnProperty.call(demo,id)?String(demo[id]):'');flags.forEach(id=>$(id).checked=false);$('status').value='offline';$('returnPlan').value='route';planChange();hideResults()};
+$('reset').onclick=()=>{values.forEach(id=>$(id).value=id==='round'?'500':(['toll','waiting','handling'].includes(id)?'0':''));flags.forEach(id=>$(id).checked=false);$('status').value='offline';$('returnPlan').value='route';planChange();hideResults()};
+$('calc').onclick=()=>{
+  hideResults();
+  try {
+    let get=id=>$(id).value,check=id=>$(id).checked;
+    const estimate=window.CargoPricing.calculate({
+      toPickup:{km:get('aKm'),minutes:get('aMin')},
+      delivery:{km:get('bKm'),minutes:get('bMin')},
+      returnPlan:$('returnPlan').value,
+      afterDelivery:$('returnPlan').value==='route'?{km:get('cKm'),minutes:get('cMin')}:null,
+      driverStatus:$('status').value,locationFresh:check('gps'),sameDayPickup:check('sameDay'),
+      routeVerified:check('route'),cargoConfirmed:check('cargo'),tollConfirmed:check('tollCheck'),
+      needsPreviousDayDeparture:check('prevDay'),noReturnReasonConfirmed:check('noReturnReason'),
+      parameters:{
+        hourlyTargetYen:get('hourly'),vehicleYenPerKm:get('perKm'),dispatchCostYen:get('dispatch'),
+        handlingBufferMinutes:get('buffer'),riskReservePct:get('risk'),roundUpYen:get('round'),expectedTollParkingYen:get('toll')
+      }
+    });
+    const fees=window.CargoPricing.supplementaryFees(get('waiting'),get('handling'));
+    $('floor').textContent=yen(estimate.internalFloorYen);
+    $('tollResult').textContent=yen(estimate.tollParkingEstimatedYen);
+    $('total').textContent=yen(estimate.provisionalCostWithExpensesYen);
+    $('extra').textContent=yen(fees.subtotalYen);
+    $('travel').textContent=estimate.sumKm.toLocaleString('ja-JP')+'km / '+Math.ceil(estimate.sumMinutes)+'分';
+    $('decision').textContent=estimate.reviewState==='manual_review'?'ドライバーによる最終審査が必要':'個別相談・条件未確認';
+    $('warnings').textContent=estimate.warnings.length?estimate.warnings.map(s=>'・'+s).join('\n'):'確認項目に不足はありません。ただし自動受注は行いません。';
+    $('warnings').style.whiteSpace='pre-wrap';
+    $('result').hidden=false;
+    $('result').scrollIntoView({behavior:'smooth',block:'start'});
+  } catch(error) {
+    $('error').textContent='入力内容を確認してください：'+(error?.message||'計算できません');
+    $('error').hidden=false;
+  }
+};
+planChange();
+})();
+</script>
+
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+let gpsPoint=null,fixAt=0,routeApi=null,loading=false,nonce=0,calculating=false,routeKeyUsed=false;
+const fmtTime=t=>new Date(t).toLocaleString('ja-JP');
+function show(id,message,isError){
+ const el=$(id);el.textContent=message;el.style.color=isError?'#a32626':'#246044';
+}
+function invalidate(){
+ nonce++;
+ $('route').checked=false;
+ $('result').hidden=true;
+}
+function fresh(){return !!gpsPoint&&Date.now()-fixAt<120000}
+function syncReturn(){
+ $('routeReturnControls').hidden=$('returnPlan').value!=='route';
+ invalidate();
+}
+$('returnPlan').addEventListener('change',syncReturn);
+['routePickup','routeDestination','routeAfterDestination','routeAvoidTolls','routeReturnGPS'].forEach(id=>{
+ $(id).addEventListener('input',invalidate);
+ $(id).addEventListener('change',invalidate);
+});
+['aKm','aMin','bKm','bMin','cKm','cMin'].forEach(id=>{
+ $(id).addEventListener('input',invalidate);
+});
+$('demo').addEventListener('click',invalidate);
+$('reset').addEventListener('click',invalidate);
+function clearGPS(){
+ gpsPoint=null;fixAt=0;invalidate();$('gps').checked=false;
+ show('routeGPSStatus','現在地：未取得。位置情報は保存されません。',false);
+}
+$('routeGPSClear').addEventListener('click',clearGPS);
+$('routeGPS').addEventListener('click',()=>{
+ if(!navigator.geolocation || !window.isSecureContext) {
+   show('routeGPSStatus','位置情報を取得できません。HTTPS・GPS許可を確認してください。',true);return;
+ }
+ show('routeGPSStatus','GPS取得中です…',false);
+ navigator.geolocation.getCurrentPosition(p=>{
+   gpsPoint={lat:p.coords.latitude,lng:p.coords.longitude};fixAt=p.timestamp||Date.now();
+   invalidate();
+   const acc=Number.isFinite(p.coords.accuracy)?Math.round(p.coords.accuracy):null;
+   show('routeGPSStatus','取得時刻 '+fmtTime(fixAt)+(acc==null?'':'／精度の目安 ±'+acc+'m')+'。2分後は再取得してください。',false);
+ },e=>{
+   clearGPS();show('routeGPSStatus','GPS取得失敗：位置情報の許可・電波状況を確認してください。',true);
+ },{enableHighAccuracy:true,maximumAge:0,timeout:16000});
+});
+window.__cargoCostMapsLoaded=async function(){
+ try{
+   const lib=await google.maps.importLibrary('routes');
+   routeApi=lib.Route;
+   show('routeKeyStatus','Google Maps：接続済み（ブラウザ用キー）',false);
+ }catch(e){show('routeKeyStatus','Google MapsのRoutes機能を読み込めません。APIの有効化状況を確認してください。',true)}
+ finally{loading=false}
+};
+function connect(key){
+ if(!key){show('routeKeyStatus','Google Mapsのブラウザ用APIキーがありません。',true);return}
+ if(routeApi){show('routeKeyStatus','Google Maps：すでに接続済みです。',false);return}
+ if(loading)return;
+ loading=true;routeKeyUsed=true;
+ show('routeKeyStatus','Google Maps接続中…',false);
+ const script=document.createElement('script');
+ script.async=true;
+ script.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&v=weekly&callback=__cargoCostMapsLoaded';
+ script.onerror=()=>{loading=false;show('routeKeyStatus','接続できませんでした。APIキーの利用ドメインとRoutes APIを確認してください。',true)};
+ document.head.appendChild(script);
+ $('routeKey').value='';
+}
+$('routeConnect').addEventListener('click',()=>connect($('routeKey').value.trim()));
+$('routeUseOldKey').addEventListener('click',()=>{
+ // Reuse only after deliberate tap. Never log or echo the value.
+ let key=null;
+ try {key=localStorage.getItem('rd_maps_key')}catch(e){}
+ if(!key){show('routeKeyStatus','このブラウザには保存済みの既存キーがありません。手入力してください。',true);return}
+ connect(key);
+});
+async function calculateLeg(a,b,avoid){
+ const response=await routeApi.computeRoutes({
+   origin:a,destination:b,travelMode:'DRIVING',routingPreference:'TRAFFIC_AWARE',
+   routeModifiers:{avoidHighways:avoid,avoidTolls:avoid},
+   fields:['distanceMeters','durationMillis']
+ });
+ const r=response.routes&&response.routes[0];
+ if(!r||!Number.isFinite(r.distanceMeters)||!Number.isFinite(r.durationMillis)||r.distanceMeters<0||r.durationMillis<0)
+   throw Error('指定された地点の道路経路が見つかりません');
+ return {km:r.distanceMeters/1000,min:Math.ceil(r.durationMillis/60000)};
+}
+$('routeAutoCalculate').addEventListener('click',async()=>{
+ if(calculating)return;
+ if(!routeApi){show('routeAutoStatus','Google Mapsへ接続してください。',true);return}
+ if(!fresh()){invalidate();show('routeAutoStatus','GPS位置がないか2分以上古くなっています。現在地を再取得してください。',true);return}
+ const pickup=$('routePickup').value.trim(),delivery=$('routeDestination').value.trim();
+ const goBack=$('returnPlan').value==='route';
+ const finish=goBack?($('routeReturnGPS').checked?gpsPoint:$('routeAfterDestination').value.trim()):null;
+ if(!pickup||!delivery||(goBack&&!finish)){
+   show('routeAutoStatus','集荷先・納品先・配送後の移動先を入力してください。配送後の移動が不要なら上で選択してください。',true);return;
+ }
+ calculating=true;
+ const myNonce=++nonce;
+ $('routeAutoCalculate').disabled=true;
+ show('routeAutoStatus','交通状況を含む道路距離を計算中です（最大3区間）…',false);
+ try{
+   const avoid=$('routeAvoidTolls').checked,origin={...gpsPoint};
+   // Do not allow users to accept results from a partial failed itinerary.
+   const first=await calculateLeg(origin,pickup,avoid);
+   const second=await calculateLeg(pickup,delivery,avoid);
+   const third=goBack?await calculateLeg(delivery,finish,avoid):null;
+   if(myNonce!==nonce||!fresh())throw Error('計算中に入力や現在地が変わりました。再度試してください');
+   const put=(id,value)=>{$(id).value=String(value)};
+   put('aKm',Math.ceil(first.km*10)/10);put('aMin',first.min);
+   put('bKm',Math.ceil(second.km*10)/10);put('bMin',second.min);
+   if(third){put('cKm',Math.ceil(third.km*10)/10);put('cMin',third.min)}
+   $('gps').checked=true;
+   // Calculation does not imply route verification.
+   $('route').checked=false;
+   $('result').hidden=true;
+   show('routeAutoStatus','経路計算成功（採算計算用距離は0.1km単位で切上げ）：回送 '+$('aKm').value+'km / '+first.min+'分、配送 '+$('bKm').value+'km / '+second.min+'分'+(third?'、配送後 '+$('cKm').value+'km / '+third.min+'分':'')+'。経路と交通状況を目視確認し、下の確認欄にチェックしてから採算計算してください。',false);
+ }catch(e){
+   $('route').checked=false;
+   show('routeAutoStatus','ルート計算を完了できませんでした。住所・API設定・通信状況を確認してください。'+(e&&e.message?'（'+String(e.message).slice(0,120)+'）':''),true);
+ }finally{calculating=false;$('routeAutoCalculate').disabled=false}
+});
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden){clearGPS();$('routeAutoStatus').textContent='画面を離れたため現在地を破棄しました。もう一度取得してください。'}
+});
+setInterval(()=>{
+ if(gpsPoint&&!fresh()){
+   clearGPS();
+   show('routeAutoStatus','GPSが2分以上古くなりました。再取得・経路再確認が必要です。',true);
+ }
+},15000);
+syncReturn();
+})();
+</script>
+</body></html>

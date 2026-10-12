@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#1c3655">
+<title>軽貨物 総合セキュリティ監査 | Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1d344f;background:#f1f5fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.65}
+header{background:#1c3655;color:#fff;padding:24px 16px}header>div,main{max-width:720px;margin:auto}
+header small{font-size:12px;letter-spacing:.08em}h1{font-size:22px;margin:8px 0}h2{font-size:19px;margin:0 0 12px}
+main{padding:16px}section{background:#fff;border:1px solid #d9e3ef;border-radius:13px;padding:20px;margin-bottom:14px}
+.notice{background:#fff3dd;color:#754f1d;border-radius:9px;padding:14px;font-size:14px}
+button{padding:14px 18px;border:0;border-radius:10px;background:#28496c;color:white;font:inherit;font-weight:700}
+button:disabled{opacity:.55}a{color:#185b97}
+#result{white-space:pre-wrap;overflow-wrap:anywhere;font-weight:600}
+.small{font-size:14px;color:#5d7087}li{margin-bottom:8px}
+</style></head><body>
+<header><div><small>RAINBOW DRIVER / CARGO / PRELAUNCH ONLY</small><h1>総合セキュリティ監査</h1></div></header>
+<main>
+<section>
+<p class="notice"><b>正式な配送受付は停止中です。</b> 管理者専用の公開前監査です。お客様の個人情報や配送依頼は送信・保存しません。</p>
+<p><a href="./driver.html">軽貨物ドライバー画面へ戻る</a></p>
+<p id="authState" role="status">管理者ログインを確認しています…</p>
+</section>
+<section id="testing" hidden>
+<h2>公開停止・アクセス制限の確認</h2>
+<p>一般受付停止、5つの非公開テーブル、4つのサーバー専用処理、架空テストデータの残存、既存テスト案件の保存状況など、10項目を確認します。</p>
+<button id="run" type="button">10項目の安全監査を実行</button>
+<p id="result" role="status" aria-live="polite">未実施</p>
+</section>
+<section>
+<h2>まだ完成していない部分</h2>
+<ul>
+<li>実際のメールアドレス宛ての本人確認コード送信・受信</li>
+<li>CAPTCHA・回数制限・本人確認・暗号化・重複防止をつないだ正式受付処理</li>
+<li>実際の受付から管理者の審査・通知までの一連の統合試験</li>
+<li>外部からの不正操作、障害、同時アクセスなどの総合検証</li>
+</ul>
+<p class="small"><b>10項目すべて合格しても、一般受付を公開可能という意味ではありません。</b> アプリの公開判断は別工程です。</p>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{"use strict";
+const $=id=>document.getElementById(id);
+const url="https://kvoaorzdewwirqryeizq.supabase.co";
+const publishableKey="sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms";
+let client=null,authorized=false;
+function output(id,text){$(id).textContent=text}
+async function login(){
+ if(!window.supabase){output("authState","認証ライブラリを読み込めませんでした。");return}
+ client=window.supabase.createClient(url,publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}});
+ try{
+  const {data:{user},error}=await client.auth.getUser();
+  if(error||!user){output("authState","軽貨物ドライバー画面からログインしてください。");return}
+  const {data,error:memberError}=await client.from("cargo_operator_accounts").select("user_id").eq("user_id",user.id).maybeSingle();
+  if(memberError||!data){output("authState","軽貨物管理者権限がありません。");return}
+  authorized=true;$("testing").hidden=false;
+  output("authState","軽貨物管理者ログインを確認しました。監査専用です。");
+ }catch{output("authState","認証を確認できませんでした。")}
+}
+$("run").onclick=async()=>{
+ if(!authorized)return;
+ const btn=$("run");btn.disabled=true;
+ output("result","サーバー側で安全監査を実行しています…");
+ try{
+  const {data,error}=await client.functions.invoke("cargo-security-audit-test",{body:{action:"run"}});
+  if(error||!data){
+   output("result","監査を完了できませんでした。ログインまたは通信状態を確認してください。一般受付は停止中です。");
+   return;
+  }
+  const ok=data.ok===true&&data.passed===10&&data.total===10
+   &&Array.isArray(data.failed_checks)&&data.failed_checks.length===0
+   &&data.public_intake_enabled===false&&data.launch_ready===false
+   &&data.actual_contact_processed===false&&data.real_dispatch_created===false;
+  if(ok){
+   output("result","成功！\n安全監査10項目：すべて合格\n一般受付：停止中\n顧客連絡先：0件\n本番配送依頼：0件\n非公開テーブル：アクセス制限確認\nサーバー専用処理：権限確認\n残存テストデータ：なし\n既存の架空案件：保持\n\n※正式受付の統合実装・実メール送信は未完成です。");
+  }else{
+   output("result","監査に未合格の項目があります。\n合格："+String(data.passed??"不明")
+      +" / "+String(data.total??"不明")
+      +"\n未合格："+(Array.isArray(data.failed_checks)?data.failed_checks.join(", "):"取得できません")
+      +"\n一般受付は停止中です。");
+  }
+ }catch{
+  output("result","監査中に通信エラーが発生しました。一般受付は停止中です。");
+ }finally{btn.disabled=false}
+};
+login();
+})();
+</script></body></html>

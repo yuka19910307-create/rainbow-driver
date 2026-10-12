@@ -1,0 +1,35 @@
+name: Cargo Expo connection check (manual)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm an Expo token is configured
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN is missing from repository secrets."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/cargo-driver-mvp-20261012
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install lightweight project dependencies
+        working-directory: cargo-ios
+        run: npm install --no-audit --no-fund
+      - name: Set up Expo account authentication
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Verify linked Expo project
+        working-directory: cargo-ios
+        run: eas project:info

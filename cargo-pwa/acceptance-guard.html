@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#1c3655">
+<title>軽貨物 受諾フロー安全検証 | Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1d344f;background:#f1f5fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.65}
+header{background:#1c3655;color:white;padding:22px 16px}header>div,main{max-width:720px;margin:auto}
+h1{font-size:22px;margin:8px 0}h2{font-size:19px}
+main{padding:16px}section{background:white;border:1px solid #d9e3ef;border-radius:13px;padding:20px;margin-bottom:14px}
+.notice{background:#fff3dd;color:#754f1d;border-radius:9px;padding:14px;font-size:14px}
+button{padding:14px 18px;border:0;border-radius:10px;background:#28496c;color:white;font:inherit;font-weight:700}
+button:disabled{opacity:.55}a{color:#185b97}
+#result{white-space:pre-wrap;overflow-wrap:anywhere;font-weight:600}
+.small{font-size:14px;color:#5d7087}
+</style></head><body>
+<header><div><small>RAINBOW DRIVER / CARGO / PRELAUNCH ONLY</small>
+<h1>管理者受諾フローの安全テスト</h1></div></header>
+<main>
+<section>
+<p class="notice"><b>一般受付は停止中です。</b> 架空の配送案件をDBの一時処理内だけで試し、検証後は変更をすべて取り消します。実際の案件・顧客情報・運転請負サービスは変更しません。</p>
+<p><a href="./driver.html">軽貨物ドライバー画面へ戻る</a></p>
+<p id="authState" role="status">管理者ログインを確認しています…</p>
+</section>
+<section id="testing" hidden>
+<h2>採算審査・安全確認・受諾・キャンセル</h2>
+<p>採算審査なしの受諾、採算割れ、確認漏れ、適正なテスト受諾、再受諾、理由不足のキャンセル、取消後の変更などをサーバー側で検証します。</p>
+<button id="run" type="button">架空の受諾フローテストを実行</button>
+<p id="result" role="status" aria-live="polite">未実施</p>
+<p class="small">本画面は安全ガードの検証専用です。正式受付、顧客への連絡、配車、決済、Push通知は発生しません。正式受諾フローの公開は別工程です。</p>
+</section></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{"use strict";
+const $=id=>document.getElementById(id);
+const url="https://kvoaorzdewwirqryeizq.supabase.co";
+const publishableKey="sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms";
+let client=null,authorized=false;
+function status(id,text){$(id).textContent=text}
+async function authenticate(){
+ if(!window.supabase){status("authState","認証ライブラリを読み込めませんでした。");return}
+ client=window.supabase.createClient(url,publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}});
+ try{
+  const {data:{user},error}=await client.auth.getUser();
+  if(error||!user){status("authState","軽貨物ドライバー画面でログインしてください。");return}
+  const {data,error:memberError}=await client.from("cargo_operator_accounts").select("user_id").eq("user_id",user.id).maybeSingle();
+  if(memberError||!data){status("authState","軽貨物管理者権限がありません。");return}
+  authorized=true;$("testing").hidden=false;
+  status("authState","軽貨物管理者ログインを確認しました。架空テスト専用です。");
+ }catch{status("authState","認証を確認できませんでした。")}
+}
+$("run").onclick=async()=>{
+ if(!authorized)return;
+ const btn=$("run");btn.disabled=true;
+ status("result","サーバーで安全な受諾フローを検証しています…");
+ try{
+  const {data,error}=await client.functions.invoke("cargo-acceptance-guard-test",{body:{action:"run"}});
+  if(error||!data){status("result","テストを実行できませんでした。ログイン・通信状態を確認してください。一般受付は停止中です。");return}
+  const ok=data.ok===true&&data.checks_total===10&&data.checks_passed===10
+    &&data.rolled_back===true&&data.no_test_rows_remain===true
+    &&data.actual_dispatch_created===false
+    &&data.customer_data_processed===false
+    &&data.public_intake_enabled===false;
+  if(ok){
+   status("result","成功！\n採算審査なし：受諾拒否\n最低額未満：拒否\n安全確認漏れ：拒否\n採算・安全確認済み：テスト受諾成功\n再受諾：拒否\nキャンセル理由不足：拒否\n理由付きキャンセル：成功\n取消済み案件の状態変更：拒否\nDBの一時変更：全件ロールバック\n実際の配送案件：変更なし\n一般受付：停止中");
+  }else{
+   status("result","検証未完了。\n合格数："+String(data.checks_passed??"不明")
+     +" / "+String(data.checks_total??"不明")
+     +"\n一時データ取消："+(data.rolled_back===true?"成功":"未確認")
+     +"\n一般受付：停止中");
+  }
+ }catch{status("result","通信エラーです。一般受付は停止中です。")}
+ finally{btn.disabled=false}
+};
+authenticate();
+})();
+</script></body></html>

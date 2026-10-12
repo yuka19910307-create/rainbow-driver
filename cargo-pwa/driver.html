@@ -53,10 +53,21 @@ a{color:#1f5e91}.badge{font-size:11px;background:#e8eef5;padding:4px 8px;border-
 <p id="pushState" class="state" role="status">通知は未設定です。</p>
 <p class="note">iPhoneの通知が届くことは、現時点では未検証です。通知テストは1分に1回・1時間に10回までです。</p>
 </section>
-<section><h2>2. 即時配送テスト案件</h2><button id="refresh" class="secondary" type="button">案件一覧を更新</button>
+<section><h2>2. ドライバー稼働状況（試験運用）</h2>
+<p class="muted">表示内容は管理者だけが確認できます。実際のお客様からの受付や配車は有効になりません。「受付可能」は20分後に自動的に期限切れとなります。現在地は公開・保存しません。</p>
+<div class="actions">
+<button id="presenceAvailable" type="button">受付可能（テスト）</button>
+<button id="presenceBusy" type="button" class="secondary">配送中</button>
+<button id="presenceBreak" type="button" class="secondary">休憩中</button>
+<button id="presenceOffline" type="button" class="secondary">オフライン</button>
+</div>
+<p class="state" id="presenceState" role="status">状態を確認中…</p>
+<button id="presenceRefresh" type="button" class="secondary">状態を更新</button>
+</section>
+<section><h2>3. 即時配送テスト案件</h2><button id="refresh" class="secondary" type="button">案件一覧を更新</button>
 <p id="listState" class="state">案件を確認中…</p><div id="requests"></div>
 </section>
-<section><h2>3. 関連画面</h2><p><a href="./review.html">採算審査・受諾前確認・キャンセル管理（PWA内）</a></p>
+<section><h2>4. 関連画面</h2><p><a href="./review.html">採算審査・受諾前確認・キャンセル管理（PWA内）</a></p>
 <p><a href="/cargo-request-preview.html">お客様向け入力フォーム（公開前プレビュー）</a></p>
 <p><a href="/cargo-operator-cost.html">認証付き採算計算（社内用）</a></p>
 <p><a href="/cargo-dispatch-test.html">管理者用のテスト案件一覧</a></p>
@@ -103,9 +114,43 @@ async function checkAuth(){
   user=u;$('authGate').hidden=true;$('dashboard').hidden=false;
   log('operator','ログイン中：'+(u.email||'登録済みユーザー'));
   log('installState',standalone()?'ホーム画面アプリとして起動中です。':'ブラウザで表示中です。iPhoneはホーム画面に追加してから通知登録してください。');
-  await Promise.allSettled([refreshRequests(),refreshPushStatus()]);
+  await Promise.allSettled([refreshRequests(),refreshPushStatus(),loadPresence()]);
  }catch(e){showLogin('ログインの確認に失敗しました。ネットワークを確認してください。')}
 }
+
+const PRESENCE={offline:'オフライン',available:'受付可能（テスト）',busy:'配送中',break:'休憩中'};
+function renderPresence(row){
+  const fresh=row?.mode==='available'&&Date.parse(row.expires_at)>Date.now();
+  const mode=fresh?'available':row?.mode==='available'?'offline':row?.mode||'offline';
+  const remaining=fresh?'・有効期限 '+new Date(row.expires_at).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'';
+  log('presenceState','現在：'+(PRESENCE[mode]||'オフライン')+remaining+'。一般のお客様には公開していません。');
+}
+async function loadPresence(){
+ if(!user)return;
+ const {data,error}=await client.from('cargo_operator_presence')
+   .select('operator_id,mode,updated_at,expires_at').eq('operator_id',user.id).maybeSingle();
+ if(error){log('presenceState','稼働状態を取得できませんでした。');return}
+ renderPresence(data);
+}
+async function setPresence(mode){
+ if(!user||!(mode in PRESENCE))return;
+ const targets=['presenceAvailable','presenceBusy','presenceBreak','presenceOffline'];
+ targets.forEach(id=>$(id).disabled=true);
+ try{
+  const base=client.from('cargo_operator_presence');
+  const {data,error:lookupError}=await base.select('operator_id').eq('operator_id',user.id).maybeSingle();
+  if(lookupError)throw Error('管理者状態を確認できませんでした。');
+  const {error}=data?await base.update({mode}).eq('operator_id',user.id):await base.insert({operator_id:user.id,mode});
+  if(error)throw Error('稼働状態を保存できませんでした。');
+  await loadPresence();
+ }catch(e){log('presenceState',e.message||'状態の保存に失敗しました。')}
+ finally{targets.forEach(id=>$(id).disabled=false)}
+}
+$('presenceAvailable').onclick=()=>setPresence('available');
+$('presenceBusy').onclick=()=>setPresence('busy');
+$('presenceBreak').onclick=()=>setPresence('break');
+$('presenceOffline').onclick=()=>setPresence('offline');
+$('presenceRefresh').onclick=loadPresence;
 function paragraph(text){
  const p=document.createElement('p');p.textContent=text;return p;
 }

@@ -56,7 +56,7 @@ a{color:#1f5e91}.badge{font-size:11px;background:#e8eef5;padding:4px 8px;border-
 <section><h2>2. 即時配送テスト案件</h2><button id="refresh" class="secondary" type="button">案件一覧を更新</button>
 <p id="listState" class="state">案件を確認中…</p><div id="requests"></div>
 </section>
-<section><h2>3. 関連画面</h2>
+<section><h2>3. 関連画面</h2><p><a href="./review.html">採算審査・受諾前確認・キャンセル管理（PWA内）</a></p>
 <p><a href="/cargo-request-preview.html">お客様向け入力フォーム（公開前プレビュー）</a></p>
 <p><a href="/cargo-operator-cost.html">認証付き採算計算（社内用）</a></p>
 <p><a href="/cargo-dispatch-test.html">管理者用のテスト案件一覧</a></p>
@@ -129,7 +129,7 @@ async function refreshRequests(){
     article.append(paragraph('寸法：'+row.cargo_length_cm+' × '+row.cargo_width_cm+' × '+row.cargo_height_cm+'cm'));
   if(row.status==='test_new'||row.status==='test_accepted'){
     const link=document.createElement('a');
-    link.href='/cargo-test-review.html?id='+encodeURIComponent(row.id);
+    link.href='./review.html?id='+encodeURIComponent(row.id);
     link.textContent=row.status==='test_new'?'社内採算の確認・テスト判断へ':'審査記録・テストキャンセルへ';
     link.style.display='inline-block';link.style.marginTop='9px';
     article.append(link);

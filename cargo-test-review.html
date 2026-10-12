@@ -39,7 +39,7 @@ a{color:#27618d}.actions{display:flex;gap:9px;flex-wrap:wrap}.actions>*{flex:1;m
 <div><label for="toll">高速・駐車費概算（円）</label><input id="toll" type="number" step="1" min="0" max="1000000" required></div>
 </div>
 <label for="proposed">費用込みの検討金額（円）</label><input id="proposed" type="number" step="1" min="500" max="6000000" required>
-<p id="minimum" class="muted">最低額と高速・駐車費を入力してください。</p>
+<p id="minimum" class="muted">最低額と高速・駐車費を入力してください。</p><button type="button" class="secondary" id="testAmounts" style="margin:8px 0">架空のテスト金額を入力する（8,000円＋1,500円）</button>
 <h3>受諾前の安全確認</h3>
 <label class="check"><input id="route" type="checkbox">道路経路・交通状況・実際の所要時間を確認した</label>
 <label class="check"><input id="cargo" type="checkbox">荷物の内容・寸法・重量・積載可否を確認した</label>
@@ -88,6 +88,12 @@ function basicValues(){
  if(!Object.keys(checks).every(k=>$(k).checked))throw Error('受諾前の確認5項目をすべてチェックしてください。');
  return {internal_floor_yen:f,expected_toll_yen:t,proposed_total_yen:p,route_checked:true,cargo_checked:true,same_day_checked:true,return_cost_checked:true,toll_checked:true,review_notes:$('notes').value.trim().slice(0,700),reviewed_at:new Date().toISOString()};
 }
+$('testAmounts').onclick=()=>{
+  $('floor').value='8000';$('toll').value='1500';$('proposed').value='9500';
+  text('minimum','最低検討額：9,500円（架空のテスト数値）');
+  markUnsaved();
+  text('saveStatus','架空のテスト数値を入力しました。5項目を確認し、DBに保存してからテスト受諾してください。実際の運賃ではありません。');
+};
 function markUnsaved(){
  saved=false;$('accept').disabled=true;
  text('saveStatus','確認内容を変更しました。受諾前にもう一度保存してください。');

@@ -34,6 +34,12 @@ label{display:block;font-weight:bold;margin-bottom:10px}.note{background:#fff3dc
 <p id="statusOutput" class="result" role="status">未確認</p>
 </section>
 <section>
+<h2>2. 署名認証を確認（メール送信なし）</h2>
+<p>Google Apps Scriptとの署名認証だけを確認します。Gmailには何も送信されません。</p>
+<button type="button" id="probeBtn" disabled>署名認証を確認（メール送信なし）</button>
+<p id="probeOutput" class="result" role="status">未確認</p>
+</section>
+<section>
 <h2>2. 自分のGmailにテスト送信</h2>
 <p>接続が正常な場合だけ送信ボタンが有効になります。送信先はGoogle Apps Scriptの所有者のGmailに固定されています。</p>
 <button type="button" id="sendBtn" disabled>テストメールを1通送信</button>
@@ -66,6 +72,7 @@ const supa=window.supabase.createClient(
 let authorized=false,ready=false,busy=false,challengeId=null;
 function buttons(){
  $("statusBtn").disabled=!authorized||busy;
+ $("probeBtn").disabled=!authorized||busy;
  $("sendBtn").disabled=!authorized||!ready||busy;
  $("verifyBtn").disabled=!authorized||!challengeId||busy;
 }
@@ -116,6 +123,22 @@ $("statusBtn").addEventListener("click",async()=>{
    ready?"ok":"error"
   );
  }catch(_){report("statusOutput","通信エラーで確認できませんでした。","error")}
+ finally{busy=false;buttons()}
+});
+$("probeBtn").addEventListener("click",async()=>{
+ if(!authorized||busy)return;
+ busy=true;buttons();report("probeOutput","署名認証を確認しています…");
+ try{
+  const r=await request("bridge_probe");
+  const status=r.data&&r.data.probe;
+  if(status==="SIGNATURE_VALID"){
+   report("probeOutput","署名認証に成功しました。メールは送信していません。","ok");
+  }else if(status==="SIGNATURE_MISMATCH"){
+   report("probeOutput","署名が一致しません。Google Apps Scriptのデプロイ先・キー・署名計算処理を確認する必要があります。メールは送信していません。","error");
+  }else{
+   report("probeOutput","診断を完了できませんでした："+(status||errorName(r))+"\\nメールは送信していません。","error");
+  }
+ }catch(_){report("probeOutput","通信エラーで診断できませんでした。メールは送信していません。","error")}
  finally{busy=false;buttons()}
 });
 $("sendBtn").addEventListener("click",async()=>{

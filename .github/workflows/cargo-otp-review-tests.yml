@@ -7,6 +7,7 @@ on:
       - "integrations/cargo-draft-otp-binding/index.ts"
       - "cargo-request-otp-integration-preview.html"
       - "tests/cargo-draft-otp-*.test.cjs"
+      - "tests/cargo-otp-pg-*.sql"
       - ".github/workflows/cargo-otp-review-tests.yml"
   workflow_dispatch:
 
@@ -24,3 +25,34 @@ jobs:
           persist-credentials: false
       - name: Run offline contract tests (no secrets or network requests)
         run: node --test tests/cargo-draft-otp-*.test.cjs
+
+  disposable-postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out review branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Start disposable PostgreSQL 16 (no Supabase connection)
+        run: |
+          docker run -d --rm --name cargo-otp-ci-postgres \
+            -e POSTGRES_PASSWORD=local-test-only \
+            postgres:16-alpine
+          for i in $(seq 1 30); do
+            if docker exec cargo-otp-ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs cargo-otp-ci-postgres
+          exit 1
+      - name: Create isolated schema and synthetic fixtures
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < tests/cargo-otp-pg-fixtures.sql
+      - name: Apply review-only SQL to disposable PostgreSQL
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < design/cargo-operator-draft-otp-binding.review.sql
+      - name: Verify RLS, permissions, OTP expiry, reuse and intake gate
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < tests/cargo-otp-pg-assert.sql
+      - name: Remove disposable database
+        if: always()
+        run: docker rm -f cargo-otp-ci-postgres || true

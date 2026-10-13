@@ -1,0 +1,33 @@
+# 軽貨物・架空申込/OTP紐づけ セキュリティレビュー
+
+更新日：2026-10-13
+
+## 判定
+**レビュー用コード作成・静的チェックは完了。DB適用とEdge Functionのデプロイは保留。**
+Supabase開発ブランチは0件。独立したステージングDBを作成すると追加費用が生じる可能性があるため、費用確認・ユーザー承認前に作成しない。既存本番DBにもDDLを適用しない。
+
+## 読み取り確認
+- 本番の`cargo_intake_control`は`intake_enabled=false`、`captcha_required=true`、`contact_verification_required=true`。
+- 既存OTPはチャレンジID、対象者HMAC、コードHMAC、期限、消費日時、試行回数を管理。既存の`cargo_email_verification_try`は行ロックと使用済み判定を実施。
+- 新しい紐づけSQLは既存のOTPテーブルを参照し、独立した`draft_id`と`challenge_id`を一意にする設計。
+- Supabaseセキュリティアドバイザーに警告あり：`pg_net`拡張がpublicスキーマ、漏洩パスワード保護が無効。既存RLS有効・ポリシーなしテーブル12件はサービス側専用設計のものも含むため、単純に公開ポリシーを追加しない。
+- 詳細：https://supabase.com/docs/guides/database/database-linter?lint=0014_extension_in_public および https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+
+## 静的チェック
+GitHub上の実コードに対して以下16項目を検査し、16件合格：
+- SQL: RLS有効、SECURITY DEFINERを使用しない、テーブル公開権限なし、RPC実行権限はservice_roleのみ、行ロック、二重claim拒否、旧コード拒否、事後bind拒否。
+- Edge: サーバーでJWTを検証、operator会員資格を照合、受付OFFを確認、秘密HMACをサーバーのみで利用、受注テーブルへの書込なし。
+- 画面: bindとclaimの双方が成功しない限り完了扱いしない、決済処理なし。
+- チェックを継続実行するため`tests/cargo-draft-otp-security.test.cjs`を追加（`node --test tests/cargo-draft-otp-security.test.cjs`）。
+- 上記16件は静的検査であり、Nodeテストランナー・SQLトランザクション・実Edge・Gmailを用いたE2E検証の成功を保証しない。
+
+## ステージング導入前の必須レビュー
+1. DBの新テーブル・RPCを隔離された開発環境で作成し、`anon`/`authenticated`に対する権限がゼロであることをSQLで確認。
+2. 管理者以外のJWT・失効したJWT・不正な`draft_id`・別operator・異なるチャレンジ・同時claimをすべて拒否。
+3. 正しいコードの確認前にはclaim不可。コード検証後は1回だけclaim可能。期限切れ、後から発行されたコード、消費済みコードは拒否。
+4. bind後にGmail送信が失敗・期限切れとなった場合、孤立レコードを期限に沿って削除する仕組みを確認。
+5. 認証済みという事実を実際の受注可否に直結させない。顧客向けAPIにはCAPTCHA、メール送信事業者、連絡先の保護、申込下書きの原子的な確定処理を別途実装。
+6. GitHub PRをレビューし、ユーザーが検証環境の費用・反映範囲を了承するまでは本番マージ・DB変更・Edgeデプロイをしない。
+
+## 公開判定
+現時点：**公開不可**。管理者本人向け架空申込のプロトタイプであり、顧客向け受注システムではない。

@@ -136,8 +136,8 @@ $('requestForm').onsubmit=e=>{
  }catch(err){$('status').textContent=err.message||'入力を確認してください。'}
 };
 $('edit').onclick=()=>{$('reviewPane').hidden=true;updateOtpHandoff();$('requestForm').scrollIntoView({behavior:'smooth',block:'start'})};
-fields.forEach(id=>$(id).addEventListener('input',()=>{verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true}));
-for(const id of ['today','reviewConfirm'])$(id).addEventListener('change',()=>{verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true});
+fields.forEach(id=>$(id).addEventListener('input',()=>{verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true;updateOtpHandoff()}));
+for(const id of ['today','reviewConfirm'])$(id).addEventListener('change',()=>{verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true;updateOtpHandoff()});
 $('submitTest').onclick=async()=>{
  const status=$('testStatus'),button=$('submitTest');
  if(!operator||!client||!verified){status.textContent='管理者としてログインし、内容を再確認してください。';return}

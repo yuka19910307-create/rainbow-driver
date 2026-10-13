@@ -90,3 +90,13 @@ GitHub上の実コードに対して以下16項目を検査し、16件合格：
 - Supabase公式ドキュメントを確認：ブラウザからのEdge Function呼び出しではCORSプリフライト処理が必要。認証済み呼び出しではユーザーJWTの検証と権限確認が必要。
 - セキュリティアドバイザは既存の`rls_enabled_no_policy`（サービスロール専用テーブルを含む）および`extension_in_public`などを報告。既存のアプリ全体に関わるため今回の作業では変更していない。参考：https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy
 - 次の実環境統合には、本番と切り離されたSupabase環境、もしくは明示的に承認された本番側の管理者専用導入が必要。導入前にDBバックアップ、JWT設定、service_role秘匿、RLSとアクセス権限、ロールバックを確認する。
+
+## 架空申込の期限切れ紐づけ整理（2026-10-13）
+- `design/cargo-operator-draft-otp-binding.review.sql`に`cargo_operator_draft_otp_cleanup(p_limit integer default 100)`を追加。**レビュー用で、本番DBには未適用**。
+- `service_role`だけが実行可能。呼び出しごとの削除上限は100件、対象は`delete_after < clock_timestamp()`となった**架空申込の紐づけ行のみ**。ロック済み行は`FOR UPDATE SKIP LOCKED`で回避。
+- 無効な上限指定は0件で停止。OTPチャレンジ本体、顧客連絡先、配送受注、決済データは削除しない。cronや自動スケジュールは追加していない。
+- `tests/cargo-otp-pg-cleanup.sql`で実PostgreSQL 16の一時DBに対して、公開ロールの権限拒否、service_roleの実行権限、上限2件、残り1件の削除、未期限切れ保護、OTP保持、繰り返し実行時0件を確認。
+- GitHub Actions 実行 `38401724012` のオフラインジョブ・一時PostgreSQL統合ジョブはいずれも**成功**：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38401724012
+- 後続の静的テストにも整理処理の上限・権限・削除対象制約を追加した。
+- 本番の`cargo_intake_control`を読み取り専用で再確認：`intake_enabled=false`、`captcha_required=true`、`contact_verification_required=true`。
+- 残課題：本番から隔離されたSupabase検証環境でのJWT・RLS・Edge実行、保持期限ポリシーと削除スケジュールの承認。新規環境には追加費用の可能性があるため、ユーザーの承認なく作成しない。

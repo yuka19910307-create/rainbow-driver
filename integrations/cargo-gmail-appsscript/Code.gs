@@ -38,8 +38,21 @@ function reply_(obj) {
 function bytesFromHex_(s) {
   if (!/^[0-9a-f]{64}$/.test(s || "")) return null;
   var a = [];
-  for (var i = 0; i < s.length; i += 2) a.push(parseInt(s.slice(i, i+2), 16));
+  for (var i = 0; i < s.length; i += 2) {
+    var n = parseInt(s.slice(i, i + 2), 16);
+    // Apps Script Byte[] uses signed bytes (-128..127).
+    a.push(n > 127 ? n - 256 : n);
+  }
   return a;
+}
+/** HMAC interoperability self-test using ONLY a public, fixed test vector. */
+function testBridgeHmacBytes() {
+  var key = bytesFromHex_("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f");
+  var data = Utilities.newBlob("CARGO_HMAC_BYTE_TEST").getBytes();
+  var actual = toHex_(Utilities.computeHmacSha256Signature(data, key));
+  var expected = "9948ce320bd81e7df47d3d0befef65614c95abea58de95da19bee3a3f4712b7f";
+  if (actual !== expected) throw new Error("HMAC Byte[] self-test failed");
+  Logger.log("HMAC Byte[] self-test PASS (no private keys used)");
 }
 function toHex_(a) {
   return a.map(function(b) {return ("0" + (b & 255).toString(16)).slice(-2);}).join("");

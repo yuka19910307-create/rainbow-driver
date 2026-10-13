@@ -79,9 +79,18 @@ begin
    where id=v_binding.challenge_id for update;
   if not found or v_challenge.subject_hmac <> v_binding.subject_hmac
      or v_challenge.consumed_at is null
+     or v_challenge.consumed_at < v_binding.created_at
      or v_challenge.consumed_at > v_binding.expires_at
      or v_now >= v_challenge.expires_at then
     return jsonb_build_object('ok',false,'reason','CHALLENGE_NOT_VERIFIED');
+  end if;
+  -- A newer OTP for the same operator invalidates this earlier challenge.
+  if exists (
+    select 1 from public.cargo_email_verification_challenges newer
+    where newer.subject_hmac=v_binding.subject_hmac
+      and (newer.created_at,newer.id)>(v_challenge.created_at,v_challenge.id)
+  ) then
+    return jsonb_build_object('ok',false,'reason','OLDER_CODE_SUPERSEDED');
   end if;
   update public.cargo_operator_draft_otp_bindings
     set claimed_at=v_now where draft_id=p_draft_id;

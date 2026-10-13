@@ -26,6 +26,9 @@ grant select on public.cargo_intake_control,public.cargo_operator_accounts,
 -- The claim RPC SELECT ... FOR UPDATE locks the OTP row, requiring UPDATE
 -- privilege on the challenge table, as in Supabase's service_role grants.
 grant update on public.cargo_email_verification_challenges to service_role;
+-- SELECT ... FOR SHARE in guarded queue RPCs requires UPDATE privilege for row locks.
+-- This permission is scoped to this ephemeral test database only.
+grant update on public.cargo_intake_control to service_role;
 insert into auth.users(id) values
  ('11111111-1111-4111-8111-111111111111'),
  ('22222222-2222-4222-8222-222222222222');

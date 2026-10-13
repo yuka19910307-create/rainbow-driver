@@ -81,7 +81,7 @@ $$;
 -- A failed/ambiguous delivery is NOT retried automatically.
 create or replace function public.cargo_customer_quote_claim_send(
  p_request_id uuid,p_operator_id uuid,p_response_token_hmac bytea
-) returns jsonb language plpgsql security invoker set search_path='' as $
+) returns jsonb language plpgsql security invoker set search_path='' as $cargo_quote_claim_body$
 declare
  v_request public.cargo_customer_intake_requests%rowtype;
  v_quote public.cargo_customer_quote_replies%rowtype;
@@ -125,7 +125,7 @@ begin
   'request_id',p_request_id,'amount_yen',v_quote.amount_yen,
   'terms',v_quote.terms,'valid_until',v_quote.valid_until);
 end;
-$$;
+$cargo_quote_claim_body$;
 
 -- Preserve unknown delivery state when provider delivery is ambiguous.
 -- This is irreversible without a manual reconciliation and new quote.

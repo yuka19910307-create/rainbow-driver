@@ -23,6 +23,9 @@ create table public.cargo_email_verification_challenges(
 grant usage on schema public to service_role;
 grant select on public.cargo_intake_control,public.cargo_operator_accounts,
  public.cargo_email_verification_challenges to service_role;
+-- The claim RPC SELECT ... FOR UPDATE locks the OTP row, requiring UPDATE
+-- privilege on the challenge table, as in Supabase's service_role grants.
+grant update on public.cargo_email_verification_challenges to service_role;
 insert into auth.users(id) values
  ('11111111-1111-4111-8111-111111111111'),
  ('22222222-2222-4222-8222-222222222222');

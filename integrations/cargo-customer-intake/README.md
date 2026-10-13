@@ -54,3 +54,11 @@
 - GitHub Actions `38475123521` でオフラインジョブ・一時PostgreSQL統合ジョブの両方成功：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38475123521
 - **本番サイト・Supabaseへの変更なし**。Resendでの実メール送信、顧客の実回答、顧客との契約合意、Square決済連携は未実施。一般受付OFFのままで、運転請負アプリへの影響はない。
 - 公開前に、利用規約や申込確認内容、契約成立タイミング、キャンセル・返金ルール、見積額の税区分、連絡先と個人情報の保持期限を確定する。お客様の「利用希望」だけで正式受諾しない設計を維持。
+
+## 管理者の見積もり「利用希望」への対応記録（2026-10-14）
+- `integrations/cargo-customer-intake/followup.review.sql`：見積もり送信済み、かつ利用希望の回答がある案件のみ、管理者が対応状況とメモを保存。ステータスは「連絡済み」「返答待ち」「個別対応終了」「受注に至らず終了」の4種類。変更履歴を別テーブルに記録。
+- `integrations/cargo-customer-intake/operator.ts`：`followup` APIを追加。本人JWTと`cargo_operator_accounts`を照合したうえで、楽観的排他制御・正しい段階遷移・受付スイッチをサーバー側で検証。`list`は最新の対応記録を表示する。
+- `cargo-customer-review.html`：利用希望の案件に限り、対応状況の選択と5〜600文字の業務メモを表示。完了後の再開はできない。
+- `integrations/cargo-customer-intake/followup-smoke.review.sql`：隔離PostgreSQLで、受付OFF拒否・権限拒否・状態遷移・二重更新拒否・業務記録保存・終了後の再開禁止・履歴件数を検証。
+- GitHub Actions `38479056117`：オフラインテストと隔離PostgreSQL統合テストの両ジョブが成功：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38479056117
+- **対応状況は業務記録のみ。顧客への自動連絡、契約確定、配車指示、Square決済は行わない。** 本番Supabaseへの適用・PRマージも未実施。

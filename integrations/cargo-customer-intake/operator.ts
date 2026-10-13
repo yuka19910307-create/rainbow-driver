@@ -7,7 +7,6 @@ const headers={"Access-Control-Allow-Origin":APP,
  "Access-Control-Allow-Methods":"POST,OPTIONS","Cache-Control":"no-store",
  "Vary":"Origin","Content-Type":"application/json; charset=utf-8"};
 const respond=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers});
-const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 // Full canonical UUID (no version requirement for externally generated ids).
 const canonical=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function aesSecret(){

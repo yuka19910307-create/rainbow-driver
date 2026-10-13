@@ -6,6 +6,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 const html=fs.readFileSync(path.resolve(__dirname,'../cargo-request-otp-integration-preview.html'),'utf8');
+const fictional=require('../cargo-pwa/fictional-flow.js');
 const script=html.match(/<script>\s*([\s\S]*?)\s*<\/script>/)?.[1];
 assert.ok(script,'Inline script must exist');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
@@ -50,7 +51,7 @@ async function setup(opts={}){
   }}
  };
  vm.runInNewContext(script,{
-  window:{supabase:{createClient:()=>db}},
+  window:{supabase:{createClient:()=>db},CargoFictionalFlow:fictional},
   document:{getElementById:el},
   confirm:()=>opts.confirm!==false,
   console:{warn(){}}

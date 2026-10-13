@@ -108,3 +108,13 @@ GitHub上の実コードに対して以下16項目を検査し、16件合格：
 - GitHub Actions `38402578959`でオフライン36件・一時PostgreSQL統合の両ジョブ成功：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38402578959
 - これは本番の顧客申込API接続や一般公開ではない。公開ページに反映するためのPRマージ、実ブラウザE2E、実Supabaseの管理者専用導入は未実施。
 - 既存の管理者限定「架空案件のテスト登録」は今回変更していない。実顧客の情報は入力しないこと。
+
+## 実際の申込プレビュー → 管理者Gmail認証テストへの導線（2026-10-13）
+- `cargo-pwa/fictional-flow.js`を追加。集荷地・配送先・荷物・個数・重量・寸法・補足・氏名（「テスト担当者」）・連絡先空欄など、**固定架空のサンプルのみ**を共通化。`sample()`、厳密一致`matches()`、認証用の固定`otpSample()`を提供。顧客の入力を保存・送信しない。
+- `cargo-request-preview.html`は管理者ログイン済み、下書き確認済み、固定サンプルと**全項目の完全一致**、確認チェック済みの場合にだけ、`./cargo-request-otp-integration-preview.html`への固定リンクを表示する。
+- 入力変更・確認チェック変更・再編集時は即座に導線を非表示にする。住所、連絡先、氏名、メモ、認証トークン、OTPはURLクエリ・フラグメント・ストレージで渡さない。
+- 遷移先の`cargo-request-otp-integration-preview.html`は共通モジュールから同じ固定架空サンプルを再生成する。遷移自体ではメール送信されず、管理者認証・受付OFF・専用API準備確認・明示的なメール送信確認が必要。
+- `tests/cargo-request-review.test.cjs`にリンクの静的URL制約、固定値の厳密照合、管理者/未ログイン/編集後のUI挙動を追加。`tests/cargo-draft-otp-flow.test.cjs`も共通架空モジュール利用に更新。
+- 初回の追加UI試験が「入力変更でリンクが隠れない」不具合を発見したため、フォームの入力・チェック変更イベントに`updateOtpHandoff()`を追加して修正。
+- GitHub Actions 実行 `38407394838`：**オフライン40件すべて成功**、一時PostgreSQL統合テスト成功。結果：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38407394838
+- **公開サイトには未反映**。このリンクを介しても実顧客の申込内容とOTPはサーバー上で結びつけられない。新しいSupabaseの紐づけテーブル・Edge Functionは本番未導入。実メールE2E・本番の受注・決済は実施しない。Draft PRを維持。

@@ -48,7 +48,7 @@ p{margin:10px 0}a{color:#245d8d}
 <section>
 <h2>4. 受付停止を再確認</h2>
 <p id="finalResult" class="result" role="status">本人確認後に自動確認します。</p>
-<p><small>成功は管理者用の試験操作を示すものであり、顧客の申込情報と認証結果をサーバーで紐づけたことを意味しません。顧客向け本番受付は引き続き停止中です。</small></p>
+<p><small>これは固定架空申込を対象とした管理者専用試験です。顧客の実際の申込情報と認証結果を紐づける本番機能ではありません。サーバー側の新API・テーブルはレビュー中で、まだデプロイしていません。</small></p>
 </section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
@@ -63,12 +63,12 @@ const db=window.supabase.createClient(
  "sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms",
  {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}}
 );
-let authorized=false,checked=false,busy=false,challengeId=null,verified=false,expiresAt=0,sendAttempted=false;
+let authorized=false,checked=false,busy=false,challengeId=null,draftId=null,verified=false,expiresAt=0,sendAttempted=false;
 const fixture={pickup:"テスト集荷地・さいたま市",delivery:"テスト配送先・東京都内",cargo:"テスト用・精密機器の箱",pieces:2,weight:8.5};
 const update=()=>{
  $("check").disabled=!authorized||busy;
  $("send").disabled=!authorized||!checked||busy||sendAttempted||verified;
- $("verify").disabled=!authorized||!challengeId||busy||verified;
+ $("verify").disabled=!authorized||!challengeId||!draftId||busy||verified;
 };
 async function call(fn,body){
  const {data,error}=await db.functions.invoke(fn,{body});
@@ -115,7 +115,7 @@ $("check").onclick=async()=>{
 $("send").onclick=async()=>{
  if(!authorized||!checked||busy||sendAttempted||verified)return;
  if(!confirm("Google Apps Script所有者のGmailへ6桁コードを1通送信します。続けますか？"))return;
- busy=true;checked=false;sendAttempted=true;challengeId=null;expiresAt=0;$("code").value="";
+ busy=true;checked=false;sendAttempted=true;challengeId=null;draftId=null;expiresAt=0;$("code").value="";
  update();set("sendResult","送信しています…");
  try{
   if(!(await guard()))throw Error("一般受付OFFを確認できず、送信を中止しました。");
@@ -123,14 +123,19 @@ $("send").onclick=async()=>{
   if(r.error||r.data?.ok!==true||r.data?.mode!=="OPERATOR_OWN_GMAIL_TEST"
     ||typeof r.data?.challenge_id!=="string"||r.data?.public_intake_enabled!==false)
     throw Error("送信受付を確認できません。重複送信せず受信トレイを確認してください。");
+  const binding=await call("cargo-draft-otp-binding",{action:"bind",challenge_id:r.data.challenge_id});
+  if(binding.error||binding.data?.ok!==true||binding.data?.mode!=="OPERATOR_SYNTHETIC_DRAFT_ONLY"
+    ||typeof binding.data?.draft_id!=="string"||binding.data?.challenge_id!==r.data.challenge_id
+    ||binding.data?.public_intake_enabled!==false)throw Error("メールは送信された可能性がありますが、架空申込との紐づけを確認できません。コード認証は進めません。");
   challengeId=r.data.challenge_id;
+  draftId=binding.data.draft_id;
   expiresAt=Date.now()+Math.min(600,Number(r.data.expires_in_seconds)||600)*1000;
-  set("sendResult","送信受付成功。所有者Gmailに届いたコードを10分以内に入力してください。",true);
+  set("sendResult","送信受付・架空申込への紐づけ成功。所有者Gmailに届いたコードを10分以内に入力してください。",true);
  }catch(e){set("sendResult",e?.message||"送信の結果を確認できません。",false)}
  finally{busy=false;update()}
 };
 $("verify").onclick=async()=>{
- if(!authorized||busy||!challengeId||verified)return;
+ if(!authorized||busy||!challengeId||!draftId||verified)return;
  const code=$("code").value.trim();
  if(!/^[0-9]{6}$/.test(code)){set("verifyResult","6桁の数字を入力してください。",false);return}
  if(Date.now()>=expiresAt){challengeId=null;$("code").value="";set("verifyResult","10分を超えました。認証コードは利用できません。",false);update();return}
@@ -143,11 +148,19 @@ $("verify").onclick=async()=>{
    if(["ALREADY_USED","EXPIRED","LOCKED","OLDER_CODE_SUPERSEDED"].includes(r.data?.reason)||r.data?.reason==="OLDER_CODE_SUPERSEDED")challengeId=null;
    return;
   }
-  verified=true;challengeId=null;
-  set("verifyResult","管理者本人の6桁コード認証に成功しました。",true);
+  set("verifyResult","6桁コード認証に成功。架空申込との一度限りの紐づけを確認しています…");
+  const claimed=await call("cargo-draft-otp-binding",{action:"claim",challenge_id:challengeId,draft_id:draftId});
+  if(claimed.error||claimed.data?.ok!==true||claimed.data?.reason!=="CLAIMED"
+    ||claimed.data?.public_intake_enabled!==false){
+   challengeId=null;draftId=null;
+   set("verifyResult","コード認証は成功しましたが、架空申込との紐づけ確定に失敗しました。再送信せず、管理者に確認してください。",false);
+   return;
+  }
+  verified=true;challengeId=null;draftId=null;
+  set("verifyResult","管理者本人の6桁コード認証と、架空申込への一度限りの紐づけに成功しました。",true);
   const safe=await guard();
   set("finalResult",safe
-   ?"完了：架空申込の入力検証 → 所有者Gmail送信 → 6桁認証 → 一般受付OFFの維持を確認しました。実受注・決済はありません。"
+   ?"完了：架空申込の入力検証 → 所有者Gmail送信 → 6桁認証 → 申込別の一度限りの紐づけ → 一般受付OFFの維持を確認しました。実受注・決済はありません。"
    :"認証は成功しましたが、受付OFFの最終確認ができません。完了とは判定しません。",safe);
  }catch(_){set("verifyResult","通信エラーで検証を完了できませんでした。",false)}
  finally{busy=false;update()}

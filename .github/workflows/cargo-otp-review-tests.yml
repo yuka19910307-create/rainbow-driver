@@ -31,6 +31,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Set up Node for TypeScript handler tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - name: Run offline contract tests (no secrets or network requests)
         run: node --test tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs
 

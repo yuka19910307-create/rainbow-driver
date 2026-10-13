@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>軽貨物・申込前安全統合テスト｜Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#203552;background:#f0f4fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.65}
+header{background:#213958;color:#fff;padding:24px 18px}
+header>div,main{max-width:680px;margin:auto}
+h1{font-size:23px}h2{font-size:19px;margin:0 0 10px}
+main{padding:18px}
+section{background:#fff;border:1px solid #d5e0ed;border-radius:16px;padding:20px;margin-bottom:16px}
+button{background:#2e4d72;color:#fff;border:0;border-radius:10px;padding:14px 18px;font-size:16px;font-weight:700;width:100%}
+button:disabled{opacity:.45}
+.result{white-space:pre-wrap;overflow-wrap:anywhere;background:#edf3f9;border-radius:10px;padding:14px;line-height:1.7}
+.ok{color:#16633e}.warn{color:#a23631}
+a{color:#1d5a9a}small{color:#64748b}.note{background:#fff3dc;border-radius:12px;padding:13px}
+</style>
+</head>
+<body>
+<header><div><small style="color:#cfdef0">RAINBOW DRIVER / CARGO / OPERATOR PRELAUNCH</small><h1>申込前・安全統合テスト</h1></div></header>
+<main>
+<section>
+<h2>一般受付は停止中です</h2>
+<p class="note">管理者専用の開発確認画面です。固定した架空の配送情報を使い、入力検証・本人確認の模擬処理・申込拒否を順番に調べます。実際の配送依頼、顧客宛メール、通知、料金確定、決済は行いません。</p>
+<p>模擬本人確認は、テスト用の認証チャレンジをデータベースに一時保存し、検証後に削除します。削除を確認できない場合は成功と判定しません。</p>
+<p><a href="./cargo-operator-login.html">管理者ログインへ</a> ／ <a href="./cargo-request-preview.html">配送依頼プレビューへ</a></p>
+<p id="auth" class="result" role="status">管理者認証を確認しています…</p>
+</section>
+<section>
+<h2>固定の架空テスト情報</h2>
+<p>集荷地：テスト集荷地・さいたま市<br>
+配送先：テスト配送先・東京都内<br>
+内容：テスト用・精密機器の箱<br>
+個数：2個 ／ 重量：8.5kg</p>
+<p><small>実住所・氏名・電話番号・メールアドレスは入力しません。テスト対象の配送情報を変更することもできません。</small></p>
+</section>
+<section>
+<h2>安全テストを実行</h2>
+<p>以下を連続確認します：受付OFF → 架空の申込入力 → 不正な入力の拒否 → Gmail接続設定 → 模擬6桁認証のルール → 正式申込の拒否 → 受付OFF維持。</p>
+<button type="button" id="run" disabled>架空データで安全テストを実行</button>
+<p id="result" class="result" role="status" aria-live="polite">未実行</p>
+</section>
+<footer><small>本画面は申込・Gmail認証の本番接続を実現するものではありません。各保護機構の組み合わせを確かめる公開前テストです。既存の本番設定は変更しません。</small></footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const display=(id,message,type)=>{
+ const e=$(id);
+ e.textContent=message;
+ e.className="result"+(type==="ok"?" ok":type==="error"?" warn":"");
+};
+if(!window.supabase){display("auth","認証ライブラリの読み込みに失敗しました。","error");return}
+const db=window.supabase.createClient(
+ "https://kvoaorzdewwirqryeizq.supabase.co",
+ "sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms",
+ {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}}
+);
+let authorized=false;
+let busy=false;
+const updateButtons=()=>{$("run").disabled=!authorized||busy};
+async function call(name,body){
+ const {data,error}=await db.functions.invoke(name,{body});
+ let parsed=data;
+ const httpStatus=error?.context?.status||null;
+ if(error?.context&&typeof error.context.json==="function"){
+  try{parsed=await error.context.json()}catch(_){}
+ }
+ return {data:parsed,error,httpStatus};
+}
+async function authenticate(){
+ try{
+  const {data,error}=await db.auth.getUser();
+  if(error||!data?.user)throw Error("LOGIN_REQUIRED");
+  const {data:member,error:memberError}=await db.from("cargo_operator_accounts").select("user_id").eq("user_id",data.user.id).maybeSingle();
+  if(memberError||!member)throw Error("OPERATOR_ONLY");
+  authorized=true;
+  display("auth","軽貨物管理者のログインと権限を確認しました。","ok");
+ }catch(_){
+  display("auth","管理者ログインを確認できません。上のリンクからログインしてください。","error");
+ }
+ updateButtons();
+}
+$("run").addEventListener("click",async()=>{
+ if(!authorized||busy)return;
+ busy=true;updateButtons();
+ let allPassed=true;
+ const lines=[];
+ function step(label,pass,detail){
+  allPassed=allPassed&&pass;
+  lines.push((pass?"✓ ":"× ")+label+(detail?"："+detail:""));
+  display("result",lines.join("\n"),allPassed?"ok":"error");
+ }
+ const fixture={
+  pickup:"テスト集荷地・さいたま市",
+  delivery:"テスト配送先・東京都内",
+  cargo:"テスト用・精密機器の箱",
+  pieces:2,
+  weight:8.5
+ };
+ try{
+  const pre=await call("cargo-intake-readiness",{action:"diagnose"});
+  const gate=pre.data;
+  const gateOK=!pre.error&&gate?.mode==="PRELAUNCH_OPERATOR_DIAGNOSTIC"
+   &&gate?.public_intake_enabled===false&&gate?.database_switch_enabled===false
+   &&gate?.customer_submission_supported===false&&gate?.captcha_required===true
+   &&gate?.contact_verification_required===true;
+  step("受付OFF・安全設定",gateOK);
+  if(!gateOK)throw Error("受付停止を確認できないため、安全上テストを中断");
+  const valid=await call("cargo-intake-readiness",{action:"validate_sample",sample:fixture});
+  step("架空の配送入力をサーバーで検証",
+   !valid.error&&valid.data?.valid===true&&valid.data?.stores_data===false
+   &&valid.data?.sends_push===false&&valid.data?.accepts_customers===false);
+  if(!allPassed)throw Error("入力検証に失敗したため中断");
+  const bad=await call("cargo-intake-readiness",{action:"validate_sample",sample:{...fixture,pickup:"架空の集荷地"}});
+  step("テスト接頭辞のない入力を拒否",!bad.error&&bad.data?.valid===false);
+  if(!allPassed)throw Error("入力拒否が確認できないため中断");
+  const status=await call("cargo-gmail-otp-test",{action:"status"});
+  const mail=status.data;
+  step("Gmail認証の設定と管理者送信先を確認",
+   !status.error&&mail?.mode==="OPERATOR_OWN_GMAIL_PRELAUNCH"
+   &&mail?.bridge_configured===true&&mail?.verification_hmac_configured===true
+   &&mail?.delivery_scope==="SCRIPT_OWNER_GMAIL_ONLY"
+   &&mail?.public_intake_enabled===false);
+  if(!allPassed)throw Error("本人確認設定が確認できないため中断");
+  const otp=await call("cargo-email-verification-test",{action:"run"});
+  const o=otp.data;
+  step("正しいコード・期限切れ・誤入力・再利用防止",
+   !otp.error&&o?.ok===true&&o?.mode==="CARGO_PRELAUNCH_SYNTHETIC_OTP"
+   &&o?.passed===true&&o?.test_record_cleanup===true
+   &&Array.isArray(o?.test_cases)&&o.test_cases.includes("SINGLE_USE")
+   &&o.test_cases.includes("EXPIRED_CODE")&&o.test_cases.includes("FIVE_FAILURE_LOCK")
+   &&o?.actual_email_sent===false&&o?.customer_data_processed===false
+   &&o?.public_intake_enabled===false,
+   o?.test_record_cleanup===true?"模擬データの削除を確認":"模擬データ削除は未確認");
+  if(!allPassed)throw Error("模擬認証の検証・削除が不完全なため中断");
+  const blocked=await call("cargo-intake-readiness",{action:"submit"});
+  step("顧客の正式申込を受付拒否",
+   blocked.data?.error==="PUBLIC_INTAKE_DISABLED"
+   &&blocked.httpStatus===423,"HTTP "+(blocked.httpStatus||"不明"));
+  if(!allPassed)throw Error("受付拒否の検証が不完全なため中断");
+  const post=await call("cargo-intake-readiness",{action:"diagnose"});
+  step("テスト後も一般受付OFF",
+   !post.error&&post.data?.database_switch_enabled===false
+   &&post.data?.public_intake_enabled===false
+   &&post.data?.customer_submission_supported===false);
+  if(allPassed)lines.push("完了：各安全機能の動作検証に成功しました。実メール・実際の受注・決済は行っていません。");
+ }catch(e){
+  lines.push("停止："+(e?.message||"テスト中に問題が発生しました。"));
+ }
+ finally{
+  display("result",lines.join("\n"),allPassed?"ok":"error");
+  busy=false;updateButtons();
+ }
+});
+authenticate();
+})();
+</script>
+</body>
+</html>

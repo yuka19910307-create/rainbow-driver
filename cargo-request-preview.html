@@ -119,7 +119,7 @@ async function canTest(){
 $('fillDemo').onclick=()=>{
  if(!window.CargoFictionalFlow){$('status').textContent='架空データの検証モジュールが利用できません。';return}
  const v=window.CargoFictionalFlow.sample();
- for(const [k,value] of Object.entries(v))$(k).value=value;
+ for(const k of fields)$(k).value=v[k];
  $('today').checked=v.today;$('reviewConfirm').checked=v.reviewConfirm;
  verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true;updateOtpHandoff();
  $('status').textContent='架空のサンプル値をセットしました。内容を確認して「入力内容を確認する」を押してください。';

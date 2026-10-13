@@ -23,7 +23,8 @@ p{margin:10px 0}a{color:#245d8d}
 <section>
 <h2>管理者専用・実送信を伴うテスト</h2>
 <p class="note">一般受付OFFを維持します。固定した架空の配送情報を検証した後、管理者本人が明示的に許可した場合だけ所有者Gmailへ1通送信します。顧客メール・正式受注・Push通知・運賃確定・決済は行いません。</p>
-<p><a href="./cargo-operator-login.html">管理者ログイン</a> ／ <a href="./cargo-integration-safety-test.html">メール送信なしの安全テスト</a></p>
+<p><a href="./cargo-request-preview.html">架空配送申込プレビューに戻る</a> ／ <a href="./cargo-operator-login.html">管理者ログイン</a> ／ <a href="./cargo-integration-safety-test.html">メール送信なしの安全テスト</a></p>
+<p><small>この画面は申込プレビューから値を受け取りません。URLやブラウザ保存領域に連絡先・配送情報・認証コードを引き継がず、同じ固定架空データを画面内で用意します。</small></p>
 <p id="auth" class="result" role="status">管理者認証を確認しています…</p>
 </section>
 <section>
@@ -51,20 +52,21 @@ p{margin:10px 0}a{color:#245d8d}
 <p><small>これは固定架空申込を対象とした管理者専用試験です。顧客の実際の申込情報と認証結果を紐づける本番機能ではありません。サーバー側の新API・テーブルはレビュー中で、まだデプロイしていません。</small></p>
 </section>
 </main>
+<script src="./cargo-pwa/fictional-flow.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 <script>
 (()=>{
 "use strict";
 const $=id=>document.getElementById(id);
 const set=(id,msg,ok)=>{const e=$(id);e.textContent=msg;e.className="result"+(ok===true?" ok":ok===false?" warn":"")};
-if(!window.supabase){set("auth","認証ライブラリを読み込めません。",false);return}
+if(!window.supabase||!window.CargoFictionalFlow){set("auth","安全な認証テストに必要なモジュールを読み込めません。",false);return}
 const db=window.supabase.createClient(
  "https://kvoaorzdewwirqryeizq.supabase.co",
  "sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms",
  {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}}
 );
 let authorized=false,checked=false,busy=false,challengeId=null,draftId=null,verified=false,expiresAt=0,sendAttempted=false;
-const fixture={pickup:"テスト集荷地・さいたま市",delivery:"テスト配送先・東京都内",cargo:"テスト用・精密機器の箱",pieces:2,weight:8.5};
+const fixture=window.CargoFictionalFlow.otpSample();
 const update=()=>{
  $("check").disabled=!authorized||busy;
  $("send").disabled=!authorized||!checked||busy||sendAttempted||verified;

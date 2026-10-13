@@ -134,18 +134,18 @@ Deno.serve(async(req:Request)=>{
       !Number.isFinite(until.valueOf())||
       typeof claimed.terms!=="string"||claimed.terms.length<30||
       claimed.terms.length>1200)throw Error("INVALID_QUOTE_CONTENT");
-    const body="Rainbow Driver 軽貨物のお見積もり案内\\n\\n"+
-     "受付ID: "+data.id+"\\n"+
-     "お見積もり金額（管理者確認済み）: "+amount.toLocaleString("ja-JP")+"円\\n"+
-     "有効期限: "+until.toLocaleString("ja-JP",{timeZone:"Asia/Tokyo"})+"\\n\\n"+
-     "適用条件・消費税・高速道路料金等の取扱い:\\n"+
-     claimed.terms+"\\n\\n"+
+    const body="Rainbow Driver 軽貨物のお見積もり案内\n\n"+
+     "受付ID: "+data.id+"\n"+
+     "お見積もり金額（管理者確認済み）: "+amount.toLocaleString("ja-JP")+"円\n"+
+     "有効期限: "+until.toLocaleString("ja-JP",{timeZone:"Asia/Tokyo"})+"\n\n"+
+     "適用条件・消費税・高速道路料金等の取扱い:\n"+
+     claimed.terms+"\n\n"+
      "このご案内だけでは配送の受諾・出動・予約・決済は確定しません。"+
      "ご利用をご希望の場合は下記のページで「利用を希望する」を選んでください。"+
-     "ご希望を確認後、担当者から別途ご連絡します。\\n\\n"+
-     "お見積もりへのご回答（有効期限まで）：\\n"+
+     "ご希望を確認後、担当者から別途ご連絡します。\n\n"+
+     "お見積もりへのご回答（有効期限まで）：\n"+
      APP+"/cargo-customer-quote-reply.html#r="+encodeURIComponent(String(data.id))+
-       "&t="+hex+"\\n\\n"+
+       "&t="+hex+"\n\n"+
      "回答は一度のみ有効です。URLは第三者に共有しないでください。";
     // Check intake mode a second time immediately before contacting the
     // external mail provider. The earlier transactional claim is also gated.

@@ -12,7 +12,7 @@ header>div,main{max-width:680px;margin:auto}header h1{font-size:24px;margin:10px
 main{padding:18px}section{background:white;border:1px solid #d5e0ed;border-radius:16px;padding:22px;margin-bottom:16px}
 h2{font-size:21px;margin:0 0 12px}p{line-height:1.75}a{color:#1d5a9a}
 button{background:#2e4d72;color:white;border:0;border-radius:10px;padding:14px 18px;font-size:16px;font-weight:700;margin:5px 0}
-button:disabled{opacity:.45}#keyInput{font-size:16px;letter-spacing:0;max-width:100%}input{font-size:22px;border:1px solid #b8c5d6;padding:12px;border-radius:9px;max-width:260px;width:100%;letter-spacing:4px}
+button:disabled{opacity:.45}input{font-size:22px;border:1px solid #b8c5d6;padding:12px;border-radius:9px;max-width:260px;width:100%;letter-spacing:4px}
 label{display:block;font-weight:bold;margin-bottom:10px}.note{background:#fff3dc;border-radius:12px;padding:13px}
 .result{white-space:pre-wrap;overflow-wrap:anywhere;background:#eef3f9;border-radius:10px;padding:14px;line-height:1.6}
 .ok{color:#16633e}.warn{color:#a23631}small{color:#63748b;line-height:1.5}footer{padding:10px 0 26px}
@@ -40,28 +40,19 @@ label{display:block;font-weight:bold;margin-bottom:10px}.note{background:#fff3dc
 <p id="probeOutput" class="result" role="status">未確認</p>
 </section>
 <section>
-<h2>3. 署名キーと接続先を照合（メール送信なし）</h2>
-<p>上の署名テストで不一致が出る場合、Google Apps Scriptのスクリプト プロパティ <code>BRIDGE_HMAC_SECRET</code> をここで照合できます。</p>
-<p class="note">入力したキーは<strong>この端末内だけで署名計算</strong>し、サーバーへ送信・保存しません。判定後に入力欄は消去されます。キーや結果の署名文字列はスクリーンショットに含めないでください。</p>
-<label for="keyInput">Google Apps Scriptの BRIDGE_HMAC_SECRET</label>
-<input id="keyInput" type="password" maxlength="64" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="64文字のキー">
-<p><button type="button" id="keyCheckBtn" disabled>接続先と秘密キーを照合（送信なし）</button></p>
-<p id="keyCheckOutput" class="result" role="status">未確認</p>
-</section>
-<section>
-<h2>4. 自分のGmailにテスト送信</h2>
+<h2>3. 自分のGmailにテスト送信</h2>
 <p>接続が正常な場合だけ送信ボタンが有効になります。送信先はGoogle Apps Scriptの所有者のGmailに固定されています。</p>
 <button type="button" id="sendBtn" disabled>テストメールを1通送信</button>
 <p id="sendOutput" class="result" role="status">未送信</p>
 </section>
 <section>
-<h2>5. 届いたコードを確認</h2>
+<h2>4. 届いたコードを確認</h2>
 <label for="code">メールに記載された6桁の数字</label>
 <input id="code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
 <p><button type="button" id="verifyBtn" disabled>6桁コードを検証</button></p>
 <p id="verifyOutput" class="result" role="status">メール送信後に確認できます。</p>
 </section>
-<footer><small>本画面は開発・検証用です。秘密キーの入力は上の専用照合欄だけに限定してください。ブラウザー内の計算後に入力欄は消去します。本人確認が成功しても一般受付は自動的に公開されません。</small></footer>
+<footer><small>本画面は開発・検証用です。秘密キーを入力する必要はありません。本人確認が成功しても一般受付は自動的に公開されません。</small></footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 <script>
@@ -82,7 +73,6 @@ let authorized=false,ready=false,busy=false,challengeId=null;
 function buttons(){
  $("statusBtn").disabled=!authorized||busy;
  $("probeBtn").disabled=!authorized||busy;
- $("keyCheckBtn").disabled=!authorized||busy;
  $("sendBtn").disabled=!authorized||!ready||busy;
  $("verifyBtn").disabled=!authorized||!challengeId||busy;
 }
@@ -150,36 +140,6 @@ $("probeBtn").addEventListener("click",async()=>{
   }
  }catch(_){report("probeOutput","通信エラーで診断できませんでした。メールは送信していません。","error")}
  finally{busy=false;buttons()}
-});
-$("keyCheckBtn").addEventListener("click",async()=>{
- if(!authorized||busy)return;
- const raw=$("keyInput").value;
- const userKey=raw.trim();
- if(!/^[0-9a-fA-F]{64}$/.test(userKey)){
-  $("keyInput").value="";
-  report("keyCheckOutput","キーは64文字の16進数で入力してください。入力欄は消去しました。","error");
-  return;
- }
- busy=true;buttons();report("keyCheckOutput","端末内で照合しています…");
- try{
-  const r=await request("bridge_key_check");
-  const d=r.data;
-  if(r.error||!d||typeof d.challenge!=="string"||typeof d.expected_signature!=="string"||typeof d.bridge_url!=="string"){
-   report("keyCheckOutput","照合準備に失敗しました："+errorName(r),"error");return;
-  }
-  const bytes=Uint8Array.from(userKey.match(/.{2}/g),h=>parseInt(h,16));
-  const key=await crypto.subtle.importKey("raw",bytes,{name:"HMAC",hash:"SHA-256"},false,["sign"]);
-  const sig=Array.from(new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(d.challenge))),b=>b.toString(16).padStart(2,"0")).join("");
-  const match=sig===d.expected_signature;
-  report("keyCheckOutput",
-   (match?"Supabase登録キーとの一致：一致\n":"Supabase登録キーとの一致：不一致\n")+
-   "Supabaseの接続先URL："+d.bridge_url+
-   "\nメール送信：なし\n一般受付：OFF"+
-   (match?"\n→キー自体は一致。Google Apps Script側の公開バージョン・URLと署名実装を確認してください。":"\n→原因候補はキーの不一致です。まだキーを変更しないでください。"),
-   match?"ok":"error"
-  );
- }catch(_){report("keyCheckOutput","照合処理が失敗しました。入力内容は送信していません。","error")}
- finally{$("keyInput").value="";busy=false;buttons()}
 });
 $("sendBtn").addEventListener("click",async()=>{
  if(!authorized||!ready||busy)return;

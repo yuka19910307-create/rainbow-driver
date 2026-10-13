@@ -65,6 +65,7 @@ button:disabled{opacity:.5;cursor:default}.secondary{background:#e8eef5;color:#2
 <section><p id="status" role="status">入力内容の確認まで試すことができます。正式な依頼送信はまだ提供していません。</p>
 <p><a href="./cargo-operator-login.html">軽貨物ドライバー管理画面（管理者専用）</a></p></section>
 </main>
+<script src="./cargo-pwa/request-review-rules.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 <script>
 (()=>{'use strict';
@@ -75,8 +76,11 @@ const handlingNames={no:'不要',yes:'希望する',unknown:'要相談'},readine
 function snapshot(){
  const raw=Object.fromEntries(fields.map(k=>[k,$(k).value.trim()]));
  if(!$('today').checked||!$('reviewConfirm').checked)throw Error('確認事項への同意が必要です。');
- const p=Number(raw.pieces),weight=Number(raw.weight),l=Number(raw.length),w=Number(raw.width),h=Number(raw.height);
- if(!Number.isInteger(p)||p<1||p>99||![weight,l,w,h].every(v=>Number.isFinite(v)&&v>0))throw Error('個数・重量・寸法を確認してください。');
+ // Validate every visible field with the same offline rules used in CI.
+ // Never send this snapshot to the backend or enable public submission.
+ if(!window.CargoRequestReview)throw Error('入力検証モジュールを読み込めません。');
+ const decision=window.CargoRequestReview.review({...raw,today:$('today').checked,reviewConfirm:$('reviewConfirm').checked});
+ if(decision.canSubmit!==false||decision.publicIntakeEnabled!==false)throw Error('一般受付は停止中です。');
  return raw;
 }
 function draw(data){
@@ -109,7 +113,8 @@ $('requestForm').onsubmit=e=>{
  try{
   if(!$('requestForm').reportValidity())return;
   verified=snapshot();draw(verified);$('reviewPane').hidden=false;
-  $('status').textContent='下書き内容を画面に表示しました。まだ送信されていません。';
+  const decision=window.CargoRequestReview.review({...verified,today:$('today').checked,reviewConfirm:$('reviewConfirm').checked});
+  $('status').textContent='下書き確認（未送信）\n'+decision.reviewReasons.map(x=>'・'+x).join('\n')+'\n一般受付OFF。見積もり・受注・決済は確定していません。';
   $('reviewPane').scrollIntoView({behavior:'smooth',block:'start'});
  }catch(err){$('status').textContent=err.message||'入力を確認してください。'}
 };

@@ -49,8 +49,9 @@ async function setup(options={}){
   },
   async rpc(_,args){
    calls.push('rpc');
-   return {data:args.p_operator_id===null?{ok:false,reason:'INVALID_INPUT'}:
-    options.claimDenied?{ok:false,reason:'ALREADY_CLAIMED'}:{ok:true,reason:'CLAIMED'},error:null};
+   return {data:options.rpcUnavailable?null:args.p_operator_id===null?{ok:false,reason:'INVALID_INPUT'}:
+    options.claimDenied?{ok:false,reason:'ALREADY_CLAIMED'}:{ok:true,reason:'CLAIMED'},
+    error:options.rpcUnavailable?{message:'RPC missing'}:null};
   }
  };
  let handler;
@@ -63,7 +64,7 @@ async function setup(options={}){
   if(extra.badOrigin)headers.origin='https://evil.invalid';
   const body=extra.body??{action,...(action==='bind'||action==='claim'?{challenge_id:challengeId}:{}),
    ...(action==='claim'?{draft_id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'}:{})};
-  const response=await handler({method:'POST',headers:{get:k=>headers[k.toLowerCase()]??null},
+  const response=await handler({method:extra.method??'POST',headers:{get:k=>headers[k.toLowerCase()]??null},
    text:async()=>JSON.stringify(body)});
   return {status:response.status,body:await response.json()};
  }

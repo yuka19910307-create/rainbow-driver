@@ -72,6 +72,10 @@ jobs:
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/schema.review.sql
       - name: Verify OFF gate and atomic customer email verification
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/schema-smoke.review.sql
+      - name: Apply manual quote and customer reply schema (disposable only)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/quotes.review.sql
+      - name: Verify operator approval, public intake OFF and one-time email attempt
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/quotes-smoke.review.sql
       - name: Remove disposable database
         if: always()
         run: docker rm -f cargo-otp-ci-postgres || true

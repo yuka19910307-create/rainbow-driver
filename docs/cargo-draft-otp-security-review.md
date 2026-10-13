@@ -66,3 +66,11 @@ GitHub上の実コードに対して以下16項目を検査し、16件合格：
 - **本番SupabaseのDBにはSQLを適用していない。新Edge Functionは未デプロイ。実Gmail送信も行っていない。**
 - 本番の受付設定を再確認：`intake_enabled=false`、`captcha_required=true`、`contact_verification_required=true`。
 - 残る課題：Supabase固有の実環境認証、Edge Function実行、実Gmail、同時claimの競合テスト、顧客向け申込との紐づけ。今回の成功だけで一般受付を公開しない。
+
+## 同時実行・ロック待ち期限切れテスト：実行成功（2026-10-13）
+- GitHub Actions 実行ID `38398206796`：`offline-security-contract`、`disposable-postgres-integration` の両ジョブが成功。
+- 一時PostgreSQL 16に対し`tests/cargo-otp-pg-concurrency.py`を実行。**同一申込への並列claimは1件のみ成功、もう1件は`ALREADY_CLAIMED`**。DBに記録されたclaimは1件。
+- 行ロックの待機中に期限切れとなったOTPは`EXPIRED`で拒否され、claim記録は0件。
+- 実行ログに`PASS: concurrent claims yield exactly one success and one replay rejection`および`PASS: code expiring while waiting for a row lock cannot be claimed`を確認。
+- 実行結果：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38398206796
+- 本番SupabaseへのDDL適用・Edge Functionデプロイ・Gmail送信・PRマージは行っていない。顧客向けの本番E2Eは依然未実施。

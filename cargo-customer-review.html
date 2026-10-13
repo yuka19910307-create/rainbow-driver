@@ -71,9 +71,9 @@ function quotePane(item){
  const existing=item.quote;
  if(existing){
   const prior=document.createElement("p");prior.className="details";
-  prior.textContent="下書き金額："+Number(existing.amount_yen).toLocaleString("ja-JP")+"円\\n"+
-   "期限："+String(existing.valid_until||"")+"\\n"+
-   "条件："+String(existing.terms||"")+"\\n"+
+  prior.textContent="下書き金額："+Number(existing.amount_yen).toLocaleString("ja-JP")+"円\n"+
+   "期限："+String(existing.valid_until||"")+"\n"+
+   "条件："+String(existing.terms||"")+"\n"+
    "送信状態："+String(existing.delivery_status||"");
   container.append(prior);
  }

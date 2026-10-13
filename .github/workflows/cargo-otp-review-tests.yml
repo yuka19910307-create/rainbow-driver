@@ -78,6 +78,10 @@ jobs:
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/quotes.review.sql
       - name: Verify operator approval, public intake OFF and one-time email attempt
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/quotes-smoke.review.sql
+      - name: Apply quote follow-up ledger (disposable database only)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/followup.review.sql
+      - name: Check customer-interest follow-up without booking or payment
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/followup-smoke.review.sql
       - name: Remove disposable database
         if: always()
         run: docker rm -f cargo-otp-ci-postgres || true

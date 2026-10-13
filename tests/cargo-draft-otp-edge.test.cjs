@@ -66,7 +66,7 @@ async function setup(options={}){
    ...(action==='claim'?{draft_id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'}:{})};
   const response=await handler({method:extra.method??'POST',headers:{get:k=>headers[k.toLowerCase()]??null},
    text:async()=>JSON.stringify(body)});
-  return {status:response.status,body:await response.json()};
+  return {status:response.status,body:response.status===204?null:await response.json()};
  }
  return {invoke,calls};
 }

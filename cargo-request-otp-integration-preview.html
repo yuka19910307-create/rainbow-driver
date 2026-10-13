@@ -108,7 +108,12 @@ $("check").onclick=async()=>{
   if(s.error||s.data?.mode!=="OPERATOR_OWN_GMAIL_PRELAUNCH"||s.data?.bridge_configured!==true
     ||s.data?.verification_hmac_configured!==true||s.data?.delivery_scope!=="SCRIPT_OWNER_GMAIL_ONLY"
     ||s.data?.public_intake_enabled!==false)throw Error("Gmail認証の設定を確認できません。");
-  checked=true;set("checkResult","架空配送情報とGmail接続設定を確認しました。一般受付OFFです。実際の配送依頼は作成していません。",true);
+  const bindReady=await call("cargo-draft-otp-binding",{action:"status"});
+  if(bindReady.error||bindReady.data?.ok!==true||bindReady.data?.ready!==true
+    ||bindReady.data?.mode!=="OPERATOR_SYNTHETIC_DRAFT_ONLY"
+    ||bindReady.data?.public_intake_enabled!==false)
+    throw Error("申込別認証APIがまだ準備できていません。Gmail送信は行いません。");
+  checked=true;set("checkResult","架空配送情報・Gmail設定・申込別認証APIを確認しました。一般受付OFFです。実際の配送依頼は作成していません。",true);
  }catch(e){set("checkResult","安全確認を停止しました："+(e?.message||"通信エラー"),false)}
  finally{busy=false;update()}
 };
@@ -119,6 +124,10 @@ $("send").onclick=async()=>{
  update();set("sendResult","送信しています…");
  try{
   if(!(await guard()))throw Error("一般受付OFFを確認できず、送信を中止しました。");
+  const ready=await call("cargo-draft-otp-binding",{action:"status"});
+  if(ready.error||ready.data?.ok!==true||ready.data?.ready!==true
+    ||ready.data?.public_intake_enabled!==false)
+    throw Error("申込別認証APIを再確認できません。Gmail送信は中止しました。");
   const r=await call("cargo-gmail-otp-test",{action:"send_test"});
   if(r.error||r.data?.ok!==true||r.data?.mode!=="OPERATOR_OWN_GMAIL_TEST"
     ||typeof r.data?.challenge_id!=="string"||r.data?.public_intake_enabled!==false)

@@ -43,7 +43,7 @@ Deno.serve(async(req:Request)=>{
  let data:Record<string,unknown>;
  try{
   const source=await req.text();
-  if(source.length>1024)return respond({error:"BODY_TOO_LARGE"},413);
+  if(source.length>12000)return respond({error:"BODY_TOO_LARGE"},413);
   data=JSON.parse(source);
   if(!data||typeof data!=="object"||Array.isArray(data))throw Error();
   if(!["list","decision","quote_prepare","quote_send","followup"].includes(String(data.action)))throw Error();
@@ -113,7 +113,7 @@ Deno.serve(async(req:Request)=>{
    const sendKey=Deno.env.get("CARGO_CUSTOMER_RESEND_API_KEY")||"";
    const from=Deno.env.get("CARGO_CUSTOMER_FROM_EMAIL")||"";
    const provider=Deno.env.get("CARGO_CUSTOMER_EMAIL_PROVIDER")||"";
-   if(!sendKey||provider!=="resend"||!/^\\S+@\\S+\\.\\S+$/.test(from))
+   if(!sendKey||provider!=="resend"||!/^\S+@\S+\.\S+$/.test(from))
     return respond({error:"QUOTE_EMAIL_NOT_CONFIGURED"},503);
    // Generate a unique opaque 256-bit response token. Only its keyed HMAC is stored.
    // The one-time secret appears in the email link fragment (never in URL query).
@@ -143,19 +143,10 @@ Deno.serve(async(req:Request)=>{
     const {data:reqRow,error:reqError}=await db.from("cargo_customer_intake_requests")
      .select("encrypted_payload").eq("id",data.id).eq("status","operator_reviewing").maybeSingle();
     if(reqError||!reqRow)throw Error("QUOTE_REQUEST_UNAVAILABLE");
-    const followups=new Map<string,unknown>();
-  if(ids.length){
-   const {data:followupRows,error:followupError}=await db
-    .from("cargo_customer_quote_followups")
-    .select("request_id,stage,operator_note,updated_at")
-    .in("request_id",ids);
-   if(followupError)return respond({error:"FOLLOWUP_QUEUE_UNAVAILABLE"},503);
-   for(const row of followupRows||[])followups.set(row.request_id,row);
-  }
-  const key=await crypto.subtle.importKey("raw",aes,"AES-GCM",false,["decrypt"]);
+    const key=await crypto.subtle.importKey("raw",aes,"AES-GCM",false,["decrypt"]);
     const details=await decrypt(key,String(reqRow.encrypted_payload||""));
     const email=String(details.email).toLowerCase();
-    if(email.length>254||!(/^[^\\s@]{1,64}@[^\\s@]{1,190}$/.test(email)))throw Error("INVALID_RECIPIENT");
+    if(email.length>254||!(/^[^\s@]{1,64}@[^\s@]{1,190}$/.test(email)))throw Error("INVALID_RECIPIENT");
     const amount=Number(claimed.amount_yen);
     const until=new Date(String(claimed.valid_until));
     if(!Number.isSafeInteger(amount)||amount<1||amount>10000000||
@@ -237,6 +228,15 @@ Deno.serve(async(req:Request)=>{
    if(quoteError)return respond({error:"QUOTE_QUEUE_UNAVAILABLE"},503);
    quotes=new Map((quoteRows||[]).map(q=>[q.request_id,q]));
   }
+  const followups=new Map<string,unknown>();
+  if(ids.length){
+   const {data:followupRows,error:followupError}=await db
+    .from("cargo_customer_quote_followups")
+    .select("request_id,stage,operator_note,updated_at")
+    .in("request_id",ids);
+   if(followupError)return respond({error:"FOLLOWUP_QUEUE_UNAVAILABLE"},503);
+   for(const row of followupRows||[])followups.set(row.request_id,row);
+  }
   const key=await crypto.subtle.importKey("raw",aes,"AES-GCM",false,["decrypt"]);
   const items=[];
   for(const row of rows||[]){
@@ -249,3 +249,4 @@ Deno.serve(async(req:Request)=>{
    automatic_dispatch:false,automatic_quote:false});
  }catch{return respond({error:"QUEUE_UNAVAILABLE"},503)}
 });
+

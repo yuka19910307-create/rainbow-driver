@@ -152,6 +152,64 @@ function quotePane(item){
  return container;
 }
 
+function followupPane(item){
+ const quote=item.quote;
+ if(item.status!=="quoted"||quote?.response_state!=="interested")return null;
+ const current=item.followup?.stage||null;
+ const stages={
+  contact_attempted:"お客様へ連絡した",
+  awaiting_reply:"お客様からの返答待ち",
+  handled_offline:"個別対応を終了した（業務記録のみ）",
+  closed_no_order:"受注に至らず終了した"
+ };
+ const panel=document.createElement("section");panel.className="card";
+ const title=document.createElement("h3");title.textContent="利用希望への対応履歴（管理者専用）";
+ panel.append(title);
+ const prev=document.createElement("p");prev.className="details";
+ prev.textContent="対応状態："+(current?stages[current]||current:"未着手")+
+  "\n最終記録："+String(item.followup?.updated_at||"なし")+
+  "\n前回メモ："+String(item.followup?.operator_note||"なし");
+ panel.append(prev);
+ const hint=label("お客様への連絡は自動送信されません。電話・メール等で実際に対応した内容だけを記録してください。");
+ panel.append(hint);
+ if(current==="handled_offline"||current==="closed_no_order"){
+  panel.append(label("この案件の対応履歴は終了済みです。記録は変更できません。"));
+  return panel;
+ }
+ const note=document.createElement("textarea");
+ note.rows=3;note.maxLength=600;note.placeholder="対応内容（5〜600文字）。個人情報を必要以上に記録しないでください。";
+ note.style.width="100%";note.style.padding="10px";note.style.borderRadius="8px";
+ note.style.border="1px solid #a8bfd5";
+ const wrapper=document.createElement("label");wrapper.textContent="対応メモ";
+ wrapper.style.display="block";wrapper.append(note);panel.append(wrapper);
+ const allowed=current===null?["contact_attempted","closed_no_order"]:
+  current==="contact_attempted"?["awaiting_reply","handled_offline","closed_no_order"]:
+  ["contact_attempted","handled_offline","closed_no_order"];
+ for(const stage of allowed){
+  panel.append(button(stages[stage],async()=>{
+   if(busy)return;
+   const memo=note.value.trim();
+   if(memo.length<5||memo.length>600){
+    text("auth","対応メモは5〜600文字で記入してください。");
+    return;
+   }
+   if(!confirm("対応状況を業務記録として保存します。顧客への通知・配車・決済は行いません。よろしいですか？"))return;
+   busy=true;$("refresh").disabled=true;
+   try{
+    const saved=await invoke({action:"followup",id:item.id,
+     expected_stage:current,next_stage:stage,note:memo});
+    if(saved?.ok!==true||saved?.booking_confirmed!==false||
+      saved?.payment_created!==false||saved?.dispatch_created!==false)throw Error();
+    await load(true);
+    text("auth","対応履歴を保存しました。顧客への通知・予約・決済は発生していません。");
+   }catch{
+    text("auth","対応履歴を保存できませんでした。重複記録せず、一覧を更新して確認してください。");
+   }finally{busy=false;$("refresh").disabled=!user}
+  }));
+ }
+ return panel;
+}
+
 function render(items){
  const root=$("requests");root.replaceChildren();
  if(items.length===0){const e=document.createElement("section");e.className="card";
@@ -180,6 +238,9 @@ function render(items){
   }else if(item.status==="operator_reviewing"){
    card.append(quotePane(item));
    card.append(button("対応終了として閉じる",()=>change(item,"closed")));
+  }else if(item.status==="quoted"&&item.quote?.response_state==="interested"){
+   const pane=followupPane(item);
+   if(pane)card.append(pane);
   }
   root.append(card);
  }

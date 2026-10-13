@@ -38,7 +38,7 @@ as $$
 declare
   v_binding public.cargo_operator_draft_otp_bindings%rowtype;
   v_challenge public.cargo_email_verification_challenges%rowtype;
-  v_now timestamptz := clock_timestamp();
+  v_now timestamptz;
 begin
   if p_operator_id is null or p_draft_id is null or p_challenge_id is null
      or p_subject_hmac is null or octet_length(p_subject_hmac) <> 32
@@ -72,11 +72,16 @@ begin
   if v_binding.claimed_at is not null then
     return jsonb_build_object('ok',false,'reason','ALREADY_CLAIMED');
   end if;
+  -- Refresh wall-clock time after acquiring the draft lock; waiting for
+  -- concurrent claims must never extend the ten-minute validity window.
+  v_now := clock_timestamp();
   if v_now >= v_binding.expires_at then
     return jsonb_build_object('ok',false,'reason','EXPIRED');
   end if;
   select * into v_challenge from public.cargo_email_verification_challenges
    where id=v_binding.challenge_id for update;
+  -- A second lock may also block. Check the actual time after both locks.
+  v_now := clock_timestamp();
   if not found or v_challenge.subject_hmac <> v_binding.subject_hmac
      or v_challenge.consumed_at is null
      or v_challenge.consumed_at < v_binding.created_at

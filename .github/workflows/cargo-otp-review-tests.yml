@@ -40,8 +40,13 @@ jobs:
             -e POSTGRES_PASSWORD=local-test-only \
             postgres:16-alpine
           for i in $(seq 1 30); do
-            if docker exec cargo-otp-ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
-              exit 0
+            if docker exec cargo-otp-ci-postgres psql -X -U postgres -Atqc "select 1" 2>/dev/null | grep -qx 1; then
+              # The official image temporarily starts PostgreSQL during init,
+              # then restarts it. Do not mistake that temporary server for ready.
+              sleep 3
+              if docker exec cargo-otp-ci-postgres psql -X -U postgres -Atqc "select 1" 2>/dev/null | grep -qx 1; then
+                exit 0
+              fi
             fi
             sleep 1
           done

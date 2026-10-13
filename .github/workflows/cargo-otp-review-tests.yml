@@ -9,6 +9,8 @@ on:
       - "cargo-request-preview.html"
       - "cargo-pwa/request-review-rules.js"
       - "cargo-customer-intake.html"
+      - "cargo-customer-quote-reply.html"
+      - "cargo-customer-review.html"
       - "integrations/cargo-customer-intake/**"
       - "tests/cargo-request-review.test.cjs"
       - "tests/cargo-draft-otp-*.test.cjs"

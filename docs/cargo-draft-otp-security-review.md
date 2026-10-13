@@ -74,3 +74,11 @@ GitHub上の実コードに対して以下16項目を検査し、16件合格：
 - 実行ログに`PASS: concurrent claims yield exactly one success and one replay rejection`および`PASS: code expiring while waiting for a row lock cannot be claimed`を確認。
 - 実行結果：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38398206796
 - 本番SupabaseへのDDL適用・Edge Functionデプロイ・Gmail送信・PRマージは行っていない。顧客向けの本番E2Eは依然未実施。
+
+## 管理者専用Edge Functionのオフライン動作確認（2026-10-13）
+- `tests/cargo-draft-otp-edge.test.cjs`を追加し、**レビュー中の実際のEdge Functionソース**をメモリ内で実行。Supabase DB/認証/Gmailをモック化し、ネットワークや本番シークレットを使用しない。
+- 7件：Bearer認証・Origin、JWT・管理者権限、受付ON拒否、read-only準備確認、OTP subject一致・不一致、claim成功・拒否、無効IDの事前拒否。
+- 既存16件と合わせたオフライン**23件すべて成功**。一時PostgreSQLのSQL検証・二重claim・ロック待ち期限切れも成功。
+- GitHub Actions 実行ID `38399153744`、両ジョブ成功：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38399153744
+- 初回の新規テスト失敗は架空challenge IDがUUIDの桁数不足だったため。架空IDを修正し再実行で成功。Edge Functionの本番ソースはこの修正では変更していない。
+- **未検証**：実Supabase Edge Functionデプロイ、実セッションを用いたAPI呼び出し、ブラウザからのE2E、顧客向け受付。PRはDraftのまま。本番DB・メール・受付・決済には変更なし。

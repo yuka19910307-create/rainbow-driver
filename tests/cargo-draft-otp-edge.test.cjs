@@ -31,13 +31,19 @@ async function setup(options={}){
    calls.push(table);
    const query={
     select(){return query},eq(){return query},order(){return query},limit(){return query},
+    then(resolve,reject){
+     // Model the real PostgREST Promise-like builder. Even LIMIT 0
+     // performs a request and reports a missing table.
+     return Promise.resolve({data:[],error:table==='cargo_operator_draft_otp_bindings'&&options.noBindingTable
+      ?{message:'relation missing'}:null}).then(resolve,reject);
+    },
     async maybeSingle(){
      if(table==='cargo_operator_accounts')return {data:options.notOperator?null:{user_id:user},error:null};
      if(table==='cargo_intake_control')return {data:{intake_enabled:!!options.intakeOn,captcha_required:true,contact_verification_required:true},error:null};
      if(table==='cargo_email_verification_challenges')return {data:challenge,error:null};
      return {data:null,error:{message:'unexpected table'}};
     },
-    async insert(){calls.push('insert');return {error:null}}
+    async insert(){calls.push('insert');return {error:options.insertFail?{message:'write denied'}:null}}
    };
    return query;
   },
@@ -102,4 +108,31 @@ test('claim returns success or denial without creating a dispatch',async()=>{
 test('malformed identifiers rejected before database access',async()=>{
  const x=await setup();const r=await x.invoke('bind',{body:{action:'bind',challenge_id:'bad'}});
  assert.equal(r.status,422);assert.deepEqual(x.calls,[]);
+});
+
+test('missing binding table or RPC must fail readiness before email',async()=>{
+ for(const options of [{noBindingTable:true},{rpcUnavailable:true}]){
+  const x=await setup(options),r=await x.invoke('status');
+  assert.equal(r.status,503);assert.equal(r.body.error,'BINDING_NOT_READY');
+  assert.ok(!x.calls.includes('insert'));
+ }
+});
+test('failed binding insert cannot report successful association',async()=>{
+ const x=await setup({insertFail:true}),r=await x.invoke('bind');
+ assert.equal(r.status,503);assert.equal(r.body.error,'BINDING_UNAVAILABLE');
+});
+test('disallowed methods and malformed payloads are rejected before DB access',async()=>{
+ for(const extra of [{method:'GET'},{body:{action:'status',unexpected:true}},
+  {body:{action:'claim',challenge_id:'bad',draft_id:'bad'}}]){
+  const x=await setup(),r=await x.invoke('status',extra);
+  assert.ok([405,400,422].includes(r.status));
+  assert.deepEqual(x.calls,[]);
+ }
+});
+test('CORS preflight is limited to the operator app origin',async()=>{
+ const x=await setup(),good=await x.invoke('status',{method:'OPTIONS'});
+ assert.equal(good.status,204);
+ const bad=await x.invoke('status',{method:'OPTIONS',badOrigin:true});
+ assert.equal(bad.status,403);assert.equal(bad.body.error,'ORIGIN_DENIED');
+ assert.deepEqual(x.calls,[]);
 });

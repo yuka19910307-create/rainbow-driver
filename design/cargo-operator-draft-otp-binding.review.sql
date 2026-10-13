@@ -107,4 +107,40 @@ revoke all on function public.cargo_operator_draft_otp_claim(uuid,uuid,uuid,byte
 grant execute on function public.cargo_operator_draft_otp_claim(uuid,uuid,uuid,bytea,bytea)
   to service_role;
 
+
+-- Bounded, explicitly invoked cleanup for expired FICTIONAL draft bindings.
+-- This does not remove OTP challenges, customer records, or dispatch requests.
+-- No cron is installed; deployment/scheduling requires separate review.
+create or replace function public.cargo_operator_draft_otp_cleanup(
+  p_limit integer default 100
+) returns integer
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_removed integer := 0;
+begin
+  if p_limit is null or p_limit < 1 or p_limit > 100 then
+    return 0;
+  end if;
+  with expired as (
+    select draft_id
+    from public.cargo_operator_draft_otp_bindings
+    where delete_after < clock_timestamp()
+    order by delete_after,draft_id
+    for update skip locked
+    limit p_limit
+  )
+  delete from public.cargo_operator_draft_otp_bindings b
+   using expired e where b.draft_id=e.draft_id;
+  get diagnostics v_removed = row_count;
+  return v_removed;
+end;
+$$;
+revoke all on function public.cargo_operator_draft_otp_cleanup(integer)
+ from public,anon,authenticated;
+grant execute on function public.cargo_operator_draft_otp_cleanup(integer)
+ to service_role;
+
 commit;

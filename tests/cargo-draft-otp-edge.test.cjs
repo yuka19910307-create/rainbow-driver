@@ -13,7 +13,7 @@ for(const [from,to] of [
  ['input.challenge_id!','input.challenge_id']
 ]){assert.ok(code.includes(from),'Source changed: '+from);code=code.replaceAll(from,to)}
 const user='11111111-1111-4111-8111-111111111111';
-const challengeId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa';
+const challengeId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const key=Buffer.alloc(32,7),base64=key.toString('base64');
 const mac=async()=>{
  const imported=await webcrypto.subtle.importKey('raw',key,{name:'HMAC',hash:'SHA-256'},false,['sign']);

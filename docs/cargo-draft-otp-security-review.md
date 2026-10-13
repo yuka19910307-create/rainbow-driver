@@ -82,3 +82,11 @@ GitHub上の実コードに対して以下16項目を検査し、16件合格：
 - GitHub Actions 実行ID `38399153744`、両ジョブ成功：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38399153744
 - 初回の新規テスト失敗は架空challenge IDがUUIDの桁数不足だったため。架空IDを修正し再実行で成功。Edge Functionの本番ソースはこの修正では変更していない。
 - **未検証**：実Supabase Edge Functionデプロイ、実セッションを用いたAPI呼び出し、ブラウザからのE2E、顧客向け受付。PRはDraftのまま。本番DB・メール・受付・決済には変更なし。
+
+## 実Supabaseの導入前チェック（2026-10-13）
+- 本番DBをSELECTのみで確認：`cargo_intake_control.intake_enabled=false`、`public.cargo_operator_draft_otp_bindings`テーブルは未作成、`public.cargo_operator_draft_otp_claim` RPCも未作成。したがって管理者専用画面の`cargo-draft-otp-binding` readiness は現状未準備で、Gmail送信前に停止するのが正しい挙動。
+- 新規Edge Functionはレビュー中で未デプロイ。**本番DBへのDDLや本番メール送信を行わない**。
+- `tests/cargo-draft-otp-edge.test.cjs`を11件へ拡張：テーブル未作成、RPC未作成、書き込み失敗、不正HTTPメソッド・不正入力、許可されないOrigin、OPTIONSプリフライトを追加。テスト用モックでのHTTP 204空レスポンス処理も正しく実装。
+- Supabase公式ドキュメントを確認：ブラウザからのEdge Function呼び出しではCORSプリフライト処理が必要。認証済み呼び出しではユーザーJWTの検証と権限確認が必要。
+- セキュリティアドバイザは既存の`rls_enabled_no_policy`（サービスロール専用テーブルを含む）および`extension_in_public`などを報告。既存のアプリ全体に関わるため今回の作業では変更していない。参考：https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy
+- 次の実環境統合には、本番と切り離されたSupabase環境、もしくは明示的に承認された本番側の管理者専用導入が必要。導入前にDBバックアップ、JWT設定、service_role秘匿、RLSとアクセス権限、ロールバックを確認する。

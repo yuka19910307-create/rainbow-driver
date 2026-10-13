@@ -55,3 +55,14 @@ GitHub上の実コードに対して以下16項目を検査し、16件合格：
 - API未準備時の送信停止と送信直前の再確認の2テストを追加。テスト定義はセキュリティ7件＋ブラウザ9件の合計16件。
 - GitHubから現行ソースを読み込み、Node標準モジュールの一部を模擬したJavaScript検証環境で16件すべて成功。**Node本体のテストランナーやGitHub Actionsによる実行とは異なるため、CI合格・実API成功とは扱わない。**
 - 本番DBへのDDL適用、Edge Functionデプロイ、実メール送信、mainへのマージは未実施。
+
+## 独立PostgreSQL 16での実SQL統合テスト（2026-10-13）
+- GitHub Actionsの`disposable-postgres-integration`ジョブが成功（実行ID `38395796752`）。
+- Dockerで一時PostgreSQL 16を作成し、`tests/cargo-otp-pg-fixtures.sql`で架空ユーザー、管理者、OTPチャレンジ、受付OFF設定を準備。
+- `design/cargo-operator-draft-otp-binding.review.sql`を**一時DBのみに**適用し、`tests/cargo-otp-pg-assert.sql`でSQL関数を実行。
+- 成功した実SQL確認：RLS、anon/authenticated権限の拒否、service_roleでのclaim、認証の一度限りの使用、未認証拒否、期限切れ拒否、別管理者拒否、申込指紋改ざん拒否、古いOTP拒否、事後bind拒否、受付OFF条件の検証。
+- 同実行の`offline-security-contract`ジョブも成功（Nodeテスト16件）。
+- 実行結果：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38395796752
+- **本番SupabaseのDBにはSQLを適用していない。新Edge Functionは未デプロイ。実Gmail送信も行っていない。**
+- 本番の受付設定を再確認：`intake_enabled=false`、`captcha_required=true`、`contact_verification_required=true`。
+- 残る課題：Supabase固有の実環境認証、Edge Function実行、実Gmail、同時claimの競合テスト、顧客向け申込との紐づけ。今回の成功だけで一般受付を公開しない。

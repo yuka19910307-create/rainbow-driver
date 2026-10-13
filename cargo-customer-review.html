@@ -1,0 +1,119 @@
+<!doctype html><html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>軽貨物｜顧客申込の審査待ち管理（管理者専用）</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#20364d;background:#f0f5fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.6}
+header{background:#1c3552;color:white;padding:25px 17px}
+header>div,main{max-width:800px;margin:auto}h1{font-size:24px;margin:4px 0}
+main{padding:16px}.card{padding:19px;border:1px solid #d8e3ef;border-radius:13px;background:white;margin-bottom:13px}
+small{color:#62768a}button{background:#25456a;color:white;border:0;border-radius:8px;font:inherit;font-weight:700;padding:11px 15px;margin:5px 8px 5px 0}
+button:disabled{opacity:.45}a{color:#2b659b}
+.msg{background:#e9f1f8;padding:12px;border-radius:9px;white-space:pre-wrap}
+.details{white-space:pre-wrap;overflow-wrap:anywhere;background:#f0f4f9;padding:12px;border-radius:9px}
+</style></head><body>
+<header><div><small style="color:#c5d7ea">RAINBOW DRIVER / CARGO / OPERATOR</small>
+<h1>軽貨物・お客様からの申込審査</h1><p>管理者専用／自動受諾・自動見積もりは行いません</p></div></header>
+<main>
+<section class="card"><p><a href="./cargo-operator-login.html">管理者ログイン</a> ／ <a href="./cargo-request-preview.html">申込プレビュー</a></p>
+<p id="auth" class="msg" role="status">管理者のログイン状態を確認しています…</p>
+<p><button type="button" id="refresh" disabled>審査待ちの申込を更新</button></p>
+<p><small>お客様の個人情報は業務目的でのみ扱ってください。画面の内容を共有端末に残さないでください。自動通知・決済・運行依頼はありません。</small></p>
+</section>
+<section id="requests" aria-live="polite"></section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{"use strict";
+const $=id=>document.getElementById(id);
+let db=null,user=null,busy=false;
+function label(text){const e=document.createElement("p");e.textContent=text;return e}
+function button(text,action){
+ const el=document.createElement("button");el.type="button";el.textContent=text;el.onclick=action;return el;
+}
+function text(id,message){$(id).textContent=message}
+async function invoke(body){
+ const {data,error}=await db.functions.invoke("cargo-customer-review-operator",{body});
+ if(error||!data)throw Error("サーバーへ接続できません。");
+ return data;
+}
+function detail(d){
+ return [
+  ["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
+  ["個数",d.pieces],["重量",String(d.weight)+"kg"],
+  ["寸法",String(d.length)+"×"+d.width+"×"+d.height+"cm"],
+  ["準備状況",d.readiness],["荷役",d.handling],
+  ["補足",d.note||"なし"],["担当者",d.clientName||"未入力"],
+  ["認証済みメール",d.email]
+ ].map(([k,v])=>k+"： "+String(v??"—")).join("\n");
+}
+async function change(item,next){
+ if(busy)return;
+ const message=next==="operator_reviewing"?"この申込を確認中にしますか？":
+  next==="declined"?"この申込を辞退扱いにしますか？":
+  "この申込を完了扱いで閉じますか？お客様への通知は行われません。";
+ if(!confirm(message))return;
+ busy=true;$("refresh").disabled=true;
+ try{
+  const r=await invoke({action:"decision",id:item.id,
+   expected_status:item.status,next_status:next});
+  if(!r?.ok)throw Error("保存できませんでした。");
+  text("auth","変更を保存しました。お客様へのメール通知・決済は行っていません。");
+  await load();
+ }catch{ text("auth","申込状態を保存できませんでした。更新後に状態を確認してください。") }
+ finally{busy=false;$("refresh").disabled=!user}
+}
+function render(items){
+ const root=$("requests");root.replaceChildren();
+ if(items.length===0){const e=document.createElement("section");e.className="card";
+  e.append(label("審査待ち・審査中の申込はありません。"));root.append(e);return}
+ for(const item of items){
+  const card=document.createElement("section");card.className="card";
+  const title=document.createElement("h2");title.textContent=
+   (item.status==="pending_operator_review"?"未審査":"確認中")+
+   " ／ "+String(item.created_at||"");
+  card.append(title);
+  const content=document.createElement("p");content.className="details";
+  content.textContent=detail(item.details||{});card.append(content);
+  card.append(label("受付ID："+String(item.id||"")));
+  if(item.status==="pending_operator_review"){
+   card.append(button("審査を開始",()=>change(item,"operator_reviewing")));
+   card.append(button("辞退として記録",()=>change(item,"declined")));
+  }else if(item.status==="operator_reviewing")
+   card.append(button("対応終了として閉じる",()=>change(item,"closed")));
+  root.append(card);
+ }
+}
+async function load(){
+ if(!user||busy)return;
+ $("refresh").disabled=true;
+ text("auth","暗号化された審査待ち申込を取得しています…");
+ try{
+  const data=await invoke({action:"list"});
+  if(data?.ok!==true||!Array.isArray(data.items))throw Error();
+  render(data.items);
+  text("auth","管理者確認済み。表示は最大20件。お客様への自動通知・受注確定はありません。");
+ }catch{text("auth","審査待ちを取得できません。機能の導入状況・権限・通信を確認してください。")}
+ finally{$("refresh").disabled=!user}
+}
+async function init(){
+ if(!window.supabase){text("auth","認証ライブラリがありません。");return}
+ db=window.supabase.createClient(
+  "https://kvoaorzdewwirqryeizq.supabase.co",
+  "sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms",
+  {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}}
+ );
+ try{
+  const {data,error}=await db.auth.getUser();
+  if(error||!data?.user)throw Error();
+  const {data:account,error:e}=await db.from("cargo_operator_accounts")
+   .select("user_id").eq("user_id",data.user.id).maybeSingle();
+  if(e||!account)throw Error();
+  user=data.user;$("refresh").disabled=false;
+  await load();
+ }catch{text("auth","軽貨物管理者としてログインしてください。");}
+}
+$("refresh").onclick=load;init();
+})();
+</script></body></html>

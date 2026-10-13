@@ -46,10 +46,11 @@ Deno.serve(async(req:Request)=>{
   if(source.length>1024)return respond({error:"BODY_TOO_LARGE"},413);
   data=JSON.parse(source);
   if(!data||typeof data!=="object"||Array.isArray(data))throw Error();
-  if(!["list","decision","quote_prepare","quote_send"].includes(String(data.action)))throw Error();
+  if(!["list","decision","quote_prepare","quote_send","followup"].includes(String(data.action)))throw Error();
   const expected=data.action==="list"?["action"]:
    data.action==="decision"?["action","id","expected_status","next_status"]:
    data.action==="quote_prepare"?["action","id","amount_yen","terms","valid_until"]:
+   data.action==="followup"?["action","id","expected_stage","next_stage","note"]:
    ["action","id","confirmation"];
   const actual=Object.keys(data).sort();
   if(actual.length!==expected.length||
@@ -68,6 +69,12 @@ Deno.serve(async(req:Request)=>{
   if(data.action==="quote_send"&&(!canonical.test(String(data.id||""))||
      data.confirmation!=="SEND_APPROVED_QUOTE"))
     throw Error();
+  if(data.action==="followup"&&(
+     !canonical.test(String(data.id||""))||
+     !(data.expected_stage===null||["contact_attempted","awaiting_reply","handled_offline","closed_no_order"].includes(String(data.expected_stage)))||
+     !["contact_attempted","awaiting_reply","handled_offline","closed_no_order"].includes(String(data.next_stage))||
+     typeof data.note!=="string"||data.note.trim().length<5||data.note.trim().length>600))
+    throw Error();
  }catch{return respond({error:"INVALID_INPUT"},422)}
  const url=Deno.env.get("SUPABASE_URL"),role=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
  const aes=aesSecret();
@@ -79,6 +86,18 @@ Deno.serve(async(req:Request)=>{
   const {data:operator,error:memberError}=await db.from("cargo_operator_accounts")
    .select("user_id").eq("user_id",auth.user.id).maybeSingle();
   if(memberError||!operator)return respond({error:"OPERATOR_ONLY"},403);
+  if(data.action==="followup"){
+   const {data:saved,error:saveError}=await db.rpc("cargo_customer_followup_save",{
+    p_request_id:data.id,p_operator_id:auth.user.id,
+    p_expected_stage:data.expected_stage,p_next_stage:data.next_stage,
+    p_note:data.note.trim()
+   });
+   if(saveError||!saved)return respond({error:"FOLLOWUP_UNAVAILABLE"},503);
+   if(saved.ok!==true)return respond({ok:false,reason:saved.reason||"DENIED"},422);
+   return respond({ok:true,reason:"FOLLOWUP_RECORDED",stage:saved.stage,
+    booking_confirmed:false,dispatch_created:false,
+    payment_created:false,customer_notified:false});
+  }
   if(data.action==="quote_prepare"){
    const {data:prepared,error:prepareError}=await db.rpc("cargo_customer_quote_prepare",{
     p_request_id:data.id,p_operator_id:auth.user.id,
@@ -124,7 +143,16 @@ Deno.serve(async(req:Request)=>{
     const {data:reqRow,error:reqError}=await db.from("cargo_customer_intake_requests")
      .select("encrypted_payload").eq("id",data.id).eq("status","operator_reviewing").maybeSingle();
     if(reqError||!reqRow)throw Error("QUOTE_REQUEST_UNAVAILABLE");
-    const key=await crypto.subtle.importKey("raw",aes,"AES-GCM",false,["decrypt"]);
+    const followups=new Map<string,unknown>();
+  if(ids.length){
+   const {data:followupRows,error:followupError}=await db
+    .from("cargo_customer_quote_followups")
+    .select("request_id,stage,operator_note,updated_at")
+    .in("request_id",ids);
+   if(followupError)return respond({error:"FOLLOWUP_QUEUE_UNAVAILABLE"},503);
+   for(const row of followupRows||[])followups.set(row.request_id,row);
+  }
+  const key=await crypto.subtle.importKey("raw",aes,"AES-GCM",false,["decrypt"]);
     const details=await decrypt(key,String(reqRow.encrypted_payload||""));
     const email=String(details.email).toLowerCase();
     if(email.length>254||!(/^[^\\s@]{1,64}@[^\\s@]{1,190}$/.test(email)))throw Error("INVALID_RECIPIENT");
@@ -214,7 +242,8 @@ Deno.serve(async(req:Request)=>{
   for(const row of rows||[]){
    const info=await decrypt(key,String(row.encrypted_payload||""));
    items.push({id:row.id,status:row.status,created_at:row.created_at,
-    details:info,quote:quotes.get(row.id)||null});
+    details:info,quote:quotes.get(row.id)||null,
+    followup:followups.get(row.id)||null});
   }
   return respond({ok:true,items,customer_notified:false,
    automatic_dispatch:false,automatic_quote:false});

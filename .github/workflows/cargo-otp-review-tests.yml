@@ -6,6 +6,9 @@ on:
       - "design/cargo-operator-draft-otp-binding.review.sql"
       - "integrations/cargo-draft-otp-binding/index.ts"
       - "cargo-request-otp-integration-preview.html"
+      - "cargo-request-preview.html"
+      - "cargo-pwa/request-review-rules.js"
+      - "tests/cargo-request-review.test.cjs"
       - "tests/cargo-draft-otp-*.test.cjs"
       - "tests/cargo-otp-pg-*.sql"
       - "tests/cargo-otp-pg-concurrency.py"
@@ -25,7 +28,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Run offline contract tests (no secrets or network requests)
-        run: node --test tests/cargo-draft-otp-*.test.cjs
+        run: node --test tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs
 
   disposable-postgres-integration:
     runs-on: ubuntu-latest

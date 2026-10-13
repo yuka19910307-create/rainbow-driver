@@ -96,8 +96,25 @@ Deno.serve(async(req:Request)=>{
    const provider=Deno.env.get("CARGO_CUSTOMER_EMAIL_PROVIDER")||"";
    if(!sendKey||provider!=="resend"||!/^\\S+@\\S+\\.\\S+$/.test(from))
     return respond({error:"QUOTE_EMAIL_NOT_CONFIGURED"},503);
+   // Generate a unique opaque 256-bit response token. Only its keyed HMAC is stored.
+   // The one-time secret appears in the email link fragment (never in URL query).
+   const rawHmac=Deno.env.get("CARGO_INTAKE_HMAC_KEY")||"";
+   let hmacBytes:Uint8Array;
+   try{
+    if(!/^[A-Za-z0-9+/]+={0,2}$/.test(rawHmac)||rawHmac.length%4)throw Error();
+    hmacBytes=Uint8Array.from(atob(rawHmac),c=>c.charCodeAt(0));
+    if(hmacBytes.length<32||hmacBytes.length>64)throw Error();
+   }catch{return respond({error:"QUOTE_TOKEN_SECRET_NOT_CONFIGURED"},503)}
+   const rawToken=crypto.getRandomValues(new Uint8Array(32));
+   const hex=Array.from(rawToken,b=>b.toString(16).padStart(2,"0")).join("");
+   const secretKey=await crypto.subtle.importKey("raw",hmacBytes,
+    {name:"HMAC",hash:"SHA-256"},false,["sign"]);
+   const signed=new Uint8Array(await crypto.subtle.sign("HMAC",secretKey,
+    new TextEncoder().encode("CARGO_CUSTOMER_QUOTE_REPLY_V1|"+data.id+"|"+hex)));
+   const fingerprint="\\x"+Array.from(signed,b=>b.toString(16).padStart(2,"0")).join("");
    const {data:claimed,error:claimError}=await db.rpc("cargo_customer_quote_claim_send",{
-    p_request_id:data.id,p_operator_id:auth.user.id
+    p_request_id:data.id,p_operator_id:auth.user.id,
+    p_response_token_hmac:fingerprint
    });
    if(claimError||!claimed)return respond({error:"QUOTE_CLAIM_UNAVAILABLE"},503);
    if(claimed.ok!==true)return respond({ok:false,reason:claimed.reason||"DENIED"},422);
@@ -124,7 +141,12 @@ Deno.serve(async(req:Request)=>{
      "適用条件・消費税・高速道路料金等の取扱い:\\n"+
      claimed.terms+"\\n\\n"+
      "このご案内だけでは配送の受諾・出動・予約・決済は確定しません。"+
-     "ご利用の場合は担当者からの別途確認をお待ちください。";
+     "ご利用をご希望の場合は下記のページで「利用を希望する」を選んでください。"+
+     "ご希望を確認後、担当者から別途ご連絡します。\\n\\n"+
+     "お見積もりへのご回答（有効期限まで）：\\n"+
+     APP+"/cargo-customer-quote-reply.html#r="+encodeURIComponent(String(data.id))+
+       "&t="+hex+"\\n\\n"+
+     "回答は一度のみ有効です。URLは第三者に共有しないでください。";
     // Check intake mode a second time immediately before contacting the
     // external mail provider. The earlier transactional claim is also gated.
     const {data:sendGate,error:sendGateError}=await db.from("cargo_intake_control")
@@ -175,14 +197,14 @@ Deno.serve(async(req:Request)=>{
   }
   const {data:rows,error:readError}=await db.from("cargo_customer_intake_requests")
    .select("id,status,created_at,encrypted_payload")
-   .in("status",["pending_operator_review","operator_reviewing"])
+   .in("status",["pending_operator_review","operator_reviewing","quoted"])
    .order("created_at",{ascending:false}).limit(20);
   if(readError)return respond({error:"QUEUE_UNAVAILABLE"},503);
   const ids=(rows||[]).map(r=>r.id);
   let quotes=new Map<string,unknown>();
   if(ids.length){
    const {data:quoteRows,error:quoteError}=await db.from("cargo_customer_quote_replies")
-    .select("request_id,amount_yen,terms,valid_until,delivery_status,updated_at")
+    .select("request_id,amount_yen,terms,valid_until,delivery_status,updated_at,response_state,responded_at")
     .in("request_id",ids);
    if(quoteError)return respond({error:"QUOTE_QUEUE_UNAVAILABLE"},503);
    quotes=new Map((quoteRows||[]).map(q=>[q.request_id,q]));

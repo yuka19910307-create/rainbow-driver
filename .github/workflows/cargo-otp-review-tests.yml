@@ -8,6 +8,7 @@ on:
       - "cargo-request-otp-integration-preview.html"
       - "tests/cargo-draft-otp-*.test.cjs"
       - "tests/cargo-otp-pg-*.sql"
+      - "tests/cargo-otp-pg-concurrency.py"
       - ".github/workflows/cargo-otp-review-tests.yml"
   workflow_dispatch:
 
@@ -58,6 +59,8 @@ jobs:
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < design/cargo-operator-draft-otp-binding.review.sql
       - name: Verify RLS, permissions, OTP expiry, reuse and intake gate
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < tests/cargo-otp-pg-assert.sql
+      - name: Verify simultaneous claims and expiry under row locks
+        run: python3 tests/cargo-otp-pg-concurrency.py
       - name: Remove disposable database
         if: always()
         run: docker rm -f cargo-otp-ci-postgres || true

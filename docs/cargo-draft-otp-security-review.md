@@ -41,3 +41,10 @@ GitHub上の実コードに対して以下16項目を検査し、16件合格：
 
 ## 次の導入ゲート
 検証環境がない状態で新SQLやEdge Functionを本番に適用しない。費用の有無とステージング方式の承認を得た後、隔離環境でSQLトランザクション・権限・並列claimを検証する。
+
+## 追加レビュー：ロック待ち・自動テスト（2026-10-13）
+- DBの`cargo_operator_draft_otp_claim`を修正。行ロックの待機時間が長引いても、ロック取得後に`clock_timestamp()`を再取得し、期限切れコードを通さない設計に変更。
+- GitHub Actions用の`.github/workflows/cargo-otp-review-tests.yml`を追加。Draft PRで変更された場合、Node標準のテストランナーでオフラインのテストファイル2つを実行する設定。
+- `tests/cargo-draft-otp-flow.test.cjs`に、正常系・bind失敗・claim失敗・誤コード・受付条件違反・送信キャンセル・未認証/非管理者の7テストを追加。
+- 2つのNodeテストファイルのJavaScript構文は確認済み。ただし、GitHub Actionsの実行履歴は現時点で確認できておらず、CI合格とは主張しない。
+- データベースへのSQL適用、Edge Functionデプロイ、メール送信、本番ブランチへのマージは行っていない。

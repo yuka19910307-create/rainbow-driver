@@ -152,6 +152,7 @@ $("run").addEventListener("click",async()=>{
    &&post.data?.customer_submission_supported===false);
   if(allPassed)lines.push("完了：各安全機能の動作検証に成功しました。実メール・実際の受注・決済は行っていません。");
  }catch(e){
+  allPassed=false;
   lines.push("停止："+(e?.message||"テスト中に問題が発生しました。"));
  }
  finally{

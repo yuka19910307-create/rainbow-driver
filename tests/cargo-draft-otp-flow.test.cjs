@@ -38,11 +38,13 @@ async function setup(opts={}){
         expires_in_seconds:600,public_intake_enabled:false}
       :{verified:body.code==='123456',reason:body.code==='123456'?'VERIFIED':'INVALID_CODE'};
    }else if(name==='cargo-draft-otp-binding'){
-    data=body.action==='bind'
-     ?{ok:!opts.bindFail,mode:'OPERATOR_SYNTHETIC_DRAFT_ONLY',
-       draft_id:'22222222-2222-4222-8222-222222222222',
-       challenge_id:body.challenge_id,public_intake_enabled:false}
-     :{ok:!opts.claimFail,reason:opts.claimFail?'DENIED':'CLAIMED',public_intake_enabled:false};
+    data=body.action==='status'
+     ?{ok:!opts.notReady,ready:!opts.notReady,mode:'OPERATOR_SYNTHETIC_DRAFT_ONLY',public_intake_enabled:false}
+     :body.action==='bind'
+      ?{ok:!opts.bindFail,mode:'OPERATOR_SYNTHETIC_DRAFT_ONLY',
+        draft_id:'22222222-2222-4222-8222-222222222222',
+        challenge_id:body.challenge_id,public_intake_enabled:false}
+      :{ok:!opts.claimFail,reason:opts.claimFail?'DENIED':'CLAIMED',public_intake_enabled:false};
    }else throw Error('Unexpected Edge Function '+name);
    return {data,error:null};
   }}
@@ -102,4 +104,17 @@ test('unauthenticated and non-operator users cannot invoke Edge Functions',async
   const s=await flow(opts);
   assert.deepEqual(s.calls,[]);
  }
+});
+
+test('missing binding API readiness prevents Gmail send',async()=>{
+ const s=await flow({notReady:true});
+ assert.equal(s.calls.includes('cargo-gmail-otp-test:send_test'),false);
+ assert.equal(s.calls.includes('cargo-draft-otp-binding:bind'),false);
+ assert.doesNotMatch(s.el('finalResult').textContent,/完了：/);
+});
+test('binding readiness is checked again immediately before send',async()=>{
+ const s=await flow();
+ const checks=s.calls.filter(x=>x==='cargo-draft-otp-binding:status');
+ assert.equal(checks.length,2);
+ assert.ok(s.calls.indexOf('cargo-draft-otp-binding:status')<s.calls.indexOf('cargo-gmail-otp-test:send_test'));
 });

@@ -60,7 +60,7 @@ async function change(item,next){
    expected_status:item.status,next_status:next});
   if(!r?.ok)throw Error("保存できませんでした。");
   text("auth","変更を保存しました。お客様へのメール通知・決済は行っていません。");
-  await load();
+  await load(true);
  }catch{ text("auth","申込状態を保存できませんでした。更新後に状態を確認してください。") }
  finally{busy=false;$("refresh").disabled=!user}
 }
@@ -85,8 +85,8 @@ function render(items){
   root.append(card);
  }
 }
-async function load(){
- if(!user||busy)return;
+async function load(allowWhileBusy=false){
+ if(!user||(busy&&!allowWhileBusy))return;
  $("refresh").disabled=true;
  text("auth","暗号化された審査待ち申込を取得しています…");
  try{
@@ -114,6 +114,6 @@ async function init(){
   await load();
  }catch{text("auth","軽貨物管理者としてログインしてください。");}
 }
-$("refresh").onclick=load;init();
+$("refresh").onclick=()=>load();init();
 })();
 </script></body></html>

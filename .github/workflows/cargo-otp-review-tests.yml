@@ -61,6 +61,8 @@ jobs:
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < tests/cargo-otp-pg-assert.sql
       - name: Verify simultaneous claims and expiry under row locks
         run: python3 tests/cargo-otp-pg-concurrency.py
+      - name: Verify bounded cleanup without deleting OTP challenges
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < tests/cargo-otp-pg-cleanup.sql
       - name: Remove disposable database
         if: always()
         run: docker rm -f cargo-otp-ci-postgres || true

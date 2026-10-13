@@ -47,8 +47,8 @@ def lock_row(digit: str):
         stderr=subprocess.PIPE, bufsize=1,
     )
     process.stdin.write(
-        f"begin;\\nselect 1 from public.cargo_operator_draft_otp_bindings "
-        f"where draft_id='{PREFIX}{digit}'::uuid for update;\\n"
+        f"begin;\nselect 1 from public.cargo_operator_draft_otp_bindings "
+        f"where draft_id='{PREFIX}{digit}'::uuid for update;\n"
     )
     process.stdin.flush()
     line = process.stdout.readline().strip()
@@ -59,7 +59,7 @@ def lock_row(digit: str):
 
 
 def release(holder):
-    holder.stdin.write("commit;\\n")
+    holder.stdin.write("commit;\n")
     holder.stdin.flush()
     holder.stdin.close()
     holder.stdin = None

@@ -100,3 +100,11 @@ GitHub上の実コードに対して以下16項目を検査し、16件合格：
 - 後続の静的テストにも整理処理の上限・権限・削除対象制約を追加した。
 - 本番の`cargo_intake_control`を読み取り専用で再確認：`intake_enabled=false`、`captcha_required=true`、`contact_verification_required=true`。
 - 残課題：本番から隔離されたSupabase検証環境でのJWT・RLS・Edge実行、保持期限ポリシーと削除スケジュールの承認。新規環境には追加費用の可能性があるため、ユーザーの承認なく作成しない。
+
+## 実際の軽貨物申込プレビューの前進（2026-10-13）
+- `cargo-request-preview.html`の下書き確認に、共通の純粋関数`cargo-pwa/request-review-rules.js`を接続。入力項目をまとめて検証し、準備状況・荷役条件・積載確認などの**手動審査事項**を画面に表示する。
+- 既存のフォーム項目・デザイン・一般受付OFFを維持。モジュール自体はネットワーク・DB・ストレージ・メール・決済にアクセスしない。常に`canSubmit:false`、`canBook:false`、`priceFinalized:false`、`requiresOperatorReview:true`。
+- `tests/cargo-request-review.test.cjs`で8件の境界値・入力・手動審査・無通信テストを追加。既存28件と合わせて**36件成功**。
+- GitHub Actions `38402578959`でオフライン36件・一時PostgreSQL統合の両ジョブ成功：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38402578959
+- これは本番の顧客申込API接続や一般公開ではない。公開ページに反映するためのPRマージ、実ブラウザE2E、実Supabaseの管理者専用導入は未実施。
+- 既存の管理者限定「架空案件のテスト登録」は今回変更していない。実顧客の情報は入力しないこと。

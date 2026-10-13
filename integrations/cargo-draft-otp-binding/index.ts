@@ -38,18 +38,18 @@ Deno.serve(async(req:Request)=>{
  if(origin&&origin!==APP)return json({error:"ORIGIN_DENIED"},403);
  const token=(req.headers.get("authorization")||"").match(/^Bearer\s+([^\s]+)$/i)?.[1];
  if(!token)return json({error:"LOGIN_REQUIRED"},401);
- let input:{action:string;challenge_id:string;draft_id?:string};
+ let input:{action:string;challenge_id?:string;draft_id?:string};
  try{
   const raw=await req.text();
   if(raw.length>256)return json({error:"BODY_TOO_LARGE"},413);
   const b=JSON.parse(raw);
   if(!b||typeof b!=="object"||Array.isArray(b))return json({error:"INVALID_BODY"},400);
-  if(b.action!=="bind"&&b.action!=="claim")return json({error:"OPERATOR_PRELAUNCH_ONLY"},400);
-  const expected=b.action==="bind"?["action","challenge_id"]:["action","challenge_id","draft_id"];
+  if(!["status","bind","claim"].includes(b.action))return json({error:"OPERATOR_PRELAUNCH_ONLY"},400);
+  const expected=b.action==="status"?["action"]:b.action==="bind"?["action","challenge_id"]:["action","challenge_id","draft_id"];
   const keys=Object.keys(b).sort();
   if(keys.length!==expected.length||keys.some((x,i)=>x!==expected[i]))
    return json({error:"INVALID_FIELDS"},400);
-  if(typeof b.challenge_id!=="string"||!UUID.test(b.challenge_id)
+  if((b.action!=="status"&&(typeof b.challenge_id!=="string"||!UUID.test(b.challenge_id)))
    ||(b.action==="claim"&&(typeof b.draft_id!=="string"||!UUID.test(b.draft_id))))
    return json({error:"INVALID_IDENTIFIERS"},422);
   input=b;
@@ -71,6 +71,21 @@ Deno.serve(async(req:Request)=>{
   if(gateErr||!gate||gate.intake_enabled!==false
    ||gate.captcha_required!==true||gate.contact_verification_required!==true)
    return json({error:"PUBLIC_INTAKE_MUST_BE_DISABLED"},423);
+  if(input.action==="status"){
+   // Read-only readiness probe: prevent sending Gmail before binding support
+   // is actually deployed. The invalid-input RPC performs no writes.
+   const {error:tableErr}=await db.from("cargo_operator_draft_otp_bindings")
+    .select("draft_id").limit(0);
+   if(tableErr)return json({error:"BINDING_NOT_READY"},503);
+   const {data:probe,error:rpcErr}=await db.rpc("cargo_operator_draft_otp_claim",{
+    p_operator_id:null,p_draft_id:null,p_challenge_id:null,
+    p_subject_hmac:null,p_draft_fingerprint_hmac:null
+   });
+   if(rpcErr||probe?.reason!=="INVALID_INPUT"||probe?.ok!==false)
+    return json({error:"BINDING_NOT_READY"},503);
+   return json({ok:true,mode:"OPERATOR_SYNTHETIC_DRAFT_ONLY",
+    ready:true,public_intake_enabled:false,customer_data_processed:false});
+  }
   const key=await crypto.subtle.importKey("raw",secret,{name:"HMAC",hash:"SHA-256"},false,["sign"]);
   // Identical subject derivation to cargo-gmail-otp-test, without leaking its value.
   const subject=bytea(await mac(key,"CARGO_OPERATOR_SELF_TEST|"+user.id));
@@ -79,7 +94,7 @@ Deno.serve(async(req:Request)=>{
   if(input.action==="bind"){
    const {data:challenge,error:chErr}=await db.from("cargo_email_verification_challenges")
     .select("id,subject_hmac,created_at,expires_at,delete_after,consumed_at")
-    .eq("id",input.challenge_id).maybeSingle();
+    .eq("id",input.challenge_id!).maybeSingle();
    if(chErr||!challenge||String(challenge.subject_hmac).toLowerCase()!==subject
     ||challenge.consumed_at!==null||Date.parse(challenge.expires_at)<=Date.now())
     return json({error:"CHALLENGE_NOT_AVAILABLE"},422);

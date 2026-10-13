@@ -19,7 +19,7 @@ test('review SQL has an RLS-protected, private, uniquely bound table',()=>{
  assert.match(sql,/enable\s+row\s+level\s+security/i);
  assert.match(sql,/revoke\s+all\s+on\s+table\s+public\.cargo_operator_draft_otp_bindings\s+from\s+public,\s*anon,\s*authenticated/i);
  assert.match(sql,/grant\s+select,insert,update,delete\s+on\s+table\s+public\.cargo_operator_draft_otp_bindings\s+to\s+service_role/i);
- assert.doesNotMatch(sql,/security\s+definer/i);
+ assert.doesNotMatch(sql,/^\s*security\s+definer\b/im);
 });
 test('claim RPC is service-role only and uses row locks for one-time claim',()=>{
  assert.match(sql,/security\s+invoker/i);

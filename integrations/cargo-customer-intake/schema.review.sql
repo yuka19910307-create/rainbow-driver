@@ -8,7 +8,11 @@ create table public.cargo_customer_intake_drafts (
  id uuid primary key,
  attempt_id uuid not null unique,
  contact_hmac bytea not null check(octet_length(contact_hmac)=32),
- encrypted_payload bytea not null check(octet_length(encrypted_payload)>=29),
+ encrypted_payload bytea,
+ constraint cargo_customer_draft_payload_check check (
+  (consumed_at is null and encrypted_payload is not null and octet_length(encrypted_payload)>=29)
+  or (consumed_at is not null and encrypted_payload is null)
+ ),
  code_hmac bytea not null check(octet_length(code_hmac)=32),
  attempts smallint not null default 0 check(attempts between 0 and 5),
  created_at timestamptz not null default now(),
@@ -90,21 +94,12 @@ begin
  returning id into v_request;
  -- Clear draft PII once moved to the operator review queue.
  update public.cargo_customer_intake_drafts
-  set consumed_at=v_now,encrypted_payload='\\x00'::bytea
+  set consumed_at=v_now,encrypted_payload=null
   where id=p_draft_id;
  return jsonb_build_object('ok',true,'reason','PENDING_OPERATOR_REVIEW',
   'request_id',v_request);
 end;
 $$;
-
--- NOTE: encrypted_payload on a consumed draft holds only a tombstone byte.
--- Use a weaker post-consumption constraint for this explicit erasure.
-alter table public.cargo_customer_intake_drafts
- drop constraint cargo_customer_intake_drafts_encrypted_payload_check;
-alter table public.cargo_customer_intake_drafts
- add constraint cargo_customer_draft_payload_check
- check ((consumed_at is null and octet_length(encrypted_payload)>=29)
-   or (consumed_at is not null and octet_length(encrypted_payload)=1));
 
 revoke all on function public.cargo_customer_intake_verify_commit(uuid,bytea)
  from public,anon,authenticated;

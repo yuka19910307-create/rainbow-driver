@@ -159,12 +159,21 @@ function render(items){
  for(const item of items){
   const card=document.createElement("section");card.className="card";
   const title=document.createElement("h2");title.textContent=
-   (item.status==="pending_operator_review"?"未審査":"確認中")+
+   (item.status==="pending_operator_review"?"未審査":
+    item.status==="operator_reviewing"?"確認中":"見積もり送信済み")+
    " ／ "+String(item.created_at||"");
   card.append(title);
   const content=document.createElement("p");content.className="details";
   content.textContent=detail(item.details||{});card.append(content);
   card.append(label("受付ID："+String(item.id||"")));
+  if(item.quote?.response_state){
+   card.append(label(item.quote.response_state==="interested"
+    ?"お客様の回答：利用を希望（正式受諾ではありません。管理者の別途確認が必要）"
+    :"お客様の回答：今回は見送り"));
+   card.append(label("回答日時："+String(item.quote.responded_at||"")));
+  }else if(item.status==="quoted"){
+   card.append(label("見積もり送信済み。お客様からの回答待ちです。"));
+  }
   if(item.status==="pending_operator_review"){
    card.append(button("審査を開始",()=>change(item,"operator_reviewing")));
    card.append(button("辞退として記録",()=>change(item,"declined")));

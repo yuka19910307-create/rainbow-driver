@@ -58,6 +58,25 @@ test('Edge function authenticates server-side and fails closed on intake state',
  assert.doesNotMatch(edge,/\.from\("cargo_dispatch_requests"\)/);
  assert.doesNotMatch(edge,/\.from\("cargo_contact_vault"\)/);
 });
+test('Gmail send is gated by two binding API readiness checks',()=>{
+ assert.match(edge,/\["status","bind","claim"\]/);
+ assert.match(edge,/input\.action==="status"/);
+ assert.match(edge,/BINDING_NOT_READY/);
+ assert.match(edge,/cargo_operator_draft_otp_claim/);
+ assert.match(html,/cargo-draft-otp-binding",\{action:"status"\}/);
+ const checks=(html.match(/cargo-draft-otp-binding",\{action:"status"\}/g)||[]).length;
+ assert.equal(checks,2,'Readiness must be checked before enabling and again before sending');
+ const send=html.indexOf('action:"send_test"');
+ const secondCheck=html.lastIndexOf('cargo-draft-otp-binding",{action:"status"}',send);
+ assert.ok(secondCheck>=0&&secondCheck<send,'Check binding API before Gmail send');
+});
+test('claim checks wall-clock expiry after acquiring both row locks',()=>{
+ const lock=sql.indexOf('where draft_id=p_draft_id for update;');
+ const challengeLock=sql.indexOf('where id=v_binding.challenge_id for update;');
+ const clock=sql.indexOf('v_now := clock_timestamp();',challengeLock);
+ const expiry=sql.indexOf('v_now >= v_challenge.expires_at',challengeLock);
+ assert.ok(lock>0&&challengeLock>lock&&clock>challengeLock&&expiry>clock);
+});
 test('browser requires bind and claim before success, without live dispatch/payment',()=>{
  assert.match(html,/action:"bind"/);
  assert.match(html,/action:"claim"/);

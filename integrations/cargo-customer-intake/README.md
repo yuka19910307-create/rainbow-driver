@@ -43,3 +43,14 @@
 - `integrations/cargo-customer-intake/quotes-smoke.review.sql`：架空の申込を利用して、管理者以外による保存拒否、条件未入力拒否、下書きの修正、受付OFF時の送信拒否、一度限りの送信権、事業者受付済み/不明状態のDB記録を検証。
 - GitHub Actions実行`38472207063`で、一時PostgreSQLの見積SQLを含む統合テストと従来のオフラインテストの2ジョブが**成功**：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38472207063
 - **本番Supabaseへは未反映**。お客様宛の実メール送信も実施していない。請求書発行・税区分の自動判定・メール送信済みの手動照合UI・顧客による正式受諾は未実装であり、一般受付を公開する前に整備する。
+
+## 追加実装：お客様の見積もりへの希望回答（2026-10-14）
+- `cargo-customer-quote-reply.html`：メール内の専用リンクから、見積もり金額・条件・有効期限を確認。「この条件で利用を希望する」「今回は見送る」のどちらかを一度だけ回答。**正式予約・契約締結・配車・決済ではない**。
+- `integrations/cargo-customer-intake/operator.ts`：管理者が見積もりの実メール送信を承認した際、暗号学的乱数から32バイト（256bit）の一回限りの秘密トークンを生成。サーバーにはその秘密そのものを保存せず、既存の秘密鍵から生成したHMACだけを記録。メールに`#r=申込ID&t=トークン`というURLフラグメント付きリンクを記載（検索クエリではなく、HTTP要求にはフラグメントを送信しない）。
+- `integrations/cargo-customer-intake/quote-reply.ts`：新しいお客様向けAPI（`view`/`reply`）。トークン照合・見積もり送信済み・期限内・本人の一度限りの回答・受付ONをサーバーRPCで確認。**必ずverify_jwt=falseでデプロイする設計**だが、事前承認まで未デプロイ。
+- `integrations/cargo-customer-intake/quotes.review.sql`：一回限りのHMAC照合、行ロック、回答（`interested`/`declined`）の保存、再回答拒否、受付OFF拒否、返値の`contract_confirmed=false`・`dispatch_created=false`・`payment_created=false`。
+- `cargo-customer-review.html`：管理者の審査一覧に送信済み見積もりと「利用希望」「見送り」を表示し、担当者が後から確認する。
+- `integrations/cargo-customer-intake/quotes-smoke.review.sql`：隔離PostgreSQLでのトークン不一致拒否、本人の見積もり確認、1回限りの利用希望回答、再回答拒否、受付OFFによる回答停止を実行。
+- GitHub Actions `38475123521` でオフラインジョブ・一時PostgreSQL統合ジョブの両方成功：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38475123521
+- **本番サイト・Supabaseへの変更なし**。Resendでの実メール送信、顧客の実回答、顧客との契約合意、Square決済連携は未実施。一般受付OFFのままで、運転請負アプリへの影響はない。
+- 公開前に、利用規約や申込確認内容、契約成立タイミング、キャンセル・返金ルール、見積額の税区分、連絡先と個人情報の保持期限を確定する。お客様の「利用希望」だけで正式受諾しない設計を維持。

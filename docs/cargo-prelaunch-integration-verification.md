@@ -38,3 +38,12 @@
 - 本番DBに架空案件を作成したり、顧客メールへ試験送信したりしない。
 - Square決済・既存の運転請負機能は変更しない。
 - セキュリティ確認と明示的な公開判断が終わるまで `cargo_intake_control.intake_enabled=false` のまま。
+
+## 申込別OTP紐づけ：レビュー用コード（未適用・未デプロイ）
+- `design/cargo-operator-draft-otp-binding.review.sql`：架空申込IDとOTPチャレンジを結びつける専用テーブル、および一度だけclaimするDB関数。公開ロールのテーブル権限とRPC実行権限を剥奪し、service_roleのみ許可する設計。
+- `integrations/cargo-draft-otp-binding/index.ts`：管理者JWT、operator権限、受付OFFを確認してから、既存の管理者本人向けOTPチャレンジに固定架空申込のサーバー計算HMACを紐づける開発用Edge Function。
+- `cargo-request-otp-integration-preview.html`：メール送信→bind→6桁認証→claim→受付OFF再確認の流れに更新。bind/claimが失敗した場合は成功扱いしない。
+- bindは未使用かつ未期限切れの最新チャレンジのみ許可。claimは本人・申込ID・チャレンジID・HMAC一致、認証済み、未使用、期限内、後続コードで上書きされていないことを確認する。
+- **これらはレビュー用であり、本番DBへDDL適用していない。新Edge Functionもデプロイしていない。** そのため更新した統合プレビューを実環境で実行しても現時点ではbindで停止する。
+- 固定架空データのみ。顧客向け本人確認の代わりにはならない。一般受付OFFのまま。
+- 2026-10-13、更新後の画面ロジックについて、モック応答を使い「正常系、bind失敗、claim失敗、誤コード、受付OFF条件違反、送信キャンセル、未ログイン」の7ケースを追加検証し、想定どおりの停止・成功を確認。実DB/実メールのE2Eテストではない。

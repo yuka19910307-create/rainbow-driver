@@ -86,3 +86,14 @@ test('browser requires bind and claim before success, without live dispatch/paym
  assert.doesNotMatch(html,/\.from\("cargo_dispatch_requests"\)/);
  assert.doesNotMatch(html,/payments\.create|squareup\.com\/v2\/payments/i);
 });
+
+test('fictional binding cleanup is bounded, expiry-only and service-role-only',()=>{
+ assert.match(sql,/create\s+or\s+replace\s+function\s+public\.cargo_operator_draft_otp_cleanup/i);
+ assert.match(sql,/p_limit\s+is\s+null\s+or\s+p_limit\s*<\s*1\s+or\s+p_limit\s*>\s*100/i);
+ assert.match(sql,/where\s+delete_after\s*<\s*clock_timestamp\(\)/i);
+ assert.match(sql,/for\s+update\s+skip\s+locked/i);
+ assert.match(sql,/revoke\s+all\s+on\s+function\s+public\.cargo_operator_draft_otp_cleanup\(integer\)[\s\S]*?from\s+public,anon,authenticated/i);
+ assert.match(sql,/grant\s+execute\s+on\s+function\s+public\.cargo_operator_draft_otp_cleanup\(integer\)[\s\S]*?to\s+service_role/i);
+ assert.doesNotMatch(sql,/delete\s+from\s+public\.cargo_email_verification_challenges/i);
+ assert.doesNotMatch(sql,/delete\s+from\s+public\.cargo_dispatch_requests/i);
+});

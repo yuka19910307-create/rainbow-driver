@@ -125,6 +125,15 @@ Deno.serve(async(req:Request)=>{
      claimed.terms+"\\n\\n"+
      "このご案内だけでは配送の受諾・出動・予約・決済は確定しません。"+
      "ご利用の場合は担当者からの別途確認をお待ちください。";
+    // Check intake mode a second time immediately before contacting the
+    // external mail provider. The earlier transactional claim is also gated.
+    const {data:sendGate,error:sendGateError}=await db.from("cargo_intake_control")
+     .select("intake_enabled,captcha_required,contact_verification_required")
+     .eq("id",1).maybeSingle();
+    if(sendGateError||sendGate?.intake_enabled!==true||
+       sendGate?.captcha_required!==true||
+       sendGate?.contact_verification_required!==true)
+     throw Error("PUBLIC_INTAKE_DISABLED");
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
     try{
      const sent=await fetch("https://api.resend.com/emails",{

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>軽貨物・管理者メールテスト | Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f0f4fa;color:#203552}
+*{box-sizing:border-box}body{margin:0}header{background:#213958;color:#fff;padding:24px 18px}
+header>div,main{max-width:680px;margin:auto}header h1{font-size:24px;margin:10px 0}
+main{padding:18px}section{background:white;border:1px solid #d5e0ed;border-radius:16px;padding:22px;margin-bottom:16px}
+h2{font-size:21px;margin:0 0 12px}p{line-height:1.75}a{color:#1d5a9a}
+button{background:#2e4d72;color:white;border:0;border-radius:10px;padding:14px 18px;font-size:16px;font-weight:700;margin:5px 0}
+button:disabled{opacity:.45}input{font-size:22px;border:1px solid #b8c5d6;padding:12px;border-radius:9px;max-width:260px;width:100%;letter-spacing:4px}
+label{display:block;font-weight:bold;margin-bottom:10px}.note{background:#fff3dc;border-radius:12px;padding:13px}
+.result{white-space:pre-wrap;overflow-wrap:anywhere;background:#eef3f9;border-radius:10px;padding:14px;line-height:1.6}
+.ok{color:#16633e}.warn{color:#a23631}small{color:#63748b;line-height:1.5}footer{padding:10px 0 26px}
+</style>
+</head>
+<body>
+<header><div><small style="color:#cfdef0">Rainbow Driver / 軽貨物・管理者専用</small><h1>本人確認メールの接続テスト</h1></div></header>
+<main>
+<section>
+<h2>一般受付は停止中</h2>
+<p>管理者のGmailへのテスト送信専用です。顧客宛メール、配送依頼、運賃確定、決済は行いません。</p>
+<p class="note">メールが送信されるのは「テストメールを1通送信」ボタンを押した場合だけです。最大3回／1時間の制限があります。</p>
+<p><a href="./cargo-operator-login.html">ドライバー管理ログインに戻る</a></p>
+<p id="auth" class="result" role="status">管理者認証を確認しています…</p>
+</section>
+<section>
+<h2>1. 接続状態を調べる</h2>
+<button type="button" id="statusBtn" disabled>接続状態を確認</button>
+<p id="statusOutput" class="result" role="status">未確認</p>
+</section>
+<section>
+<h2>2. 自分のGmailにテスト送信</h2>
+<p>接続が正常な場合だけ送信ボタンが有効になります。送信先はGoogle Apps Scriptの所有者のGmailに固定されています。</p>
+<button type="button" id="sendBtn" disabled>テストメールを1通送信</button>
+<p id="sendOutput" class="result" role="status">未送信</p>
+</section>
+<section>
+<h2>3. 届いたコードを確認</h2>
+<label for="code">メールに記載された6桁の数字</label>
+<input id="code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+<p><button type="button" id="verifyBtn" disabled>6桁コードを検証</button></p>
+<p id="verifyOutput" class="result" role="status">メール送信後に確認できます。</p>
+</section>
+<footer><small>本画面は開発・検証用です。秘密キーやパスワードは入力しないでください。本人確認が成功しても一般受付は自動的に公開されません。</small></footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+function report(id, msg, kind) {
+ const node=$(id); node.textContent=msg;
+ node.className="result"+(kind==="ok"?" ok":kind==="error"?" warn":"");
+}
+if(!window.supabase){report("auth","認証ライブラリの読み込みに失敗しました。再読み込みしてください。","error");return;}
+const supa=window.supabase.createClient(
+ "https://kvoaorzdewwirqryeizq.supabase.co",
+ "sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms",
+ {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}}
+);
+let authorized=false,ready=false,busy=false,challengeId=null;
+function buttons(){
+ $("statusBtn").disabled=!authorized||busy;
+ $("sendBtn").disabled=!authorized||!ready||busy;
+ $("verifyBtn").disabled=!authorized||!challengeId||busy;
+}
+function errorName(response){
+ const data=response.data;
+ if(data && typeof data.error==="string") return data.error;
+ if(response.error && response.error.context && response.error.context.status) return "HTTP "+response.error.context.status;
+ return "通信または認証エラー";
+}
+async function request(action,fields){
+ const {data,error}=await supa.functions.invoke("cargo-gmail-otp-test",{body:Object.assign({action},fields||{})});
+ let resolved=data;
+ if(error && error.context && typeof error.context.json==="function"){
+  try{resolved=await error.context.json()}catch(_){}
+ }
+ return {data:resolved,error};
+}
+async function establishAuth(){
+ try{
+  const {data,error}=await supa.auth.getUser();
+  if(error||!data||!data.user) throw new Error("LOGIN_REQUIRED");
+  const user=data.user;
+  const {data:operator,error:opError}=await supa.from("cargo_operator_accounts").select("user_id").eq("user_id",user.id).maybeSingle();
+  if(opError||!operator) throw new Error("CARGO_OPERATOR_ONLY");
+  authorized=true;
+  report("auth","管理者認証済み："+(user.email||"管理者")+"\n軽貨物管理者の権限を確認しました。","ok");
+ }catch(_){
+  report("auth","このブラウザで管理者ログインを確認できません。上のリンクから管理者としてログインしてください。","error");
+ }
+ buttons();
+}
+$("statusBtn").addEventListener("click",async()=>{
+ if(!authorized||busy)return;busy=true;ready=false;buttons();
+ report("statusOutput","確認中…");
+ try{
+  const r=await request("status");
+  if(r.error||!r.data||r.data.mode!=="OPERATOR_OWN_GMAIL_PRELAUNCH"){
+   report("statusOutput","状態を確認できません："+errorName(r)+"\n管理者ログインと一般受付OFFの設定を確認してください。","error");return;
+  }
+  const d=r.data;
+  ready=d.bridge_configured===true && d.verification_hmac_configured===true && d.delivery_scope==="SCRIPT_OWNER_GMAIL_ONLY" && d.public_intake_enabled===false;
+  report("statusOutput",
+   "Gmail接続URL・署名キー："+(d.bridge_configured?"認識済み":"未設定・形式不正")+
+   "\n認証コード保護キー："+(d.verification_hmac_configured?"認識済み":"未設定・形式不正")+
+   "\n一般受付："+(d.public_intake_enabled===false?"OFF":"要確認")+
+   "\n送信先：Google Apps Script所有者のみ"+
+   "\n判定："+(ready?"次のテストに進めます。":"設定の確認が必要です。"),
+   ready?"ok":"error"
+  );
+ }catch(_){report("statusOutput","通信エラーで確認できませんでした。","error")}
+ finally{busy=false;buttons()}
+});
+$("sendBtn").addEventListener("click",async()=>{
+ if(!authorized||!ready||busy)return;
+ if(!confirm("Google Apps Script所有者のGmailへテストメールを1通送信します。実行しますか？"))return;
+ busy=true;challengeId=null;$("code").value="";buttons();
+ report("sendOutput","テストメールを送信しています…");report("verifyOutput","未検証");
+ try{
+  const r=await request("send_test");
+  if(r.error||!r.data||r.data.ok!==true||typeof r.data.challenge_id!=="string"){
+   report("sendOutput","送信を確認できませんでした："+errorName(r)+"\n連続送信せず、まず受信トレイと迷惑メールを確認してください。","error");return;
+  }
+  challengeId=r.data.challenge_id;
+  report("sendOutput","送信受付成功。Gmailに届く6桁コードを10分以内に入力してください。\n一般受付はOFFのままです。","ok");
+ }catch(_){report("sendOutput","通信エラーです。連続送信せずGmailを確認してください。","error")}
+ finally{busy=false;buttons()}
+});
+$("verifyBtn").addEventListener("click",async()=>{
+ if(!challengeId||busy||!authorized)return;
+ const code=$("code").value.trim();
+ if(!/^[0-9]{6}$/.test(code)){report("verifyOutput","6桁の数字を入力してください。","error");return}
+ busy=true;buttons();report("verifyOutput","確認中…");
+ try{
+  const r=await request("verify",{challenge_id:challengeId,code});
+  if(!r.error&&r.data&&r.data.verified===true){
+   report("verifyOutput","確認コードの検証に成功しました。一般受付はOFFのままです。","ok");
+   challengeId=null;$("code").value="";
+  }else{
+   report("verifyOutput","検証できませんでした："+((r.data&&r.data.reason)||errorName(r)),"error");
+  }
+ }catch(_){report("verifyOutput","通信エラーです。","error")}
+ finally{busy=false;buttons()}
+});
+establishAuth();
+})();
+</script></body>
+</html>

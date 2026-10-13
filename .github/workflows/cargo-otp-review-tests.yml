@@ -8,6 +8,8 @@ on:
       - "cargo-request-otp-integration-preview.html"
       - "cargo-request-preview.html"
       - "cargo-pwa/request-review-rules.js"
+      - "cargo-customer-intake.html"
+      - "integrations/cargo-customer-intake/**"
       - "tests/cargo-request-review.test.cjs"
       - "tests/cargo-draft-otp-*.test.cjs"
       - "tests/cargo-otp-pg-*.sql"
@@ -66,6 +68,10 @@ jobs:
         run: python3 tests/cargo-otp-pg-concurrency.py
       - name: Verify bounded cleanup without deleting OTP challenges
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < tests/cargo-otp-pg-cleanup.sql
+      - name: Apply customer intake staging schema (isolated database ONLY)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/schema.review.sql
+      - name: Verify OFF gate and atomic customer email verification
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/schema-smoke.review.sql
       - name: Remove disposable database
         if: always()
         run: docker rm -f cargo-otp-ci-postgres || true

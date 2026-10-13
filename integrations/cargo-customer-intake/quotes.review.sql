@@ -16,7 +16,17 @@ create table public.cargo_customer_quote_replies (
  updated_at timestamptz not null default now(),
  delivery_attempted_at timestamptz,
  sent_at timestamptz,
- provider_message_id text
+ provider_message_id text,
+ -- Only the HMAC of a random 256-bit email reply token is stored.
+ response_token_hmac bytea check (
+  response_token_hmac is null or octet_length(response_token_hmac)=32
+ ),
+ response_state text check (response_state in ('interested','declined')),
+ responded_at timestamptz,
+ constraint cargo_quote_response_integrity check (
+  (response_state is null and responded_at is null) or
+  (response_state is not null and responded_at is not null)
+ )
 );
 alter table public.cargo_customer_quote_replies enable row level security;
 revoke all on public.cargo_customer_quote_replies from public,anon,authenticated;
@@ -70,14 +80,15 @@ $$;
 -- One and only one sender may claim an email delivery attempt.
 -- A failed/ambiguous delivery is NOT retried automatically.
 create or replace function public.cargo_customer_quote_claim_send(
- p_request_id uuid,p_operator_id uuid
-) returns jsonb language plpgsql security invoker set search_path='' as $$
+ p_request_id uuid,p_operator_id uuid,p_response_token_hmac bytea
+) returns jsonb language plpgsql security invoker set search_path='' as $
 declare
  v_request public.cargo_customer_intake_requests%rowtype;
  v_quote public.cargo_customer_quote_replies%rowtype;
  v_now timestamptz;
 begin
- if p_request_id is null or p_operator_id is null then
+ if p_request_id is null or p_operator_id is null
+  or p_response_token_hmac is null or octet_length(p_response_token_hmac)<>32 then
   return jsonb_build_object('ok',false,'reason','INVALID_INPUT');
  end if;
  perform 1 from public.cargo_intake_control
@@ -107,7 +118,8 @@ begin
   return jsonb_build_object('ok',false,'reason','EXPIRED');
  end if;
  update public.cargo_customer_quote_replies
-  set delivery_status='sending',delivery_attempted_at=v_now,updated_at=v_now
+  set delivery_status='sending',delivery_attempted_at=v_now,updated_at=v_now,
+      response_token_hmac=p_response_token_hmac
   where request_id=p_request_id;
  return jsonb_build_object('ok',true,'reason','SENDING_CLAIMED',
   'request_id',p_request_id,'amount_yen',v_quote.amount_yen,
@@ -159,13 +171,78 @@ revoke all on function public.cargo_customer_quote_prepare(uuid,uuid,integer,tex
  from public,anon,authenticated;
 grant execute on function public.cargo_customer_quote_prepare(uuid,uuid,integer,text,timestamptz)
  to service_role;
-revoke all on function public.cargo_customer_quote_claim_send(uuid,uuid)
+revoke all on function public.cargo_customer_quote_claim_send(uuid,uuid,bytea)
  from public,anon,authenticated;
-grant execute on function public.cargo_customer_quote_claim_send(uuid,uuid)
+grant execute on function public.cargo_customer_quote_claim_send(uuid,uuid,bytea)
  to service_role;
 revoke all on function public.cargo_customer_quote_finalize(uuid,uuid,boolean,text)
  from public,anon,authenticated;
 grant execute on function public.cargo_customer_quote_finalize(uuid,uuid,boolean,text)
  to service_role;
+
+-- Customer may express interest or decline using a one-time email-only secret.
+-- THIS IS NOT A CONTRACT ACCEPTANCE, PAYMENT, DRIVER ASSIGNMENT, OR BOOKING.
+-- Only service_role invokes; token HMAC is checked atomically in the DB.
+create or replace function public.cargo_customer_quote_reply(
+ p_request_id uuid,p_response_token_hmac bytea,
+ p_choice text default null
+) returns jsonb language plpgsql security invoker set search_path='' as $$
+declare
+ v_request public.cargo_customer_intake_requests%rowtype;
+ v_quote public.cargo_customer_quote_replies%rowtype;
+ v_now timestamptz;
+begin
+ if p_request_id is null or p_response_token_hmac is null
+  or octet_length(p_response_token_hmac)<>32
+  or (p_choice is not null and p_choice not in ('interested','declined')) then
+  return jsonb_build_object('ok',false,'reason','INVALID_INPUT');
+ end if;
+ perform 1 from public.cargo_intake_control
+  where id=1 and intake_enabled=true and captcha_required=true
+   and contact_verification_required=true for share;
+ if not found then
+  return jsonb_build_object('ok',false,'reason','PUBLIC_INTAKE_DISABLED');
+ end if;
+ -- Stable lock order prevents interleaving with quote preparation/send.
+ select * into v_request from public.cargo_customer_intake_requests
+  where id=p_request_id for update;
+ if not found or v_request.status<>'quoted' then
+  return jsonb_build_object('ok',false,'reason','QUOTE_NOT_AVAILABLE');
+ end if;
+ select * into v_quote from public.cargo_customer_quote_replies
+  where request_id=p_request_id for update;
+ if not found or v_quote.delivery_status<>'sent'
+  or v_quote.response_token_hmac is null
+  or v_quote.response_token_hmac<>p_response_token_hmac then
+  return jsonb_build_object('ok',false,'reason','QUOTE_NOT_AVAILABLE');
+ end if;
+ v_now:=clock_timestamp();
+ if v_quote.valid_until<=v_now or v_request.delete_after<=v_now then
+  return jsonb_build_object('ok',false,'reason','EXPIRED');
+ end if;
+ if p_choice is null then
+  return jsonb_build_object('ok',true,'reason','QUOTE_VIEW',
+   'amount_yen',v_quote.amount_yen,'terms',v_quote.terms,
+   'valid_until',v_quote.valid_until,'reply_state',v_quote.response_state);
+ end if;
+ if v_quote.responded_at is not null then
+  return jsonb_build_object('ok',false,'reason','ALREADY_REPLIED');
+ end if;
+ update public.cargo_customer_quote_replies
+  set response_state=p_choice,responded_at=v_now,updated_at=v_now
+  where request_id=p_request_id;
+ return jsonb_build_object('ok',true,
+  'reason',case when p_choice='interested' then 'INTEREST_RECORDED'
+     else 'DECLINE_RECORDED' end,
+  'operator_review_required',true,
+  'dispatch_created',false,'payment_created',false,
+  'contract_confirmed',false);
+end;
+$$;
+revoke all on function public.cargo_customer_quote_reply(uuid,bytea,text)
+ from public,anon,authenticated;
+grant execute on function public.cargo_customer_quote_reply(uuid,bytea,text)
+ to service_role;
+
 
 commit;

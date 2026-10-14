@@ -55,7 +55,7 @@ begin
  select * into v_quote from public.cargo_customer_quote_replies
   where request_id=p_request_id for update;
  if not found or v_quote.delivery_status<>'sent'
-  or v_quote.response_state<>'interested' then
+  or v_quote.response_state is distinct from 'interested' then
   return jsonb_build_object('ok',false,'reason','CUSTOMER_INTEREST_REQUIRED');
  end if;
  select * into v_old from public.cargo_customer_quote_followups

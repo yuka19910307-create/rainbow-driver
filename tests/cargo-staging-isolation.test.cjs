@@ -44,3 +44,16 @@ test('operator endpoint checks identity and membership on the server',()=>{
  assert.match(src,/cargo_operator_accounts/);
  assert.match(src,/LOGIN_REQUIRED/);
 });
+
+test('staging operator login uses isolated auth storage and server-side authorization',()=>{
+ const login=read('staging/cargo-operator-login.html');
+ const review=read('staging/cargo-customer-review.html');
+ assert.ok(login.includes(STAGING));
+ assert.ok(!login.includes(PRODUCTION));
+ assert.match(login,/rd-cargo-staging-operator-auth-v1/);
+ assert.match(login,/auth\.signInWithPassword/);
+ assert.match(login,/functions\.invoke\("cargo-customer-review-operator"/);
+ assert.doesNotMatch(login,/db\.from\("cargo_operator_accounts"\)/);
+ assert.match(review,/href="\.\/cargo-operator-login\.html"/);
+ assert.ok(fs.existsSync(path.join(root,'staging/cargo-operator-login.html')));
+});

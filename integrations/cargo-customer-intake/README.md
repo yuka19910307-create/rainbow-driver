@@ -62,3 +62,8 @@
 - `integrations/cargo-customer-intake/followup-smoke.review.sql`：隔離PostgreSQLで、受付OFF拒否・権限拒否・状態遷移・二重更新拒否・業務記録保存・終了後の再開禁止・履歴件数を検証。
 - GitHub Actions `38479056117`：オフラインテストと隔離PostgreSQL統合テストの両ジョブが成功：https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38479056117
 - **対応状況は業務記録のみ。顧客への自動連絡、契約確定、配車指示、Square決済は行わない。** 本番Supabaseへの適用・PRマージも未実施。
+
+## 検証環境の送信受付判定を修正（2026-10-14）
+- 顧客OTP APIのメール送信受付判定はHTTP成功だけではなく、ResendのJSON応答に空でないメールIDがある場合に限る。不正JSON・ID欠落・エラー・タイムアウトは未確認として扱い、自動再送しない。事業者受付は受信箱への到着を保証するものではない。
+- `tests/cargo-customer-email-acceptance.test.cjs`で正常応答、ID欠落・型不正・空白・過長ID、不正JSON、HTTPエラー、タイムアウトと自動再送なしを検証。受付OFFでは外部送信に進まないことも検証。
+- 分離検証プロジェクト `hvdoqcrnztqmbzgwrovd` の `cargo-customer-intake` Version 5 に反映。公開JWT不要の既存設定を維持し、受付OFFとCAPTCHA必須条件は変更なし。実際の顧客メール送信・本番プロジェクトへの反映は行っていない。

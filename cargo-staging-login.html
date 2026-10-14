@@ -4,8 +4,8 @@
 :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#233650;background:#f0f4f9}*{box-sizing:border-box}body{margin:0}header{background:#213e60;color:white;padding:28px 22px}header div,main{max-width:600px;margin:auto}h1{font-size:25px;margin:9px 0}h2{font-size:21px;margin-top:0}main{padding:22px 16px}section{background:white;border:1px solid #d7e1ed;padding:24px;border-radius:18px;margin-bottom:18px}p{line-height:1.8}label{display:block;font-weight:650;margin:20px 0 8px}input{width:100%;font-size:17px;padding:14px;border:1px solid #aebed0;border-radius:9px}button{width:100%;min-height:50px;padding:14px;margin-top:24px;border:0;border-radius:10px;background:#27496e;color:white;font-size:17px;font-weight:700;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.badge{display:inline-block;border-radius:20px;background:#e7f4ee;color:#246147;padding:6px 12px;font-size:14px;font-weight:700}.muted{color:#58697c;font-size:14px}.status{white-space:pre-wrap;overflow-wrap:anywhere}.status:empty{display:none}.error{color:#a42c39}.success{color:#246147}ul{padding-left:23px;line-height:2}#logout{background:#e9eef5;color:#284363}[hidden]{display:none!important}</style></head>
 <body><header><div><small>Rainbow Driver / 軽貨物</small><h1>検証用ログイン</h1></div></header><main>
 <section id="login"><span class="badge">検証環境</span><h2 style="margin-top:20px">管理者としてログイン</h2><p>検証用に登録したメールアドレスとパスワードを入力してください。</p><form id="form"><label for="email">メールアドレス</label><input id="email" name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" required><label for="password">検証用のパスワード</label><input id="password" name="password" type="password" autocomplete="current-password" required><button id="submit" type="submit" disabled>ログインして接続を確認</button></form><p class="muted">Supabaseの管理画面用・データベース用ではなく、先ほどユーザー作成時に設定したパスワードです。</p></section>
-<section id="dashboard" hidden><span class="badge">確認完了</span><h2 style="margin-top:20px">ログイン・接続に成功しました</h2><ul><li>管理者権限：確認済み</li><li>検証用データベース：接続成功</li><li>一般受付：OFF</li></ul><p>検証環境の準備確認ができました。配送依頼の一連の動作確認は次の工程です。</p><button id="logout" type="button">ログアウト</button></section>
-<section><p id="message" class="status" role="status" aria-live="polite">ログイン画面を準備中です…</p><p class="muted">この画面は接続確認専用です。メール送信・配送依頼・決済は行いません。ログイン状態はこのページを閉じるか再読み込みすると消えます。</p></section>
+<section id="dashboard" hidden><span class="badge">確認完了</span><h2 style="margin-top:20px">ログイン・接続に成功しました</h2><ul><li>管理者権限：確認済み</li><li>検証用データベース：接続成功</li><li>一般受付：OFF</li></ul><p>検証環境の準備確認ができました。配送依頼の一連の動作確認は次の工程です。</p><div id="samplePanel"><h2>架空の配送依頼テスト</h2><p>固定の架空案件を検証用データベースに保存し、管理者として確認します。</p><ul><li>集荷：テスト集荷地・さいたま市</li><li>配送先：テスト配送先・東京都内</li><li>荷物：テスト用・精密機器の箱</li><li>数量：2箱 ／ 重量：8.5kg</li></ul><button id="sampleCreate" type="button">架空案件を1件保存</button><button id="sampleLoad" type="button">保存した案件を読み込む</button><p id="sampleState" class="status" role="status" aria-live="polite">未確認</p><button id="sampleReview" type="button" hidden>内容を確認済みにする</button><p class="muted">同じ案件を重複登録しません。ここでの確認は配送の受諾ではありません。顧客向けの本人確認・受付とは別の保存テストです。</p></div><button id="logout" type="button">ログアウト</button></section>
+<section><p id="message" class="status" role="status" aria-live="polite">ログイン画面を準備中です…</p><p class="muted">架空データの検証専用です。メール送信・実際の配送依頼・決済は行いません。ログイン状態はこのページを閉じるか再読み込みすると消えます。</p></section>
 </main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js" integrity="sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg" crossorigin="anonymous"></script>
 <script>
 (()=>{'use strict';
@@ -14,8 +14,9 @@ const URL='https://hvdoqcrnztqmbzgwrovd.supabase.co',KEY='sb_publishable_A-f3WQb
 if(location.origin!=='https://app.rainbow-driver.com'){say('公式サイトの検証用URLから開いてください。',true);return}
 if(!window.supabase){say('認証機能を読み込めませんでした。ページを再読み込みしてください。',true);return}
 const client=window.supabase.createClient(URL,KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,storageKey:'rd-cargo-free-staging-memory-v1'}});
+let accessToken=null;
 const errors={OPERATOR_ONLY:'検証用の管理者権限を確認できませんでした。',INTAKE_MUST_BE_OFF:'受付停止の設定を確認できないため、接続確認を停止しました。',SCHEMA_NOT_READY:'検証用データベースの準備を確認できませんでした。',STAGING_ONLY:'検証環境を確認できませんでした。',INVALID_SESSION:'ログイン情報を確認できませんでした。'};
-async function forget(){try{await client.auth.signOut({scope:'local'})}catch{}}
+async function forget(){accessToken=null;try{await client.auth.signOut({scope:'local'})}catch{}}
 $('submit').disabled=false;say('');
 $('form').addEventListener('submit',async e=>{
 e.preventDefault();if($('submit').disabled)return;$('submit').disabled=true;say('ログインと管理者権限を確認中です…');
@@ -30,10 +31,29 @@ try{
  if(!response.ok||result.ok!==true||result.environment!=='CARGO_FREE_STAGING'||result.operator_verified!==true||result.database_ready!==true||result.public_intake_enabled!==false||result.email_sent!==false||result.request_created!==false||result.payment_created!==false){
   await forget();say('メール・パスワードの認証は成功しましたが、接続確認は完了していません。\n'+(errors[result.error]||'画面の表示を担当者へお知らせください。')+'\n確認結果：HTTP '+response.status+(errors[result.error]?' / '+result.error:''),true);return
  }
- $('login').hidden=true;$('dashboard').hidden=false;say('管理者ログインと検証環境への接続を確認しました。');
+ accessToken=data.session.access_token;$('login').hidden=true;$('dashboard').hidden=false;say('管理者ログインと検証環境への接続を確認しました。');await sampleAction('load');
 }catch{await forget();say('通信を完了できませんでした。通信状態を確認してください。',true)}
 finally{$('password').value='';$('submit').disabled=false}
 });
+let sampleBusy=false;
+async function sampleAction(action){
+ if(sampleBusy||!accessToken)return;sampleBusy=true;
+ for(const id of ['sampleCreate','sampleLoad','sampleReview','logout'])$(id).disabled=true;
+ $('sampleReview').hidden=true;$('sampleState').textContent='データベースへ確認中…';
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+ try{
+  const r=await fetch(URL+'/functions/v1/cargo-staging-sample',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({action}),cache:'no-store',credentials:'omit',signal:controller.signal});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.ok!==true||d.environment!=='CARGO_FREE_STAGING'||d.public_intake_enabled!==false||d.customer_request_created!==false||d.email_sent!==false||d.payment_created!==false)throw Error('HTTP '+r.status);
+  const row=d.sample;
+  if(row!==null&&(!row||row.scenario!=='FICTIONAL_V1'||!['pending_review','reviewed'].includes(row.status)||typeof row.id!=='string'))throw Error('INVALID_RESPONSE');
+  $('sampleCreate').hidden=!!row;
+  $('sampleReview').hidden=!row||row.status!=='pending_review';
+  $('sampleState').textContent=row?'保存済みの架空案件\n案件ID：'+row.id+'\n状態：'+(row.status==='reviewed'?'管理者確認済み':'管理者確認待ち'):'保存された架空案件はありません。上の「架空案件を1件保存」を押してください。';
+ }catch{$('sampleState').textContent='結果を確認できませんでした。「保存した案件を読み込む」で状態を確認してください。'}
+ finally{clearTimeout(timer);sampleBusy=false;for(const id of ['sampleCreate','sampleLoad','sampleReview','logout'])$(id).disabled=false}
+}
+for(const [id,action] of [['sampleCreate','create'],['sampleLoad','load'],['sampleReview','review']])$(id).addEventListener('click',()=>sampleAction(action));
 $('logout').addEventListener('click',async()=>{$('logout').disabled=true;await forget();$('dashboard').hidden=true;$('login').hidden=false;$('password').value='';$('logout').disabled=false;say('ログアウトしました。')});
 })();
 </script></body></html>

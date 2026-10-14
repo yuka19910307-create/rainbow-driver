@@ -16,6 +16,7 @@ on:
       - "tests/cargo-staging-live-smoke.mjs"
       - "integrations/cargo-customer-intake/**"
       - "tests/cargo-request-review.test.cjs"
+      - "tests/cargo-customer-email-acceptance.test.cjs"
       - "tests/cargo-draft-otp-*.test.cjs"
       - "tests/cargo-otp-pg-*.sql"
       - "tests/cargo-otp-pg-concurrency.py"
@@ -39,7 +40,7 @@ jobs:
         with:
           node-version: '24'
       - name: Run offline contract tests (no secrets or network requests)
-        run: node --test tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs
+        run: node --test tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs tests/cargo-customer-email-acceptance.test.cjs
 
   staging-live-smoke:
     runs-on: ubuntu-latest

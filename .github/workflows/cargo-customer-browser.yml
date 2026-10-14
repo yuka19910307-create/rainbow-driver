@@ -1,0 +1,28 @@
+name: Cargo customer form browser test
+on:
+  pull_request:
+    paths:
+      - "staging/cargo-customer-intake.html"
+      - "cargo-pwa/request-review-rules.js"
+      - "tests/cargo-customer-form-browser.test.cjs"
+      - ".github/workflows/cargo-customer-browser.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-mobile-chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install isolated browser test dependency
+        run: npm install --prefix "$RUNNER_TEMP/cargo-browser" --no-save --ignore-scripts playwright@1.51.1
+      - name: Install Chromium for simulated offline form test
+        run: node "$RUNNER_TEMP/cargo-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Exercise real form with intercepted synthetic responses only
+        run: NODE_PATH="$RUNNER_TEMP/cargo-browser/node_modules" node tests/cargo-customer-form-browser.test.cjs

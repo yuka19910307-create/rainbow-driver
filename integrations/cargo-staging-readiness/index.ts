@@ -18,7 +18,7 @@ function customerConfiguration(schemaReady){
   verification_key_configured:base64KeyConfigured('CARGO_INTAKE_HMAC_KEY',[32,64]),
   encryption_key_configured:base64KeyConfigured('CARGO_CONTACT_AES_256_GCM_KEY',[32]),
   captcha_configured:!!(env('CARGO_CUSTOMER_TURNSTILE_SITE_KEY')&&env('CARGO_CUSTOMER_TURNSTILE_SECRET')),
-  email_provider_configured:env('CARGO_CUSTOMER_EMAIL_PROVIDER')==='resend'&&!!env('CARGO_CUSTOMER_RESEND_API_KEY')&&/^[^\\s@]{1,64}@[^\\s@]{1,190}$/.test(env('CARGO_CUSTOMER_FROM_EMAIL')),
+  email_provider_configured:env('CARGO_CUSTOMER_EMAIL_PROVIDER')==='resend'&&!!env('CARGO_CUSTOMER_RESEND_API_KEY')&&/^[^\s@]{1,64}@[^\s@]{1,190}$/.test(env('CARGO_CUSTOMER_FROM_EMAIL')),
   schema_configured:schemaReady
  };
  return {...result,configuration_recognized:Object.values(result).every(v=>v===true),

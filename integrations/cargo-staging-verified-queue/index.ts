@@ -12,10 +12,10 @@ Deno.serve(async req=>{
  if(!token)return reply({error:"LOGIN_REQUIRED"},401);
  let body;
  try{const raw=await req.text();if(raw.length>200)throw Error();body=JSON.parse(raw);
-  if(!body||Array.isArray(body)||!['list','save_verified_sample','start_review','save_quote_draft','save_simulated_response'].includes(body.action))throw Error();
-  const keys=Object.keys(body).sort(),expected=body.action==='save_simulated_response'?['action','id','response']:['start_review','save_quote_draft'].includes(body.action)?['action','id']:['action'];
+  if(!body||Array.isArray(body)||!['list','save_verified_sample','start_review','save_quote_draft','save_simulated_response','start_followup','complete_followup'].includes(body.action))throw Error();
+  const keys=Object.keys(body).sort(),expected=body.action==='save_simulated_response'?['action','id','response']:['start_review','save_quote_draft','start_followup','complete_followup'].includes(body.action)?['action','id']:['action'];
   if(keys.length!==expected.length||keys.some((k,i)=>k!==expected[i]))throw Error();
-  if(['start_review','save_quote_draft','save_simulated_response'].includes(body.action)&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.id))throw Error();
+  if(!['list','save_verified_sample'].includes(body.action)&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.id))throw Error();
   if(body.action==='save_simulated_response'&&!['interested','declined'].includes(body.response))throw Error();
  }catch{return reply({error:"INVALID_INPUT"},400)}
  const url=Deno.env.get("SUPABASE_URL"),role=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -54,6 +54,11 @@ Deno.serve(async req=>{
    if(responseError||!saved)return reply({error:'RESPONSE_UNAVAILABLE'},503);
    if(saved.ok!==true)return reply({error:saved.reason},409);
   }
+  if(['start_followup','complete_followup'].includes(body.action)){
+   const {data:checked,error:followupError}=await db.rpc('cargo_staging_followup_check',{p_operator_id:uid,p_id:body.id,p_action:body.action==='start_followup'?'start':'complete'});
+   if(followupError||!checked)return reply({error:'FOLLOWUP_UNAVAILABLE'},503);
+   if(checked.ok!==true)return reply({error:checked.reason},409);
+  }
   const rows=await db.from('cargo_staging_verified_requests').select('id,source_draft_id,status,created_at,review_started_at').eq('operator_id',uid).order('created_at',{ascending:false}).limit(10);
   if(rows.error)return reply({error:"QUEUE_UNAVAILABLE"},503);
   const ids=(rows.data||[]).map(r=>r.id);
@@ -62,7 +67,10 @@ Deno.serve(async req=>{
   const responses=ids.length?await db.from('cargo_staging_quote_responses').select('request_id,response,mode,created_at').in('request_id',ids):{data:[],error:null};
   if(responses.error)return reply({error:'RESPONSE_UNAVAILABLE'},503);
   const responseById=new Map((responses.data||[]).map(r=>[r.request_id,r]));
+  const followups=ids.length?await db.from('cargo_staging_followups').select('request_id,status,started_at,checked_at').in('request_id',ids):{data:[],error:null};
+  if(followups.error)return reply({error:'FOLLOWUP_UNAVAILABLE'},503);
+  const followupById=new Map((followups.data||[]).map(f=>[f.request_id,f]));
   const byId=new Map((quotes.data||[]).map(q=>[q.request_id,q]));
-  return reply({ok:true,environment:'CARGO_FREE_STAGING',items:(rows.data||[]).map(r=>({...r,details:fixture,quote_draft:byId.get(r.id)||null,simulated_response:responseById.get(r.id)||null})),public_intake_enabled:false,customer_request_created:false,email_sent:false,payment_created:false});
+  return reply({ok:true,environment:'CARGO_FREE_STAGING',items:(rows.data||[]).map(r=>({...r,details:fixture,quote_draft:byId.get(r.id)||null,simulated_response:responseById.get(r.id)||null,followup:followupById.get(r.id)||null})),public_intake_enabled:false,customer_request_created:false,email_sent:false,payment_created:false});
  }catch{return reply({error:"QUEUE_UNAVAILABLE"},503)}
 });

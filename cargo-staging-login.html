@@ -152,6 +152,22 @@ async function queueAction(action,id,response){
       const result=document.createElement('p');result.className='status';
       result.textContent='顧客役のテスト回答：保存済み\n'+(response.response==='interested'?'相談を希望する':'今回は見送る')+'\n配送・料金・決済は確定していません。';
       box.appendChild(result);
+      if(response.response==='interested'){
+       const f=item.followup;
+       if(f&&(f.request_id!==item.id||!['reviewing','checked'].includes(f.status)))throw Error('INVALID_FOLLOWUP');
+       const status=document.createElement('p');status.className='status';
+       status.textContent='管理者の相談対応テスト：'+(!f?'未開始':f.status==='checked'?'確認完了':'確認中');
+       box.appendChild(status);
+       if(!f||f.status==='reviewing'){
+        const check=document.createElement('button');check.type='button';
+        check.textContent=!f?'相談希望の確認を開始（テスト）':'相談希望の確認を完了（テスト）';
+        check.addEventListener('click',()=>queueAction(!f?'start_followup':'complete_followup',item.id));
+        box.appendChild(check);
+       }else{
+        const done=document.createElement('p');done.textContent='この架空依頼の管理者確認テストは完了しました。実際のお客様への連絡・配送・料金確定・決済は行っていません。';
+        box.appendChild(done);
+       }
+      }
      }else{
       const preview=document.createElement('button');preview.type='button';preview.textContent='顧客役で見積もり案を確認（送信なし）';
       const panel=document.createElement('div');panel.hidden=true;

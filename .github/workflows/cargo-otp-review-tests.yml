@@ -11,6 +11,8 @@ on:
       - "cargo-customer-intake.html"
       - "cargo-customer-quote-reply.html"
       - "cargo-customer-review.html"
+      - "staging/**"
+      - "tests/cargo-staging-isolation.test.cjs"
       - "integrations/cargo-customer-intake/**"
       - "tests/cargo-request-review.test.cjs"
       - "tests/cargo-draft-otp-*.test.cjs"
@@ -36,7 +38,7 @@ jobs:
         with:
           node-version: '24'
       - name: Run offline contract tests (no secrets or network requests)
-        run: node --test tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs
+        run: node --test tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs
 
   disposable-postgres-integration:
     runs-on: ubuntu-latest

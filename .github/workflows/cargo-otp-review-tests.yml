@@ -13,6 +13,7 @@ on:
       - "cargo-customer-review.html"
       - "staging/**"
       - "tests/cargo-staging-isolation.test.cjs"
+      - "tests/cargo-staging-live-smoke.mjs"
       - "integrations/cargo-customer-intake/**"
       - "tests/cargo-request-review.test.cjs"
       - "tests/cargo-draft-otp-*.test.cjs"
@@ -39,6 +40,21 @@ jobs:
           node-version: '24'
       - name: Run offline contract tests (no secrets or network requests)
         run: node --test tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs
+
+  staging-live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check live staging API is disabled and operator requires login
+        env:
+          CARGO_STAGING_PUBLISHABLE_KEY: sb_publishable_A-f3WQb7Oh8uMqO4BJPPtg_l4c_JCfQ
+        run: node tests/cargo-staging-live-smoke.mjs
 
   disposable-postgres-integration:
     runs-on: ubuntu-latest

@@ -31,7 +31,7 @@ try{
  if(!response.ok||result.ok!==true||result.environment!=='CARGO_FREE_STAGING'||result.operator_verified!==true||result.database_ready!==true||result.public_intake_enabled!==false||result.email_sent!==false||result.request_created!==false||result.payment_created!==false){
   await forget();say('メール・パスワードの認証は成功しましたが、接続確認は完了していません。\n'+(errors[result.error]||'画面の表示を担当者へお知らせください。')+'\n確認結果：HTTP '+response.status+(errors[result.error]?' / '+result.error:''),true);return
  }
- accessToken=data.session.access_token;$('login').hidden=true;$('dashboard').hidden=false;say('管理者ログインと検証環境への接続を確認しました。');await sampleAction('load');
+ accessToken=data.session.access_token;$('login').hidden=true;$('dashboard').hidden=false;say('管理者ログインと検証環境への接続を確認しました。');await sampleAction('load');await showOtpStatus();
 }catch{await forget();say('通信を完了できませんでした。通信状態を確認してください。',true)}
 finally{$('password').value='';$('submit').disabled=false}
 });
@@ -74,14 +74,15 @@ async function otpRun(work){
   $('otpMessage').textContent=(known[e.code]||'連携結果を確認できませんでした。再送せず、表示を担当者へお知らせください。')+(e.http?'（HTTP '+e.http+'）':'');
  }finally{otpBusy=false;for(const id of ['otpStatus','otpProbe','otpVerify','logout','sampleCreate','sampleLoad','sampleReview'])$(id).disabled=false;$('otpSend').disabled=challengeId!==null}
 }
-$('otpStatus').addEventListener('click',()=>otpRun(async()=>{
+function showOtpStatus(){return otpRun(async()=>{
  $('otpSend').hidden=true;$('otpProbe').hidden=true;$('otpMessage').textContent='準備状況を確認中…';
  const d=await otpCall('cargo-gmail-otp-test',{action:'status'});
  const b=await otpCall('cargo-staging-otp-binding',{action:'status'});
  if(d.mode!=='OPERATOR_OWN_GMAIL_PRELAUNCH'||d.delivery_scope!=='SCRIPT_OWNER_GMAIL_ONLY'||b.mode!=='OPERATOR_SYNTHETIC_DRAFT_ONLY')throw Error('INVALID_MODE');
  $('otpMessage').textContent='検証環境の準備状況\nGmail接続設定：'+(d.bridge_configured?'認識済み':'未登録または形式不正')+'\n認証保護キー：'+(d.verification_hmac_configured?'認識済み':'未登録または形式不正')+'\n架空依頼との結び付け：'+(b.binding_schema_ready?'準備済み':'未準備')+'\n一般受付：OFF';
  $('otpProbe').hidden=!(d.bridge_configured&&d.verification_hmac_configured&&b.ready);
-}));
+});}
+$('otpStatus').addEventListener('click',showOtpStatus);
 $('otpProbe').addEventListener('click',()=>otpRun(async()=>{
  $('otpSend').hidden=true;$('otpMessage').textContent='署名接続を確認中…';
  const d=await otpCall('cargo-gmail-otp-test',{action:'bridge_probe'});

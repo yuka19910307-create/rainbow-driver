@@ -1,0 +1,31 @@
+name: Owner-only staging end-to-end tests
+on:
+  push:
+    branches: [main]
+    paths:
+      - "integrations/cargo-staging-owner-e2e/**"
+      - "cargo-staging-owner-e2e.html"
+      - "cargo-staging-owner-review-rules.js"
+      - ".github/workflows/cargo-owner-e2e.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  owner-isolation-and-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test scoped owner-only handler with synthetic services
+        run: node integrations/cargo-staging-owner-e2e/owner.test.cjs
+      - name: Install isolated browser dependency
+        run: npm install --prefix "$RUNNER_TEMP/owner-browser" --no-save --ignore-scripts playwright@1.51.1
+      - name: Install Chromium
+        run: node "$RUNNER_TEMP/owner-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Exercise owner form through review with all services intercepted
+        run: NODE_PATH="$RUNNER_TEMP/owner-browser/node_modules" node integrations/cargo-staging-owner-e2e/browser.test.cjs

@@ -12,10 +12,11 @@ Deno.serve(async req=>{
  if(!token)return reply({error:"LOGIN_REQUIRED"},401);
  let body;
  try{const raw=await req.text();if(raw.length>200)throw Error();body=JSON.parse(raw);
-  if(!body||Array.isArray(body)||!['list','save_verified_sample','start_review','save_quote_draft'].includes(body.action))throw Error();
-  const keys=Object.keys(body).sort(),expected=['start_review','save_quote_draft'].includes(body.action)?['action','id']:['action'];
+  if(!body||Array.isArray(body)||!['list','save_verified_sample','start_review','save_quote_draft','save_simulated_response'].includes(body.action))throw Error();
+  const keys=Object.keys(body).sort(),expected=body.action==='save_simulated_response'?['action','id','response']:['start_review','save_quote_draft'].includes(body.action)?['action','id']:['action'];
   if(keys.length!==expected.length||keys.some((k,i)=>k!==expected[i]))throw Error();
-  if(['start_review','save_quote_draft'].includes(body.action)&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.id))throw Error();
+  if(['start_review','save_quote_draft','save_simulated_response'].includes(body.action)&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.id))throw Error();
+  if(body.action==='save_simulated_response'&&!['interested','declined'].includes(body.response))throw Error();
  }catch{return reply({error:"INVALID_INPUT"},400)}
  const url=Deno.env.get("SUPABASE_URL"),role=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
  if(url!==TARGET||!role)return reply({error:"STAGING_ONLY"},503);
@@ -48,12 +49,20 @@ Deno.serve(async req=>{
    if(quoteError||!saved)return reply({error:'QUOTE_UNAVAILABLE'},503);
    if(saved.ok!==true)return reply({error:saved.reason},409);
   }
+  if(body.action==='save_simulated_response'){
+   const {data:saved,error:responseError}=await db.rpc('cargo_staging_quote_response_save',{p_operator_id:uid,p_id:body.id,p_response:body.response});
+   if(responseError||!saved)return reply({error:'RESPONSE_UNAVAILABLE'},503);
+   if(saved.ok!==true)return reply({error:saved.reason},409);
+  }
   const rows=await db.from('cargo_staging_verified_requests').select('id,source_draft_id,status,created_at,review_started_at').eq('operator_id',uid).order('created_at',{ascending:false}).limit(10);
   if(rows.error)return reply({error:"QUEUE_UNAVAILABLE"},503);
   const ids=(rows.data||[]).map(r=>r.id);
   const quotes=ids.length?await db.from('cargo_staging_quote_drafts').select('request_id,amount_yen,terms,status,created_at').in('request_id',ids):{data:[],error:null};
   if(quotes.error)return reply({error:'QUOTE_UNAVAILABLE'},503);
+  const responses=ids.length?await db.from('cargo_staging_quote_responses').select('request_id,response,mode,created_at').in('request_id',ids):{data:[],error:null};
+  if(responses.error)return reply({error:'RESPONSE_UNAVAILABLE'},503);
+  const responseById=new Map((responses.data||[]).map(r=>[r.request_id,r]));
   const byId=new Map((quotes.data||[]).map(q=>[q.request_id,q]));
-  return reply({ok:true,environment:'CARGO_FREE_STAGING',items:(rows.data||[]).map(r=>({...r,details:fixture,quote_draft:byId.get(r.id)||null})),public_intake_enabled:false,customer_request_created:false,email_sent:false,payment_created:false});
+  return reply({ok:true,environment:'CARGO_FREE_STAGING',items:(rows.data||[]).map(r=>({...r,details:fixture,quote_draft:byId.get(r.id)||null,simulated_response:responseById.get(r.id)||null})),public_intake_enabled:false,customer_request_created:false,email_sent:false,payment_created:false});
  }catch{return reply({error:"QUEUE_UNAVAILABLE"},503)}
 });

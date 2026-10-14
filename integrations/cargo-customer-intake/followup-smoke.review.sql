@@ -33,6 +33,24 @@ begin
   v_request,v_not_operator,null,'contact_attempted','架空のお客様に連絡した記録です。');
  if v_result->>'reason'<>'OPERATOR_ONLY' then
   raise exception 'FOLLOWUP_NON_OPERATOR_ALLOWED %',v_result;end if;
+ -- Missing or declined customer replies must never allow contact follow-up.
+ update public.cargo_customer_quote_replies
+  set response_state=null,responded_at=null where request_id=v_request;
+ v_result:=public.cargo_customer_followup_save(
+  v_request,v_operator,null,'contact_attempted','未回答の架空のお客様についての拒否テスト。');
+ if v_result->>'reason' is distinct from 'CUSTOMER_INTEREST_REQUIRED' then
+  raise exception 'FOLLOWUP_UNANSWERED_CUSTOMER_ALLOWED %',v_result;end if;
+ update public.cargo_customer_quote_replies
+  set response_state='declined',responded_at=clock_timestamp() where request_id=v_request;
+ v_result:=public.cargo_customer_followup_save(
+  v_request,v_operator,null,'contact_attempted','辞退した架空のお客様についての拒否テスト。');
+ if v_result->>'reason' is distinct from 'CUSTOMER_INTEREST_REQUIRED' then
+  raise exception 'FOLLOWUP_DECLINED_CUSTOMER_ALLOWED %',v_result;end if;
+ if exists(select 1 from public.cargo_customer_quote_followups where request_id=v_request)
+  or exists(select 1 from public.cargo_customer_quote_followup_events where request_id=v_request)
+ then raise exception 'REJECTED_FOLLOWUP_CREATED_RECORDS';end if;
+ update public.cargo_customer_quote_replies
+  set response_state='interested',responded_at=clock_timestamp() where request_id=v_request;
  v_result:=public.cargo_customer_followup_save(
   v_request,v_operator,null,'awaiting_reply','架空のお客様の返答を待つ。');
  if v_result->>'reason'<>'INVALID_TRANSITION' then

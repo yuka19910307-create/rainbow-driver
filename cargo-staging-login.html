@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://hvdoqcrnztqmbzgwrovd.supabase.co; img-src 'none'; base-uri 'none'; form-action 'none'"><title>検証用ログイン | Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#233650;background:#f0f4f9}*{box-sizing:border-box}body{margin:0}header{background:#213e60;color:white;padding:28px 22px}header div,main{max-width:600px;margin:auto}h1{font-size:25px;margin:9px 0}h2{font-size:21px;margin-top:0}main{padding:22px 16px}section{background:white;border:1px solid #d7e1ed;padding:24px;border-radius:18px;margin-bottom:18px}p{line-height:1.8}label{display:block;font-weight:650;margin:20px 0 8px}input{width:100%;font-size:17px;padding:14px;border:1px solid #aebed0;border-radius:9px}button{width:100%;min-height:50px;padding:14px;margin-top:24px;border:0;border-radius:10px;background:#27496e;color:white;font-size:17px;font-weight:700;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.badge{display:inline-block;border-radius:20px;background:#e7f4ee;color:#246147;padding:6px 12px;font-size:14px;font-weight:700}.muted{color:#58697c;font-size:14px}.status{white-space:pre-wrap;overflow-wrap:anywhere}.status:empty{display:none}.error{color:#a42c39}.success{color:#246147}ul{padding-left:23px;line-height:2}#logout{background:#e9eef5;color:#284363}[hidden]{display:none!important}</style></head>
+<body><header><div><small>Rainbow Driver / 軽貨物</small><h1>検証用ログイン</h1></div></header><main>
+<section id="login"><span class="badge">検証環境</span><h2 style="margin-top:20px">管理者としてログイン</h2><p>検証用に登録したメールアドレスとパスワードを入力してください。</p><form id="form"><label for="email">メールアドレス</label><input id="email" name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" required><label for="password">検証用のパスワード</label><input id="password" name="password" type="password" autocomplete="current-password" required><button id="submit" type="submit" disabled>ログインして接続を確認</button></form><p class="muted">Supabaseの管理画面用・データベース用ではなく、先ほどユーザー作成時に設定したパスワードです。</p></section>
+<section id="dashboard" hidden><span class="badge">確認完了</span><h2 style="margin-top:20px">ログイン・接続に成功しました</h2><ul><li>管理者権限：確認済み</li><li>検証用データベース：接続成功</li><li>一般受付：OFF</li></ul><p>検証環境の準備確認ができました。配送依頼の一連の動作確認は次の工程です。</p><button id="logout" type="button">ログアウト</button></section>
+<section><p id="message" class="status" role="status" aria-live="polite">ログイン画面を準備中です…</p><p class="muted">この画面は接続確認専用です。メール送信・配送依頼・決済は行いません。ログイン状態はこのページを閉じるか再読み込みすると消えます。</p></section>
+</main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js" integrity="sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg" crossorigin="anonymous"></script>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id),say=(s,error=false)=>{$('message').textContent=s;$('message').className='status '+(error?'error':'success')};
+const URL='https://hvdoqcrnztqmbzgwrovd.supabase.co',KEY='sb_publishable_A-f3WQb7Oh8uMqO4BJPPtg_l4c_JCfQ';
+if(location.origin!=='https://app.rainbow-driver.com'){say('公式サイトの検証用URLから開いてください。',true);return}
+if(!window.supabase){say('認証機能を読み込めませんでした。ページを再読み込みしてください。',true);return}
+const client=window.supabase.createClient(URL,KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,storageKey:'rd-cargo-free-staging-memory-v1'}});
+const errors={OPERATOR_ONLY:'検証用の管理者権限を確認できませんでした。',INTAKE_MUST_BE_OFF:'受付停止の設定を確認できないため、接続確認を停止しました。',SCHEMA_NOT_READY:'検証用データベースの準備を確認できませんでした。',STAGING_ONLY:'検証環境を確認できませんでした。',INVALID_SESSION:'ログイン情報を確認できませんでした。'};
+async function forget(){try{await client.auth.signOut({scope:'local'})}catch{}}
+$('submit').disabled=false;say('');
+$('form').addEventListener('submit',async e=>{
+e.preventDefault();if($('submit').disabled)return;$('submit').disabled=true;say('ログインと管理者権限を確認中です…');
+try{
+ const {data,error}=await client.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
+ $('password').value='';
+ if(error||!data?.session?.access_token){say('ログインできませんでした。検証用のメールアドレスとパスワードを確認してください。',true);return}
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+ let response;
+ try{response=await fetch(URL+'/functions/v1/cargo-staging-readiness',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+data.session.access_token,'Content-Type':'application/json'},body:JSON.stringify({action:'status'}),cache:'no-store',credentials:'omit',signal:controller.signal})}finally{clearTimeout(timer)}
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok||result.ok!==true||result.environment!=='CARGO_FREE_STAGING'||result.operator_verified!==true||result.database_ready!==true||result.public_intake_enabled!==false||result.email_sent!==false||result.request_created!==false||result.payment_created!==false){
+  await forget();say('メール・パスワードの認証は成功しましたが、接続確認は完了していません。\n'+(errors[result.error]||'画面の表示を担当者へお知らせください。')+'\n確認結果：HTTP '+response.status+(errors[result.error]?' / '+result.error:''),true);return
+ }
+ $('login').hidden=true;$('dashboard').hidden=false;say('管理者ログインと検証環境への接続を確認しました。');
+}catch{await forget();say('通信を完了できませんでした。通信状態を確認してください。',true)}
+finally{$('password').value='';$('submit').disabled=false}
+});
+$('logout').addEventListener('click',async()=>{$('logout').disabled=true;await forget();$('dashboard').hidden=true;$('login').hidden=false;$('password').value='';$('logout').disabled=false;say('ログアウトしました。')});
+})();
+</script></body></html>

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://hvdoqcrnztqmbzgwrovd.supabase.co; img-src 'none'; base-uri 'none'; form-action 'none'"><title>検証用ログイン | Rainbow Driver</title>
 <style>
-:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#233650;background:#f0f4f9}*{box-sizing:border-box}body{margin:0}header{background:#213e60;color:white;padding:28px 22px}header div,main{max-width:600px;margin:auto}h1{font-size:25px;margin:9px 0}h2{font-size:21px;margin-top:0}main{padding:22px 16px}section{background:white;border:1px solid #d7e1ed;padding:24px;border-radius:18px;margin-bottom:18px}p{line-height:1.8}label{display:block;font-weight:650;margin:20px 0 8px}input{width:100%;font-size:17px;padding:14px;border:1px solid #aebed0;border-radius:9px}button{width:100%;min-height:50px;padding:14px;margin-top:24px;border:0;border-radius:10px;background:#27496e;color:white;font-size:17px;font-weight:700;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.badge{display:inline-block;border-radius:20px;background:#e7f4ee;color:#246147;padding:6px 12px;font-size:14px;font-weight:700}.muted{color:#58697c;font-size:14px}.status{white-space:pre-wrap;overflow-wrap:anywhere}.status:empty{display:none}.error{color:#a42c39}.success{color:#246147}ul{padding-left:23px;line-height:2}#logout{background:#e9eef5;color:#284363}[hidden]{display:none!important}</style></head>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#233650;background:#f0f4f9}*{box-sizing:border-box}body{margin:0}header{background:#213e60;color:white;padding:28px 22px}header div,main{max-width:600px;margin:auto}h1{font-size:25px;margin:9px 0}h2{font-size:21px;margin-top:0}main{padding:22px 16px}section{background:white;border:1px solid #d7e1ed;padding:24px;border-radius:18px;margin-bottom:18px}p{line-height:1.8}label{display:block;font-weight:650;margin:20px 0 8px}input,select{width:100%;font-size:17px;padding:14px;border:1px solid #aebed0;border-radius:9px}button{width:100%;min-height:50px;padding:14px;margin-top:24px;border:0;border-radius:10px;background:#27496e;color:white;font-size:17px;font-weight:700;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.badge{display:inline-block;border-radius:20px;background:#e7f4ee;color:#246147;padding:6px 12px;font-size:14px;font-weight:700}.muted{color:#58697c;font-size:14px}.status{white-space:pre-wrap;overflow-wrap:anywhere}.status:empty{display:none}.error{color:#a42c39}.success{color:#246147}ul{padding-left:23px;line-height:2}#logout{background:#e9eef5;color:#284363}[hidden]{display:none!important}</style></head>
 <body><header><div><small>Rainbow Driver / 軽貨物</small><h1>検証用ログイン</h1></div></header><main>
 <section id="login"><span class="badge">検証環境</span><h2 style="margin-top:20px">管理者としてログイン</h2><p>検証用に登録したメールアドレスとパスワードを入力してください。</p><form id="form"><label for="email">メールアドレス</label><input id="email" name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" required><label for="password">検証用のパスワード</label><input id="password" name="password" type="password" autocomplete="current-password" required><button id="submit" type="submit" disabled>ログインして接続を確認</button></form><p class="muted">Supabaseの管理画面用・データベース用ではなく、先ほどユーザー作成時に設定したパスワードです。</p></section>
 <section id="dashboard" hidden><span class="badge">確認完了</span><h2 style="margin-top:20px">ログイン・接続に成功しました</h2><ul><li>管理者権限：確認済み</li><li>検証用データベース：接続成功</li><li>一般受付：OFF</li></ul><p>検証環境の準備確認ができました。配送依頼の一連の動作確認は次の工程です。</p><div id="samplePanel"><h2>架空の配送依頼テスト</h2><p>固定の架空案件を検証用データベースに保存し、管理者として確認します。</p><ul><li>集荷：テスト集荷地・さいたま市</li><li>配送先：テスト配送先・東京都内</li><li>荷物：テスト用・精密機器の箱</li><li>数量：2箱 ／ 重量：8.5kg</li></ul><button id="sampleCreate" type="button">架空案件を1件保存</button><button id="sampleLoad" type="button">保存した案件を読み込む</button><p id="sampleState" class="status" role="status" aria-live="polite">未確認</p><button id="sampleReview" type="button" hidden>内容を確認済みにする</button><p class="muted">同じ案件を重複登録しません。ここでの確認は配送の受諾ではありません。顧客向けの本人確認・受付とは別の保存テストです。</p></div><div id="verifiedQueuePanel"><h2>認証済みの架空依頼・審査一覧</h2><p>Gmail認証と結び付いた固定の架空依頼を管理者として審査します。</p><button id="queueReload" type="button">審査一覧を読み込む</button><button id="queueSave" type="button" hidden>認証済みの架空依頼を審査待ちに保存</button><p id="queueMessage" role="status" aria-live="polite"></p><div id="queueItems"></div><p class="muted">実際のお客様の入力内容は保存していません。テスト見積もり案は下書き・未送信です。配送・料金・決済は確定しません。</p></div><div id="otpPanel"><h2>Gmail認証と架空依頼の連携</h2><p>管理者本人のGmailで認証し、固定の架空依頼に認証結果を一度だけ結び付けます。</p><button id="otpStatus" type="button">Gmail連携の準備状況を確認</button><p id="otpMessage" class="status" role="status" aria-live="polite"></p><button id="otpProbe" type="button" hidden>署名接続を確認（送信なし）</button><button id="otpSend" type="button" hidden>自分のGmailへコードを1通送る</button><form id="otpForm" hidden><label for="otpCode">Gmailに届いた6桁コード</label><input id="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required><button id="otpVerify" type="submit">認証して架空依頼に結び付ける</button></form><p class="muted">送信先はGoogle Apps Script所有者のGmailのみです。顧客の依頼・配車・決済は作成しません。</p></div><button id="logout" type="button">ログアウト</button></section>
@@ -115,7 +115,7 @@ $('otpForm').addEventListener('submit',e=>{e.preventDefault();return otpRun(asyn
 });});
 
 
-async function queueAction(action,id){
+async function queueAction(action,id,response){
  if(queueBusy||sampleBusy||otpBusy||!accessToken)return;
  queueBusy=true;
  const buttons=['queueReload','queueSave','otpStatus','otpProbe','otpSend','otpVerify','sampleCreate','sampleLoad','sampleReview','logout'];
@@ -123,7 +123,7 @@ async function queueAction(action,id){
  $('queueMessage').textContent='審査一覧を確認中…';$('queueItems').textContent='';
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
  try{
-  const r=await fetch(URL+'/functions/v1/cargo-staging-verified-queue',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify(id?{action,id}:{action}),cache:'no-store',credentials:'omit',signal:controller.signal});
+  const r=await fetch(URL+'/functions/v1/cargo-staging-verified-queue',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify(response?{action,id,response}:id?{action,id}:{action}),cache:'no-store',credentials:'omit',signal:controller.signal});
   const d=await r.json().catch(()=>({}));
   if(!r.ok||d.ok!==true||d.environment!=='CARGO_FREE_STAGING'||d.public_intake_enabled!==false||d.customer_request_created!==false||d.email_sent!==false||d.payment_created!==false||!Array.isArray(d.items)){
    const e=new Error();e.reason=d.error;throw e;
@@ -146,6 +146,30 @@ async function queueAction(action,id){
     if(q){
      if(q.status!=='draft'||q.amount_yen!==10000||q.request_id!==item.id)throw Error('INVALID_QUOTE');
      note.textContent='テスト見積もり案：保存済み（下書き・未送信）\nテスト金額：10,000円\n'+q.terms;
+     const response=item.simulated_response;
+     if(response){
+      if(response.mode!=='ADMIN_SIMULATION'||response.request_id!==item.id||!['interested','declined'].includes(response.response))throw Error('INVALID_RESPONSE');
+      const result=document.createElement('p');result.className='status';
+      result.textContent='顧客役のテスト回答：保存済み\n'+(response.response==='interested'?'相談を希望する':'今回は見送る')+'\n配送・料金・決済は確定していません。';
+      box.appendChild(result);
+     }else{
+      const preview=document.createElement('button');preview.type='button';preview.textContent='顧客役で見積もり案を確認（送信なし）';
+      const panel=document.createElement('div');panel.hidden=true;
+      const title=document.createElement('h3');title.textContent='顧客役の確認・回答テスト';
+      const explanation=document.createElement('p');explanation.textContent='架空依頼の見積もり案：10,000円。実際の運賃ではありません。管理者が顧客役として回答を保存します。回答は1回だけ保存し、配送・料金・決済は確定しません。';
+      const form=document.createElement('form'),label=document.createElement('label'),select=document.createElement('select');
+      const selectId='test-response-'+item.id;select.id=selectId;label.htmlFor=selectId;label.textContent='テスト回答';
+      for(const [value,text] of [['','選択してください'],['interested','相談を希望する'],['declined','今回は見送る']]){
+       const option=document.createElement('option');option.value=value;option.textContent=text;select.appendChild(option);
+      }
+      select.required=true;
+      const save=document.createElement('button');save.type='submit';save.textContent='顧客役のテスト回答を保存（送信なし）';
+      form.appendChild(label);form.appendChild(select);form.appendChild(save);
+      form.addEventListener('submit',e=>{e.preventDefault();if(!['interested','declined'].includes(select.value))return;return queueAction('save_simulated_response',item.id,select.value)});
+      panel.appendChild(title);panel.appendChild(explanation);panel.appendChild(form);
+      preview.addEventListener('click',()=>{panel.hidden=false;preview.hidden=true});
+      box.appendChild(preview);box.appendChild(panel);
+     }
     }else{
      note.textContent='テスト見積もり案（下書き・未送信）\nテスト金額：10,000円\n架空案件の保存テスト用。実際の運賃ではありません。';
      const save=document.createElement('button');save.type='button';save.textContent='テスト見積もり案を保存（送信なし）';

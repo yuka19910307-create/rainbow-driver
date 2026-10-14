@@ -4,7 +4,7 @@
 :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#233650;background:#f0f4f9}*{box-sizing:border-box}body{margin:0}header{background:#213e60;color:white;padding:28px 22px}header div,main{max-width:600px;margin:auto}h1{font-size:25px;margin:9px 0}h2{font-size:21px;margin-top:0}main{padding:22px 16px}section{background:white;border:1px solid #d7e1ed;padding:24px;border-radius:18px;margin-bottom:18px}p{line-height:1.8}label{display:block;font-weight:650;margin:20px 0 8px}input{width:100%;font-size:17px;padding:14px;border:1px solid #aebed0;border-radius:9px}button{width:100%;min-height:50px;padding:14px;margin-top:24px;border:0;border-radius:10px;background:#27496e;color:white;font-size:17px;font-weight:700;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.badge{display:inline-block;border-radius:20px;background:#e7f4ee;color:#246147;padding:6px 12px;font-size:14px;font-weight:700}.muted{color:#58697c;font-size:14px}.status{white-space:pre-wrap;overflow-wrap:anywhere}.status:empty{display:none}.error{color:#a42c39}.success{color:#246147}ul{padding-left:23px;line-height:2}#logout{background:#e9eef5;color:#284363}[hidden]{display:none!important}</style></head>
 <body><header><div><small>Rainbow Driver / 軽貨物</small><h1>検証用ログイン</h1></div></header><main>
 <section id="login"><span class="badge">検証環境</span><h2 style="margin-top:20px">管理者としてログイン</h2><p>検証用に登録したメールアドレスとパスワードを入力してください。</p><form id="form"><label for="email">メールアドレス</label><input id="email" name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" required><label for="password">検証用のパスワード</label><input id="password" name="password" type="password" autocomplete="current-password" required><button id="submit" type="submit" disabled>ログインして接続を確認</button></form><p class="muted">Supabaseの管理画面用・データベース用ではなく、先ほどユーザー作成時に設定したパスワードです。</p></section>
-<section id="dashboard" hidden><span class="badge">確認完了</span><h2 style="margin-top:20px">ログイン・接続に成功しました</h2><ul><li>管理者権限：確認済み</li><li>検証用データベース：接続成功</li><li>一般受付：OFF</li></ul><p>検証環境の準備確認ができました。配送依頼の一連の動作確認は次の工程です。</p><div id="samplePanel"><h2>架空の配送依頼テスト</h2><p>固定の架空案件を検証用データベースに保存し、管理者として確認します。</p><ul><li>集荷：テスト集荷地・さいたま市</li><li>配送先：テスト配送先・東京都内</li><li>荷物：テスト用・精密機器の箱</li><li>数量：2箱 ／ 重量：8.5kg</li></ul><button id="sampleCreate" type="button">架空案件を1件保存</button><button id="sampleLoad" type="button">保存した案件を読み込む</button><p id="sampleState" class="status" role="status" aria-live="polite">未確認</p><button id="sampleReview" type="button" hidden>内容を確認済みにする</button><p class="muted">同じ案件を重複登録しません。ここでの確認は配送の受諾ではありません。顧客向けの本人確認・受付とは別の保存テストです。</p></div><div id="otpPanel"><h2>Gmail認証と架空依頼の連携</h2><p>管理者本人のGmailで認証し、固定の架空依頼に認証結果を一度だけ結び付けます。</p><button id="otpStatus" type="button">Gmail連携の準備状況を確認</button><p id="otpMessage" class="status" role="status" aria-live="polite"></p><button id="otpProbe" type="button" hidden>署名接続を確認（送信なし）</button><button id="otpSend" type="button" hidden>自分のGmailへコードを1通送る</button><form id="otpForm" hidden><label for="otpCode">Gmailに届いた6桁コード</label><input id="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required><button id="otpVerify" type="submit">認証して架空依頼に結び付ける</button></form><p class="muted">送信先はGoogle Apps Script所有者のGmailのみです。顧客の依頼・配車・決済は作成しません。</p></div><button id="logout" type="button">ログアウト</button></section>
+<section id="dashboard" hidden><span class="badge">確認完了</span><h2 style="margin-top:20px">ログイン・接続に成功しました</h2><ul><li>管理者権限：確認済み</li><li>検証用データベース：接続成功</li><li>一般受付：OFF</li></ul><p>検証環境の準備確認ができました。配送依頼の一連の動作確認は次の工程です。</p><div id="samplePanel"><h2>架空の配送依頼テスト</h2><p>固定の架空案件を検証用データベースに保存し、管理者として確認します。</p><ul><li>集荷：テスト集荷地・さいたま市</li><li>配送先：テスト配送先・東京都内</li><li>荷物：テスト用・精密機器の箱</li><li>数量：2箱 ／ 重量：8.5kg</li></ul><button id="sampleCreate" type="button">架空案件を1件保存</button><button id="sampleLoad" type="button">保存した案件を読み込む</button><p id="sampleState" class="status" role="status" aria-live="polite">未確認</p><button id="sampleReview" type="button" hidden>内容を確認済みにする</button><p class="muted">同じ案件を重複登録しません。ここでの確認は配送の受諾ではありません。顧客向けの本人確認・受付とは別の保存テストです。</p></div><div id="verifiedQueuePanel"><h2>認証済みの架空依頼・審査一覧</h2><p>Gmail認証と結び付いた固定の架空依頼を管理者として審査します。</p><button id="queueReload" type="button">審査一覧を読み込む</button><button id="queueSave" type="button" hidden>認証済みの架空依頼を審査待ちに保存</button><p id="queueMessage" role="status" aria-live="polite"></p><div id="queueItems"></div><p class="muted">実際のお客様の入力内容は保存していません。審査開始で配送・料金・決済は確定しません。</p></div><div id="otpPanel"><h2>Gmail認証と架空依頼の連携</h2><p>管理者本人のGmailで認証し、固定の架空依頼に認証結果を一度だけ結び付けます。</p><button id="otpStatus" type="button">Gmail連携の準備状況を確認</button><p id="otpMessage" class="status" role="status" aria-live="polite"></p><button id="otpProbe" type="button" hidden>署名接続を確認（送信なし）</button><button id="otpSend" type="button" hidden>自分のGmailへコードを1通送る</button><form id="otpForm" hidden><label for="otpCode">Gmailに届いた6桁コード</label><input id="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required><button id="otpVerify" type="submit">認証して架空依頼に結び付ける</button></form><p class="muted">送信先はGoogle Apps Script所有者のGmailのみです。顧客の依頼・配車・決済は作成しません。</p></div><button id="logout" type="button">ログアウト</button></section>
 <section><p id="message" class="status" role="status" aria-live="polite">ログイン画面を準備中です…</p><p class="muted">架空データの検証専用です。メール送信・実際の配送依頼・決済は行いません。ログイン状態はこのページを閉じるか再読み込みすると消えます。</p></section>
 </main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js" integrity="sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg" crossorigin="anonymous"></script>
 <script>
@@ -16,7 +16,7 @@ if(!window.supabase){say('認証機能を読み込めませんでした。ペー
 const client=window.supabase.createClient(URL,KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,storageKey:'rd-cargo-free-staging-memory-v1'}});
 let accessToken=null;
 const errors={OPERATOR_ONLY:'検証用の管理者権限を確認できませんでした。',INTAKE_MUST_BE_OFF:'受付停止の設定を確認できないため、接続確認を停止しました。',SCHEMA_NOT_READY:'検証用データベースの準備を確認できませんでした。',STAGING_ONLY:'検証環境を確認できませんでした。',INVALID_SESSION:'ログイン情報を確認できませんでした。'};
-async function forget(){accessToken=null;challengeId=null;draftId=null;$('otpCode').value='';$('otpForm').hidden=true;$('otpSend').hidden=true;$('otpProbe').hidden=true;try{await client.auth.signOut({scope:'local'})}catch{}}
+async function forget(){accessToken=null;$('queueItems').textContent='';challengeId=null;draftId=null;$('otpCode').value='';$('otpForm').hidden=true;$('otpSend').hidden=true;$('otpProbe').hidden=true;try{await client.auth.signOut({scope:'local'})}catch{}}
 $('submit').disabled=false;say('');
 $('form').addEventListener('submit',async e=>{
 e.preventDefault();if($('submit').disabled)return;$('submit').disabled=true;say('ログインと管理者権限を確認中です…');
@@ -31,14 +31,14 @@ try{
  if(!response.ok||result.ok!==true||result.environment!=='CARGO_FREE_STAGING'||result.operator_verified!==true||result.database_ready!==true||result.public_intake_enabled!==false||result.email_sent!==false||result.request_created!==false||result.payment_created!==false){
   await forget();say('メール・パスワードの認証は成功しましたが、接続確認は完了していません。\n'+(errors[result.error]||'画面の表示を担当者へお知らせください。')+'\n確認結果：HTTP '+response.status+(errors[result.error]?' / '+result.error:''),true);return
  }
- accessToken=data.session.access_token;$('login').hidden=true;$('dashboard').hidden=false;say('管理者ログインと検証環境への接続を確認しました。');await sampleAction('load');await showOtpStatus();
+ accessToken=data.session.access_token;$('login').hidden=true;$('dashboard').hidden=false;say('管理者ログインと検証環境への接続を確認しました。');await sampleAction('load');await showOtpStatus();await queueAction('list');
 }catch{await forget();say('通信を完了できませんでした。通信状態を確認してください。',true)}
 finally{$('password').value='';$('submit').disabled=false}
 });
-let sampleBusy=false,otpBusy=false,challengeId=null,draftId=null;
+let sampleBusy=false,otpBusy=false,queueBusy=false,challengeId=null,draftId=null;
 
 async function sampleAction(action){
- if(sampleBusy||otpBusy||!accessToken)return;sampleBusy=true;
+ if(sampleBusy||otpBusy||queueBusy||!accessToken)return;sampleBusy=true;
  for(const id of ['sampleCreate','sampleLoad','sampleReview','logout'])$(id).disabled=true;
  $('sampleReview').hidden=true;$('sampleState').textContent='データベースへ確認中…';
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
@@ -67,7 +67,7 @@ async function otpCall(slug,body){
  }finally{clearTimeout(timer)}
 }
 async function otpRun(work){
- if(otpBusy||sampleBusy||!accessToken)return;
+ if(otpBusy||sampleBusy||queueBusy||!accessToken)return;
  otpBusy=true;for(const id of ['otpStatus','otpProbe','otpSend','otpVerify','logout','sampleCreate','sampleLoad','sampleReview'])$(id).disabled=true;
  try{await work()}catch(e){
   const known={GOOGLE_SETUP_INCOMPLETE:'検証環境のGmail送信設定が未登録です。',VERIFICATION_HMAC_NOT_CONFIGURED:'検証環境の認証保護キーが未登録です。',RATE_LIMITED:'送信回数の上限です。再送せず時間をおいてください。',MAIL_DELIVERY_NOT_CONFIRMED:'送信結果を確認できませんでした。届いたコードも無効になるため再送を繰り返さず担当者へお知らせください。',INVALID_CODE:'コードが一致しません。',EXPIRED:'コードの有効期限が切れています。',LOCKED:'入力回数の上限です。',CHALLENGE_NOT_AVAILABLE:'認証コードとの結び付けを確認できませんでした。再送せず担当者へお知らせください。',ALREADY_CLAIMED:'この認証結果は使用済みです。',OLDER_CODE_SUPERSEDED:'新しいコードが発行されたため、このコードは使えません。'};
@@ -113,6 +113,40 @@ $('otpForm').addEventListener('submit',e=>{e.preventDefault();return otpRun(asyn
  if(b.ok!==true||b.reason!=='CLAIMED'||b.customer_data_processed!==false||b.dispatch_created!==false)throw Error('CLAIM_FAILED');
  $('otpMessage').textContent='Gmail認証と架空依頼への結び付けに成功しました。一般受付はOFFのままです。';
 });});
+
+
+async function queueAction(action,id){
+ if(queueBusy||sampleBusy||otpBusy||!accessToken)return;
+ queueBusy=true;
+ const buttons=['queueReload','queueSave','otpStatus','otpProbe','otpSend','otpVerify','sampleCreate','sampleLoad','sampleReview','logout'];
+ for(const x of buttons)$(x).disabled=true;
+ $('queueMessage').textContent='審査一覧を確認中…';$('queueItems').textContent='';
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+ try{
+  const r=await fetch(URL+'/functions/v1/cargo-staging-verified-queue',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify(id?{action,id}:{action}),cache:'no-store',credentials:'omit',signal:controller.signal});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.ok!==true||d.environment!=='CARGO_FREE_STAGING'||d.public_intake_enabled!==false||d.customer_request_created!==false||d.email_sent!==false||d.payment_created!==false||!Array.isArray(d.items)){
+   const e=new Error();e.reason=d.error;throw e;
+  }
+  $('queueMessage').textContent=d.items.length?'認証済みの架空依頼：'+d.items.length+'件。一般受付はOFFです。':'認証済みの架空依頼は、まだ一覧に保存されていません。';
+  $('queueSave').hidden=d.items.length>0;
+  for(const item of d.items){
+   if(!['pending_operator_review','operator_reviewing'].includes(item.status))throw Error();
+   const box=document.createElement('div');box.className='status';
+   const text=document.createElement('p');
+   text.textContent='依頼ID：'+item.id+'\n状態：'+(item.status==='operator_reviewing'?'審査中':'審査待ち')+'\n集荷：'+item.details.pickup+'\n配送先：'+item.details.delivery+'\n荷物：'+item.details.cargo+'\n'+item.details.pieces+'箱 ／ '+item.details.weight+'kg';
+   box.appendChild(text);
+   if(item.status==='pending_operator_review'){
+    const button=document.createElement('button');button.type='button';button.textContent='この架空依頼の審査を開始';
+    button.addEventListener('click',()=>queueAction('start_review',item.id));box.appendChild(button);
+   }
+   $('queueItems').appendChild(box);
+  }
+ }catch(e){$('queueItems').textContent='';$('queueMessage').textContent=['VERIFIED_DRAFT_REQUIRED','VERIFIED_DRAFT_WINDOW_ENDED'].includes(e.reason)?'利用できる認証記録がありません。メールを再送せず担当者へお知らせください。':'審査一覧を確認できませんでした。メールを再送せず担当者へお知らせください。'}
+ finally{clearTimeout(timer);queueBusy=false;for(const x of buttons)$(x).disabled=false;$('otpSend').disabled=challengeId!==null}
+}
+$('queueReload').addEventListener('click',()=>queueAction('list'));
+$('queueSave').addEventListener('click',()=>queueAction('save_verified_sample'));
 
 $('logout').addEventListener('click',async()=>{$('logout').disabled=true;await forget();$('dashboard').hidden=true;$('login').hidden=false;$('password').value='';$('logout').disabled=false;say('ログアウトしました。')});
 })();

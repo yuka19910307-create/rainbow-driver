@@ -16,7 +16,7 @@ Deno.serve(async req=>{
  if(url!==TARGET||!key)return reply({error:'STAGING_ONLY'},503);
  try{
   const raw=await req.text();if(raw.length>3000)return reply({error:'INVALID_INPUT'},400);
-  const b=JSON.parse(raw),allowed=b?.action==='status'?['action']:b?.action==='captcha_verify'?['action','captcha_token']:b?.action==='send_test'?['action','captcha_token','confirmation']:[];
+  const b=JSON.parse(raw),allowed=['status','storage_check'].includes(b?.action)?['action']:b?.action==='captcha_verify'?['action','captcha_token']:b?.action==='send_test'?['action','captcha_token','confirmation']:[];
   if(!b||Array.isArray(b)||!allowed.length||Object.keys(b).length!==allowed.length||Object.keys(b).some(k=>!allowed.includes(k)))return reply({error:'INVALID_INPUT'},400);
   const db=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
   const u=await db.auth.getUser(token);
@@ -24,6 +24,29 @@ Deno.serve(async req=>{
   const m=await db.from('cargo_operator_accounts').select('user_id').eq('user_id',OWNER_ID).maybeSingle();
   if(m.error||!m.data)return reply({error:'OPERATOR_ONLY'},403);
   if(!await off(db))return reply({error:'INTAKE_MUST_BE_OFF'},423);
+
+  if(b.action==='storage_check'){
+   const encoded=Deno.env.get('CARGO_CONTACT_AES_256_GCM_KEY')||'';
+   let rawKey;
+   try{if(!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)||encoded.length%4)throw Error();rawKey=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));if(rawKey.length!==32)throw Error()}catch{return reply({error:'ENCRYPTION_NOT_CONFIGURED'},503)}
+   const payload=JSON.stringify({scenario:'FICTIONAL_STORAGE_V1',pickup:'テスト集荷地',delivery:'テスト配送先',cargo:'テスト荷物',pieces:2,weight:8.5,email:'sample@example.invalid'});
+   const aesKey=await crypto.subtle.importKey('raw',rawKey,'AES-GCM',false,['encrypt','decrypt']);
+   const iv=crypto.getRandomValues(new Uint8Array(12)),cipher=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},aesKey,new TextEncoder().encode(payload)));
+   const bytes=new Uint8Array(13+cipher.length);bytes[0]=1;bytes.set(iv,1);bytes.set(cipher,13);
+   const hex=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+   const written=await db.from('cargo_staging_encrypted_storage_checks').upsert({operator_id:OWNER_ID,encrypted_payload:'\\x'+hex},{onConflict:'operator_id'});
+   if(written.error)return reply({error:'STORAGE_WRITE_FAILED'},503);
+   const read=await db.from('cargo_staging_encrypted_storage_checks').select('encrypted_payload').eq('operator_id',OWNER_ID).maybeSingle();
+   if(read.error||typeof read.data?.encrypted_payload!=='string')return reply({error:'STORAGE_READ_FAILED'},503);
+   const text=read.data.encrypted_payload;
+   if(!/^\\x[0-9a-f]+$/i.test(text)||text.length%2!==0||text.length>4000)return reply({error:'STORAGE_FORMAT_FAILED'},503);
+   const loaded=Uint8Array.from({length:(text.length-2)/2},(_,i)=>parseInt(text.slice(2+i*2,4+i*2),16));
+   if(loaded[0]!==1||loaded.length<29)return reply({error:'STORAGE_FORMAT_FAILED'},503);
+   const decoded=new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:loaded.slice(1,13)},aesKey,loaded.slice(13)));
+   if(decoded!==payload)return reply({error:'STORAGE_COMPARE_FAILED'},503);
+   return reply({ok:true,...flags,encrypted_storage_verified:true,fixture:'FICTIONAL_STORAGE_V1',email_sent:false});
+  }
+
   const site=Deno.env.get('CARGO_CUSTOMER_TURNSTILE_SITE_KEY')||'',secret=Deno.env.get('CARGO_CUSTOMER_TURNSTILE_SECRET')||'';
   const day=new Date().toISOString().slice(0,10);
   const prior=await db.from('cargo_staging_external_mail_checks').select('state').eq('operator_id',OWNER_ID).eq('test_day',day).maybeSingle();

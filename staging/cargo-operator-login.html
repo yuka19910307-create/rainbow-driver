@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>【検証環境】軽貨物管理者ログイン</title>
+<style>body{font-family:system-ui,sans-serif;background:#f4f6fa;color:#213449;margin:0}main{max-width:520px;margin:24px auto;padding:22px;background:white;border-radius:12px}label{display:block;margin-top:14px}input,button{font:inherit;padding:12px;width:100%;box-sizing:border-box;margin-top:5px}button{margin-top:16px;background:#254368;color:white;border:0;border-radius:8px}button:disabled{opacity:.5}#status{white-space:pre-wrap}a{color:#175b9a}</style></head>
+<body><div style="background:#8b1e24;color:white;padding:12px;text-align:center;font-weight:bold">検証環境：本番ではありません／一般受付OFF・メール送信禁止</div>
+<main><h1>軽貨物・管理者ログイン（検証用）</h1><p>この画面は検証用Supabaseの認証だけを使用します。本番の運転請負アプリとは独立しています。</p>
+<form id="login"><label for="email">登録済みメールアドレス</label><input id="email" type="email" autocomplete="username" required><label for="password">パスワード</label><input id="password" type="password" autocomplete="current-password" required><button id="submit" type="submit">検証環境にログイン</button></form>
+<p id="status" role="status">認証状態を確認しています…</p><div id="loggedIn" hidden><p>管理者APIによる権限確認に成功しました。</p><p><a href="./cargo-customer-review.html">検証用・申込審査画面を開く</a></p><button id="logout" type="button">ログアウト</button></div>
+</main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script><script>
+(async()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const db=window.supabase.createClient("https://hvdoqcrnztqmbzgwrovd.supabase.co","sb_publishable_A-f3WQb7Oh8uMqO4BJPPtg_l4c_JCfQ",{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-staging-operator-auth-v1"}});
+async function check(){
+ $("loggedIn").hidden=true;$("login").hidden=false;
+ const {data:{user},error}=await db.auth.getUser();
+ if(error||!user){$("status").textContent="検証用アカウントでログインしてください。";return}
+ // Only the protected API may authorize the operator; the browser cannot query the membership table.
+ const {data,error:apiError}=await db.functions.invoke("cargo-customer-review-operator",{body:{action:"list"}});
+ if(apiError||data?.ok!==true||!Array.isArray(data.items)){
+  $("status").textContent="管理者APIの権限確認に失敗しました。登録状況を確認してください。";return
+ }
+ $("status").textContent="検証環境の管理者認証に成功しました。";
+ $("login").hidden=true;$("loggedIn").hidden=false;
+}
+$("login").addEventListener("submit",async event=>{
+ event.preventDefault();$("submit").disabled=true;$("status").textContent="ログイン確認中…";
+ try{
+  const {error}=await db.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
+  $("password").value="";
+  if(error){$("status").textContent="ログインできませんでした。メールアドレスとパスワードをご確認ください。";return}
+  await check();
+ }catch{$("status").textContent="通信エラーが発生しました。"}
+ finally{$("submit").disabled=false}
+});
+$("logout").onclick=async()=>{await db.auth.signOut();await check()};
+await check();
+})();
+</script></body></html>

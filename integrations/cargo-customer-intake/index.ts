@@ -118,7 +118,11 @@ async function sendEmail(address:string,code:string,from:string,key:string){
       " です。10分以内に入力してください。ご自身で申し込んでいない場合は破棄してください。"
    })
   });
-  return r.ok;
+  if(!r.ok)return false;
+  // HTTP success alone does not establish provider acceptance.
+  // Missing/malformed acknowledgement is uncertain; never auto-retry.
+  const result=await r.json();
+  return typeof result?.id==='string'&&result.id.trim().length>0&&result.id.length<=200;
  }catch{return false}
  finally{clearTimeout(timeout)}
 }

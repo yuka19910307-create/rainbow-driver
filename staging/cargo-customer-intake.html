@@ -122,7 +122,16 @@ function renderSummary(p){
 }
 async function invoke(action,payload={}){
  const {data,error}=await db.functions.invoke("cargo-customer-intake",{body:{action,...payload}});
- if(error||!data)throw Error("受付機能を利用できません。");
+ if(error){
+  try{
+   const rejected=await error.context?.clone().json();
+   const reason=rejected?.reason||rejected?.error;
+   if(["MAIL_BUDGET_EXHAUSTED","MAIL_BUDGET_UNAVAILABLE"].includes(reason))
+    return {ok:false,reason};
+  }catch{/* Preserve the existing generic handling for other failures. */}
+  throw Error("サーバーへ接続できません。");
+ }
+ if(!data)throw Error("サーバーへ接続できません。");
  return data;
 }
 function loadTurnstile(siteKey){
@@ -191,6 +200,12 @@ $("sendEmail").onclick=async()=>{
    attempt_id:crypto.randomUUID(),email:checked.email,request:checked.request,
    captcha_token:turnstileToken
   });
+  if(["MAIL_BUDGET_EXHAUSTED","MAIL_BUDGET_UNAVAILABLE"].includes(response?.reason)){
+   status("sendStatus",response.reason==="MAIL_BUDGET_EXHAUSTED"
+    ?"送信上限に達したため、確認メールは送信していません。時間をおいてからお試しいただくか、問い合わせ窓口へご相談ください。"
+    :"送信枠を確認できないため、確認メールは送信していません。問い合わせ窓口へご相談ください。");
+   return;
+  }
   if(response?.ok!==true||response?.state!=="AWAITING_EMAIL_CODE"||
     typeof response?.challenge_id!=="string")
    throw Error("送信を確認できません。");

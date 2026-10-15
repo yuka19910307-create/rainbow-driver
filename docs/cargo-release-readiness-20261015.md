@@ -68,3 +68,16 @@ No production deployment or public intake enablement was performed in this step.
 - Disposable quote test now uses a request created 31 days ago throughout the claim/reply flow and separately verifies EXPIRED on the quote's own deadline.
 - Commit 5124254a965abd4c4430495cce1f9388abb7551e: security/disposable-SQL workflow 38672944798 and live OFF/auth smoke 38672944809 succeeded.
 - Read-only verification: old request-age checks 0; quote deadline guards 2; real customer request count 0; intake_enabled=false. No production deployment or real mail.
+
+## Shared customer email cap — 2026-10-15
+
+- Applied staging_shared_customer_mail_budget only to staging. Global reservation cap shared by customer OTP and operator quotes: 10 attempts/calendar hour and 50/JST day. Config/counters only, no contact/IP/PII. These are conservative staging defaults, not a provider-account-wide or free-tier guarantee.
+- Service-only SECURITY INVOKER RPC locks a single budget row; checks/reset/increment are atomic. Missing, disabled, exhausted or failed budget state blocks email. Denials do not increment; unknown/failed provider calls are not refunded.
+- OTP claims budget after creating its unique draft and before the final intake switch check. Budget rejection removes the draft without contacting the provider.
+- Quote claim obtains budget only after existing request/quote/expiry/gate checks, in the same DB transaction as the irreversible send claim. Capped quotes remain ready_to_send.
+- Staging cargo-customer-intake v12 deployed, preserving existing verify_jwt=false and custom intake/CAPTCHA/OTP checks. Operator function remains JWT protected; SQL enforces quote cap without changing that deployment.
+- Customer and operator pages distinguish budget refusal (mail not sent) from unknown provider delivery. Updated source/upgrade SQL retain the same guard.
+- Rollback SQL tested hourly cap, day cap, hour/day reset, disabled state and public privilege denial. Actual handler tests verify zero provider calls and cleared draft on cap/failure; all four pages recognize budget errors. Counter remains 0/0, customer request count 0, intake OFF.
+- Commit 0839e44f9f926763ba5ddaac8bc9ea620f08b98c: security/disposable-SQL 38675377796, staging OFF/auth smoke 38675377797 and browser 38675377809 succeeded.
+- Security advisors report intentional RLS-without-client-policies on the new service-only table; client privileges revoked. Existing leaked-password warning unchanged.
+- This is not complete abuse protection. Trusted source IP handling, per-IP fairness/limits, operator monitoring/alerting and external-service limits remain launch checks. No real customer mail or production change.

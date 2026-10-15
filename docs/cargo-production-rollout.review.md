@@ -1,0 +1,70 @@
+# 軽貨物受付：本番反映の準備と復旧手順
+更新：2026-10-15。実施計画であり、本番変更・一般受付ON・顧客メール送信の承認ではない。
+
+## 現在地と工数の見込み
+限定した初回公開（配送相談→メール確認→手動審査→手動見積もり→希望回答）の残作業は、約8〜16時間＝1〜2作業日分の暫定見込み。
+料金自動計算、契約自動成立、ドライバー配車、Square等の自動決済は含まない。
+条件回答待ち、外部サービス審査待ち、新たな不具合修正は別。連続したバックグラウンド作業や特定日の公開を約束するものではない。
+
+| 残作業 | 目安 | 完了条件 |
+|---|---:|---|
+| 公開案内・契約/料金条件・外部サービスの取扱確認 | 2〜4時間 | 事業者情報、契約成立、キャンセル、税込/税別・実費等が運営者確認済み。保管先・メール履歴の扱いも確定 |
+| 本番導入の準備・レビューと承認後の反映 | 3〜6時間 | 下記の対象だけを選択し、移行・設定・権限・復旧手順の確認完了 |
+| 不正利用対策・監視・通し確認・修正 | 3〜6時間 | 公開経路の送受信/回答/重複防止、停止動作、異常時の手順が確認済み |
+
+## 本番で確認した差分（読み取りのみ）
+- main 基準：3e7f7db4883020f6bed3c1a2dca593f278ae2d8c。実際の反映前に再取得する。
+- 顧客用 intake/review/quote-reply ページは main に存在しない。
+- 本番 kvoaorzdewwirqryeizq には intake control、operator accounts、rate buckets と rate-hit 関数が存在する。
+- 顧客の drafts/requests/quote replies/followups/followup events/retention runs の6テーブルと customer RPC は未導入。
+- 検証環境 hvdoqcrnztqmbzgwrovd の所有者固定テストは成功。ただし、その成功を公開顧客経路・実見積もり送受信の成功と同一視しない。
+
+## 反映対象を限定する
+公開サイトへの候補：
+- cargo-customer-intake.html
+- cargo-customer-review.html
+- cargo-customer-quote-reply.html
+- cargo-pwa/request-review-rules.js（依存先がmainの版と一致するか確認）
+- cargo-operator-login.html（既存ログインとの互換性を確認し、必要な差分だけ反映）
+- 公開前に確定したプライバシー・契約条件の案内（現時点では文案のみ）
+
+関数と設定：
+- cargo-customer-intake：integrations/cargo-customer-intake/index.ts。ログイン前利用の設計として既存の独自認証・受付OFF・Turnstile・OTPを確認した上でJWT設定を決める。
+- cargo-customer-review-operator：operator.ts。verify_jwt=true、getUser＋operator membership必須。
+- 顧客の見積もり回答関数：quote-reply.ts。秘密トークンHMAC・期限・受付OFFを確認。正確な配備名はフロントのinvoke名と照合する。
+- 新規本番用の環境設定は管理画面等の安全な経路で設定し、値をチャット・GitHub・ログに出さない。ステージング鍵をそのまま複製しない。
+- 送信元は cargo@mail.rainbow-driver.com を候補とする。Resendアカウント/権限/検証ドメインが本番用キーと一致するか確認。
+- 問い合わせ：rainbow.driver.saitama@gmail.com / https://lin.ee/8YNhfM5。ログイン・所有者テスト宛先の変更とは別。
+
+除外：
+- staging/ 以下、owner-only test、stage secrets/fixture/owner lookup/recovery のデータとコード
+- staging-bootstrap.sql（既存control/operatorを再作成するため本番へ適用しない）
+- 運転請負、既存driver画面、CNAME、Square本番、dispatch関連の無関係な差分
+- 開発ブランチ全体のマージ
+
+## 実施順（準備済みの設計。まだ本番未実施）
+1. production-preflight.review.sql で選択プロジェクトと現状を再確認。顧客データや秘密値を取得しない。
+2. 既存mainのSHA、配備済み関数版、対象テーブル/RPC定義、受付スイッチを記録。復旧時に戻す版を特定する。
+3. 現在の受付OFFを維持して新しい顧客テーブル/RPCのみ導入する。schema.review.sql → quotes.review.sql → followup.review.sql → closed-no-order-retention.review.sql の依存順。各ファイルはレビュー用なので、そのまま無確認で実行せず、本番専用migrationとして内容と権限を固定する。
+4. 初回導入のquotes.review.sqlには継続相談の期限修正が含まれる。既存quote RPCの更新環境だけで active-consultation-expiry.review.sql を使う。両方を重複実施する必要はない。
+5. RLS/権限、operator所属の実在、service-only RPC、暗号化鍵の有効性、外部サービス設定を確認。ブラウザからoperator所属表を直接読める前提が現行ポリシーと整合するかも確認する。
+6. 関数・サイトの対象差分を反映し、受付OFF状態と未ログイン拒否、ブラウザの参照先、本番/検証環境の混在がないことを確認。
+7. 下書き削除、終了案件削除、失敗監視を本番用名で設定。staging用scheduleファイルを無変更で実行しない。作成直後から既存案件を削除対象に推定しない。
+8. 公開経路の通し試験は対象・宛先・送信回数を限定した計画を先に作る。受付ONや実メールが必要な段階は明示承認後のみ。所有者専用テストの繰り返しで代替しない。
+9. 完了結果と公開条件を確認してから運営者に一般受付開始の判断を求める。未完了がある間は受付OFFを維持。
+
+## 復旧と停止
+- 送信不明、重複登録、暗号化復号不良、権限逸脱、環境混在等を検知したら一般受付を停止し、新規送信・見積もり送信を止める。画面を戻すだけでは停止にならない。
+- 最初に残っているdraft/request/quoteの状態と、プロバイダーの配信状態を確認する。メールは取り消せないため、自動再送・送信予約の解除をしない。
+- サイト/関数は記録した対象版に戻す。旧コードが新しい終了・保留情報を誤処理しないか確認し、必要なら顧客APIを停止したままにする。
+- DBは原則として前進修正する。受付済みデータや新テーブルをDROPして戻さない。
+- 削除ジョブに疑いがある場合は該当ジョブだけを停止し、保留情報を維持する。暗号化鍵を変更・紛失してもデータは復元しない。
+- 復旧後は同じ受信者への重複通知を避け、ログイン制御・受付OFF・データ整合の再確認後に再開判断する。
+
+## 公開判断までに必要な業務情報
+- 正式な事業者名・必要な公表事項
+- 契約成立の時点と双方の確認方法
+- キャンセル条件と連絡方法
+- 税区分、高速・駐車・待機・荷役等の扱い
+- 本番の保管サービス/取扱国、メール履歴・バックアップ等の保存運用
+未回答の内容をシステム側で推測して確定しない。

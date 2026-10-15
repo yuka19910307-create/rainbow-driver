@@ -111,3 +111,12 @@
 - 12ファイルの内容ハッシュ・ローカル参照先・検証環境参照の混入を検査。CI成功は公開許可ではない。ブランチ保護の必須チェック設定は変更していない。
 - コミット `2c0eb466c17b5e2d499c606241fd6fea9623ed21` の Actions run `38727916594` で新規照合ステップ・既存offlineテスト・隔離Postgresテスト・staging OFF確認が成功。
 - 本番デプロイ、一般受付開始、顧客へのメール送信は行っていない。
+
+
+## 2026-10-15: future pickup time — staging API deployment
+
+- Staging project `hvdoqcrnztqmbzgwrovd` only: `cargo-customer-intake` updated from v12 to v13. Source blob `09521c13d7819a2efba370f032bc6ec70111d3ab`; retrieved deployed source matches exactly.
+- Existing `verify_jwt=false` preserved; custom intake gate, Turnstile and OTP checks unchanged. No secrets, schema, operator function or production changes.
+- Supports immediate/today or a strictly validated future Japan-local pickup time, retained in encrypted request data. This is a requested time, not a confirmed booking.
+- Live verification: status HTTP 200 reports public_intake_enabled=false, accepts_orders=false, automatic_dispatch=false, payment_enabled=false. Payloads containing only action=start or action=verify both return HTTP 423 PUBLIC_INTAKE_DISABLED before writes/mail.
+- Customer UI changes remain on the development branch; no public UI deployment in this step. Future-time authenticated live end-to-end flow remains untested; prior local pipeline and CI checks are not a substitute for that launch gate.

@@ -1,5 +1,5 @@
 import {createClient} from "npm:@supabase/supabase-js@2.112.3";
-// REVIEW ONLY — cargo customer intake OPERATOR queue. Do not deploy yet.
+// Cargo customer intake OPERATOR queue. Staging-tested; production rollout pending.
 // No public listing, no auto-quote, no driver assignment, no payment, no push.
 const APP="https://app.rainbow-driver.com";
 const headers={"Access-Control-Allow-Origin":APP,
@@ -46,8 +46,10 @@ Deno.serve(async(req:Request)=>{
   if(source.length>12000)return respond({error:"BODY_TOO_LARGE"},413);
   data=JSON.parse(source);
   if(!data||typeof data!=="object"||Array.isArray(data))throw Error();
-  if(!["list","decision","quote_prepare","quote_send","followup"].includes(String(data.action)))throw Error();
-  const expected=data.action==="list"?["action"]:
+  if(!["list","list_retention","decision","quote_prepare","quote_send","followup","close_no_order","retention_hold"].includes(String(data.action)))throw Error();
+  const expected=(data.action==="list"||data.action==="list_retention")?["action"]:
+   data.action==="close_no_order"?["action","id","confirmation"]:
+   data.action==="retention_hold"?["action","id","hold","confirmation"]:
    data.action==="decision"?["action","id","expected_status","next_status"]:
    data.action==="quote_prepare"?["action","id","amount_yen","terms","valid_until"]:
    data.action==="followup"?["action","id","expected_stage","next_stage","note"]:
@@ -57,8 +59,13 @@ Deno.serve(async(req:Request)=>{
     actual.some((k,i)=>k!==[...expected].sort()[i]))throw Error();
   if(data.action==="decision"&&(!canonical.test(String(data.id||""))||
       !["pending_operator_review","operator_reviewing"].includes(String(data.expected_status))||
-      !["operator_reviewing","declined","closed"].includes(String(data.next_status))))
+      !["operator_reviewing","declined"].includes(String(data.next_status))))
     throw Error();
+  if(data.action==="close_no_order"&&(!canonical.test(String(data.id||""))||
+     data.confirmation!=="CLOSE_WITHOUT_ORDER_OR_RETENTION_NEED"))throw Error();
+  if(data.action==="retention_hold"&&(!canonical.test(String(data.id||""))||
+     typeof data.hold!=="boolean"||
+     data.confirmation!==(data.hold?"KEEP_REQUIRED_RECORD":"RELEASE_WITHOUT_RETENTION_NEED")))throw Error();
   if(data.action==="quote_prepare"&&(!canonical.test(String(data.id||""))||
       !Number.isSafeInteger(data.amount_yen)||Number(data.amount_yen)<1||
       Number(data.amount_yen)>10000000||typeof data.terms!=="string"||
@@ -86,6 +93,18 @@ Deno.serve(async(req:Request)=>{
   const {data:operator,error:memberError}=await db.from("cargo_operator_accounts")
    .select("user_id").eq("user_id",auth.user.id).maybeSingle();
   if(memberError||!operator)return respond({error:"OPERATOR_ONLY"},403);
+  if(data.action==="close_no_order"||data.action==="retention_hold"){
+   const closing=data.action==="close_no_order";
+   const {data:saved,error:saveError}=await db.rpc(
+    closing?"cargo_customer_close_no_order":"cargo_customer_retention_set_hold",
+    closing?{p_request_id:data.id,p_operator_id:auth.user.id,p_no_order_confirmed:true}:
+     {p_request_id:data.id,p_operator_id:auth.user.id,p_hold:data.hold}
+   );
+   if(saveError||!saved)return respond({error:"RETENTION_UNAVAILABLE"},503);
+   if(saved.ok!==true)return respond({ok:false,reason:saved.reason||"DENIED"},422);
+   return respond({ok:true,reason:saved.reason,delete_after:saved.delete_after||null,
+    customer_notified:false,payment_created:false,dispatch_created:false});
+  }
   if(data.action==="followup"){
    const {data:saved,error:saveError}=await db.rpc("cargo_customer_followup_save",{
     p_request_id:data.id,p_operator_id:auth.user.id,
@@ -215,8 +234,8 @@ Deno.serve(async(req:Request)=>{
     payment_created:false,driver_assigned:false,customer_notified:false});
   }
   const {data:rows,error:readError}=await db.from("cargo_customer_intake_requests")
-   .select("id,status,created_at,encrypted_payload")
-   .in("status",["pending_operator_review","operator_reviewing","quoted"])
+   .select("id,status,created_at,encrypted_payload,closed_no_order_at,retention_hold,delete_after")
+   .in("status",data.action==="list_retention"?["closed","declined"]:["pending_operator_review","operator_reviewing","quoted"])
    .order("created_at",{ascending:false}).limit(20);
   if(readError)return respond({error:"QUEUE_UNAVAILABLE"},503);
   const ids=(rows||[]).map(r=>r.id);
@@ -242,6 +261,8 @@ Deno.serve(async(req:Request)=>{
   for(const row of rows||[]){
    const info=await decrypt(key,String(row.encrypted_payload||""));
    items.push({id:row.id,status:row.status,created_at:row.created_at,
+    closed_no_order_at:row.closed_no_order_at,retention_hold:row.retention_hold,
+    delete_after:row.delete_after,
     details:info,quote:quotes.get(row.id)||null,
     followup:followups.get(row.id)||null});
   }

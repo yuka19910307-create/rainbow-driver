@@ -53,7 +53,8 @@ function detail(d){
   ["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
   ["個数",d.pieces],["重量",String(d.weight)+"kg"],
   ["寸法",String(d.length)+"×"+d.width+"×"+d.height+"cm"],
-  ["準備状況",d.readiness],["荷役",d.handling],
+  ["集荷準備",({ready:"集荷可能",preparing:"準備中",unknown:"要確認"})[d.readiness]||"要確認"],
+  ["積み降ろし補助",({no:"不要",yes:"希望",unknown:"要相談"})[d.handling]||"要確認"],
   ["補足",d.note||"なし"],["担当者",d.clientName||"未入力"],
   ["認証済みメール",d.email]
  ].map(([k,v])=>k+"： "+String(v??"—")).join("\n");
@@ -84,7 +85,7 @@ function quotePane(item){
   prior.textContent="下書き金額："+Number(existing.amount_yen).toLocaleString("ja-JP")+"円\n"+
    "期限："+String(existing.valid_until||"")+"\n"+
    "条件："+String(existing.terms||"")+"\n"+
-   "送信状態："+String(existing.delivery_status||"");
+   "送信状態："+(({ready_to_send:"下書き・未送信",sending:"送信処理中",sent:"送信受付済み",delivery_unknown:"送信結果不明（再送不可）"})[existing.delivery_status]||"要確認");
   container.append(prior);
  }
  if(existing&&existing.delivery_status!=="ready_to_send"){

@@ -42,6 +42,17 @@ begin
  if v_result->>'reason'<>'NO_ORDER_CONFIRMATION_REQUIRED' then raise exception 'missing explicit confirmation guard'; end if;
  v_result:=public.cargo_customer_close_no_order(v_ids[1],gen_random_uuid(),true);
  if v_result->>'reason'<>'OPERATOR_ONLY' then raise exception 'missing operator guard'; end if;
+ -- An ongoing consultation may still prepare a fresh quote after the old
+ -- creation-based retention deadline. Quote-specific expiry remains enforced.
+ v_result:=public.cargo_customer_quote_prepare(v_ids[1],v_owner,10000,
+  repeat('synthetic terms ',4),clock_timestamp()+interval '2 days');
+ if v_result->>'reason'<>'QUOTE_READY_TO_SEND' then raise exception 'old active quote blocked: %',v_result; end if;
+ v_result:=public.cargo_customer_quote_prepare(v_ids[1],v_owner,10000,
+  repeat('synthetic terms ',4),clock_timestamp()-interval '1 day');
+ if v_result->>'reason'<>'INVALID_EXPIRY' then raise exception 'expired quote allowed'; end if;
+ v_result:=public.cargo_customer_quote_prepare(v_ids[2],v_owner,10000,
+  repeat('synthetic terms ',4),clock_timestamp()+interval '2 days');
+ if v_result->>'reason'<>'REQUEST_NOT_REVIEWABLE' then raise exception 'closed quote allowed'; end if;
  -- Active and held stay excluded even if their original delete_after is old.
  v_result:=public.cargo_customer_closed_cleanup(0);
  if v_result->>'reason'<>'INVALID_LIMIT' then raise exception 'limit guard'; end if;

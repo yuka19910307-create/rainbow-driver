@@ -28,14 +28,22 @@ This record supersedes older progress statements, not security constraints. Publ
 - Confirmation summaries now use the Japanese preparation and handling labels from the form. Stored enum values and sending logic remain unchanged.
 - Commits: acb7fc869fbeae1d106923c8d23cbb37f221bf18, f10270221f717287d4455b89b5525862d8220dac; summary labels 33ea890434dad29f8deca83e6fe497056fb48de8 and 202b4bbf6a041d575e3b75919f100db322de2edc.
 - These changes are on test/cargo-safe-integration-20261013 only; they have not been published to the production site.
-- The proposed deletion period for closed consultations without a contract remains unapproved. Do not deploy verified-request deletion or publish a guaranteed retention period until the operator decides and the implementation is verified.
+- Owner adopted the recommended 30-day-after-closure policy on 2026-10-15 at 11:03 JST. Explicit no-order closure and retention holds are implemented in staging; operator UI/API wiring, production rollout and external-service retention remain pending.
 
 ## Remaining public-launch gates
 
-1. Agree and implement customer-facing privacy notice, contact channel, request/quote/followup retention and deletion policy. Current 30-day request default is not an approved complete policy.
+1. Finish privacy notice and production implementation of the approved retention policy. Contact channels and the 30-day-after-no-order-closure policy are decided. Validate operator closure/hold UI/API, existing request-expiry behavior, production scheduling/failure monitoring, and external-service retention.
 2. Review customer terms: when a contract forms, cancellation handling, tax/tolls/waiting/handling conditions. A quote reply remains an expression of interest, not automatic dispatch or payment.
 3. Review abuse controls, IP-side limits and monitoring; verify public-path and quote/reply behavior in an explicitly scoped environment. Do not repeat completed owner tests without a concrete reason.
 4. Prepare and review production configuration/migration/site changes and rollback plan. Do not copy secrets through chat or GitHub. Do not merge the entire development branch blindly.
 5. Obtain explicit launch approval before enabling general intake or sending customer mail. Existing driving service and Square production must remain unaffected.
 
 No production deployment or public intake enablement was performed in this step.
+
+## Approved closed-consultation retention implementation
+
+- Staging migration staging_closed_no_order_retention adds explicit closure timestamp, default-on retention hold, service-only closure/hold RPCs, transactional dependent-record cleanup, and count-only run records protected by RLS.
+- Every-hour staging job cargo-staging-closed-no-order-retention runs at minute 17. Scheduled-run success has not yet been observed. Cron failure history is available; push/email alerts are not configured.
+- Rollback-only service_role test passed: one eligible closed request and its quote/followup/event/consumed draft removed; six protected requests retained. Tested operator/confirmation/limit guards, hold release resetting the deadline, public access denial, and idempotence. Zero fixture rows persisted.
+- Security advisors: new retention table has RLS with no client policies intentionally, and anon/authenticated privileges are revoked. Existing leaked-password-protection warning remains; no billing/auth configuration changed.
+- General intake stays OFF. No customer mail, production changes or owner-test deletion.

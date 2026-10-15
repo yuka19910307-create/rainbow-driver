@@ -28,11 +28,11 @@ This record supersedes older progress statements, not security constraints. Publ
 - Confirmation summaries now use the Japanese preparation and handling labels from the form. Stored enum values and sending logic remain unchanged.
 - Commits: acb7fc869fbeae1d106923c8d23cbb37f221bf18, f10270221f717287d4455b89b5525862d8220dac; summary labels 33ea890434dad29f8deca83e6fe497056fb48de8 and 202b4bbf6a041d575e3b75919f100db322de2edc.
 - These changes are on test/cargo-safe-integration-20261013 only; they have not been published to the production site.
-- Owner adopted the recommended 30-day-after-closure policy on 2026-10-15 at 11:03 JST. Explicit no-order closure and retention holds are implemented in staging; operator UI/API wiring, production rollout and external-service retention remain pending.
+- Owner adopted the recommended 30-day-after-closure policy on 2026-10-15 at 11:03 JST. Explicit no-order closure and retention holds are implemented in staging; operator UI/API wiring is complete in development/staging; production rollout and external-service retention remain pending.
 
 ## Remaining public-launch gates
 
-1. Finish privacy notice and production implementation of the approved retention policy. Contact channels and the 30-day-after-no-order-closure policy are decided. Validate operator closure/hold UI/API, existing request-expiry behavior, production scheduling/failure monitoring, and external-service retention.
+1. Finish privacy notice and production implementation of the approved retention policy. Contact channels and the 30-day-after-no-order-closure policy are decided. Operator closure/hold UI/API tests passed; validate existing request-expiry behavior, production scheduling/failure monitoring, and external-service retention.
 2. Review customer terms: when a contract forms, cancellation handling, tax/tolls/waiting/handling conditions. A quote reply remains an expression of interest, not automatic dispatch or payment.
 3. Review abuse controls, IP-side limits and monitoring; verify public-path and quote/reply behavior in an explicitly scoped environment. Do not repeat completed owner tests without a concrete reason.
 4. Prepare and review production configuration/migration/site changes and rollback plan. Do not copy secrets through chat or GitHub. Do not merge the entire development branch blindly.
@@ -43,7 +43,18 @@ No production deployment or public intake enablement was performed in this step.
 ## Approved closed-consultation retention implementation
 
 - Staging migration staging_closed_no_order_retention adds explicit closure timestamp, default-on retention hold, service-only closure/hold RPCs, transactional dependent-record cleanup, and count-only run records protected by RLS.
-- Every-hour staging job cargo-staging-closed-no-order-retention runs at minute 17. Scheduled-run success has not yet been observed. Cron failure history is available; push/email alerts are not configured.
+- Every-hour staging job cargo-staging-closed-no-order-retention runs at minute 17. The scheduled run at 2026-10-15 11:17 JST succeeded (zero requests deleted). Cron failure history is available; push/email alerts are not configured.
 - Rollback-only service_role test passed: one eligible closed request and its quote/followup/event/consumed draft removed; six protected requests retained. Tested operator/confirmation/limit guards, hold release resetting the deadline, public access denial, and idempotence. Zero fixture rows persisted.
 - Security advisors: new retention table has RLS with no client policies intentionally, and anon/authenticated privileges are revoked. Existing leaked-password-protection warning remains; no billing/auth configuration changed.
 - General intake stays OFF. No customer mail, production changes or owner-test deletion.
+
+## Operator closure/hold controls — 2026-10-15
+
+- Both development operator pages now provide explicit no-order closure, saved-record hold/release, deletion due date in JST, and a separate closed/declined list. Cancelling confirmation makes no mutation.
+- Removed the legacy direct closed-status UI/API path, which bypassed the retention confirmation. The server obtains operator identity from the verified JWT, rejects extra/body operator IDs and wrong confirmations, then calls the service-only RPC.
+- cargo-customer-review-operator staging version 11 deployed with verify_jwt=true. Original version 10 source matched the reviewed repository file before replacement. No production function deployed.
+- Tests use the actual handler with synthetic auth/RPC and both pages with a simulated DOM. They verify unauthorized denial, payload/confirmation guards, no-order/hold/release mapping, active vs closed list scopes, and no mail calls. This is not a real authenticated browser-to-staging end-to-end claim.
+- Added tests/cargo-customer-retention-operator.test.cjs to CI and added retention SQL plus rollback tests to disposable PostgreSQL integration.
+- Commit 3060ef2047fa429fdb4bc73c34a907083da75d76: security/disposable-SQL workflow 38671675886 succeeded; customer form browser workflow 38671675951 succeeded; live staging OFF/auth smoke 38671676074 succeeded.
+- Development page changes are not yet published. Owner does not need to repeat the completed OTP test.
+- Cron execution at 11:17 JST succeeded; read-only check shows customer request count 0, deleted request count 0, intake_enabled=false.

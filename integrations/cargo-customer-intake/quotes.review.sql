@@ -85,6 +85,7 @@ declare
  v_request public.cargo_customer_intake_requests%rowtype;
  v_quote public.cargo_customer_quote_replies%rowtype;
  v_now timestamptz;
+ v_budget jsonb;
 begin
  if p_request_id is null or p_operator_id is null
   or p_response_token_hmac is null or octet_length(p_response_token_hmac)<>32 then
@@ -115,6 +116,10 @@ begin
  v_now:=clock_timestamp();
  if v_quote.valid_until<=v_now then
   return jsonb_build_object('ok',false,'reason','EXPIRED');
+ end if;
+ v_budget:=public.cargo_customer_mail_budget_claim();
+ if v_budget->>'allowed' is distinct from 'true' then
+  return jsonb_build_object('ok',false,'reason',coalesce(v_budget->>'reason','MAIL_BUDGET_UNAVAILABLE'));
  end if;
  update public.cargo_customer_quote_replies
   set delivery_status='sending',delivery_attempted_at=v_now,updated_at=v_now,

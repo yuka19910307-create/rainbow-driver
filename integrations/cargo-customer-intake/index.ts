@@ -1,5 +1,5 @@
 import {createClient} from "npm:@supabase/supabase-js@2.112.3";
-// REVIEW ONLY: customer intake + email OTP, deliberately NOT deployed.
+// Customer intake + email OTP. Staging tested; production rollout pending.
 // Never point this at the existing owner-Gmail test bridge.
 // Launch requires explicit user authorization, CAPTCHA/provider configuration,
 // a privacy/retention review, a staffed operator-review queue, and intake gate ON.
@@ -189,7 +189,14 @@ Deno.serve(async(req:Request)=>{
     code_hmac:codeHash,expires_at:expires.toISOString(),delete_after:deleteAfter.toISOString()
    });
    if(writeError)return reply({error:"DRAFT_CREATE_FAILED"},503);
-   // Recheck the live switch after creating the draft and before external mail.
+   // Shared across recipients and quote emails. Missing/failed budget check blocks mail.
+   const {data:budget,error:budgetError}=await db.rpc("cargo_customer_mail_budget_claim");
+   if(budgetError||budget?.allowed!==true){
+    await db.from("cargo_customer_intake_drafts").delete().eq("id",id);
+    const exhausted=!budgetError&&budget?.reason==="MAIL_BUDGET_EXHAUSTED";
+    return reply({error:exhausted?"MAIL_BUDGET_EXHAUSTED":"MAIL_BUDGET_UNAVAILABLE"},exhausted?429:503);
+   }
+   // Recheck the live switch after reserving budget and immediately before external mail.
    const {data:gate2,error:gate2Error}=await db.from("cargo_intake_control")
     .select("intake_enabled,captcha_required,contact_verification_required").eq("id",1).maybeSingle();
    if(gate2Error||gate2?.intake_enabled!==true||gate2?.captcha_required!==true||

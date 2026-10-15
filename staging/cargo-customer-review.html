@@ -146,9 +146,10 @@ function quotePane(item){
  });
  container.append(save);
  if(existing?.delivery_status==="ready_to_send"){
+  let quoteDirty=false;
   const sendQuote=button("保存済み見積もりをお客様へ1通送信",async()=>{
-   if(busy)return;
-   if(!confirm("保存済みのお見積もりをお客様の認証済みメールへ送信します。実メールが1通送られる可能性があります。送信後の訂正・自動再送はできません。実行しますか？"))return;
+   if(busy||quoteDirty)return;
+   if(!confirm("次の保存済み見積もりを送信します。\n金額："+Number(existing.amount_yen).toLocaleString("ja-JP")+"円\n期限："+localDate(existing.valid_until)+"（日本時間）\n条件："+String(existing.terms||"")+"\n\n認証済みメールへ1通送信します。送信後の訂正・再送はできません。実行しますか？"))return;
    busy=true;$("refresh").disabled=true;
    try{
     const result=await invoke({action:"quote_send",id:item.id,confirmation:"SEND_APPROVED_QUOTE"});
@@ -166,7 +167,7 @@ function quotePane(item){
   const unsaved=label("送信対象は保存済みの金額・条件・期限です。");
   for(const input of [amount,terms,dateInput]){
    input.addEventListener("input",()=>{
-    sendQuote.disabled=true;
+    quoteDirty=true;sendQuote.disabled=true;
     unsaved.textContent="変更は未保存です。下書きを保存し直してから送信してください。";
    });
   }

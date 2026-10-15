@@ -38,6 +38,13 @@ begin
  if (select delivery_status from public.cargo_customer_quote_replies where request_id=v_one)<>'ready_to_send' then
   raise exception 'QUOTE_OFF_GATE_CHANGED_STATE'; end if;
  update public.cargo_intake_control set intake_enabled=true where id=1;
+ -- Exhausted shared budget must not claim the irreversible delivery attempt.
+ update public.cargo_customer_mail_budget set hour_attempts=hourly_limit where id=1;
+ v_a:=public.cargo_customer_quote_claim_send(v_one,v_operator,decode(repeat('aa',32),'hex'));
+ if v_a->>'reason'<>'MAIL_BUDGET_EXHAUSTED' then raise exception 'QUOTE_MAIL_CAP_BYPASSED %',v_a; end if;
+ if (select delivery_status from public.cargo_customer_quote_replies where request_id=v_one)<>'ready_to_send' then
+  raise exception 'CAPPED_QUOTE_CLAIMED'; end if;
+ update public.cargo_customer_mail_budget set hour_attempts=0 where id=1;
  v_a:=public.cargo_customer_quote_claim_send(v_one,v_operator,decode(repeat('aa',32),'hex'));
  if v_a->>'reason'<>'SENDING_CLAIMED' or (v_a->>'amount_yen')::integer<>26000 then
   raise exception 'QUOTE_CLAIM_FAILED %',v_a; end if;

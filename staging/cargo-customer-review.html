@@ -36,7 +36,16 @@ function button(text,action){
 function text(id,message){$(id).textContent=message}
 async function invoke(body){
  const {data,error}=await db.functions.invoke("cargo-customer-review-operator",{body});
- if(error||!data)throw Error("サーバーへ接続できません。");
+ if(error){
+  try{
+   const rejected=await error.context?.clone().json();
+   const reason=rejected?.reason||rejected?.error;
+   if(["MAIL_BUDGET_EXHAUSTED","MAIL_BUDGET_UNAVAILABLE"].includes(reason))
+    return {ok:false,reason};
+  }catch{/* Preserve the existing generic handling for other failures. */}
+  throw Error("サーバーへ接続できません。");
+ }
+ if(!data)throw Error("サーバーへ接続できません。");
  return data;
 }
 function detail(d){
@@ -142,6 +151,8 @@ function quotePane(item){
     const result=await invoke({action:"quote_send",id:item.id,confirmation:"SEND_APPROVED_QUOTE"});
     if(result?.ok===true&&result?.reason==="QUOTE_PROVIDER_ACCEPTED"){
      text("auth","メール送信事業者が見積もりを受け付けました。配送・決済は確定していません。");
+    }else if(["MAIL_BUDGET_EXHAUSTED","MAIL_BUDGET_UNAVAILABLE"].includes(result?.reason)){
+     text("auth","送信上限または送信枠の確認で停止しました。見積もりメールは送信していません。送信枠を確認してください。");
     }else text("auth","メールの送信結果を確認できません。再送せず、メール事業者側を確認してください。");
    }catch{text("auth","送信結果は不明です。二重送信を避けるため、再送せずメール事業者側を確認してください。")}
    finally{

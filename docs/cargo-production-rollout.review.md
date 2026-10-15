@@ -47,7 +47,7 @@
 2. 既存mainのSHA、配備済み関数版、対象テーブル/RPC定義、受付スイッチを記録。復旧時に戻す版を特定する。
 3. 現在の受付OFFを維持して新しい顧客テーブル/RPCのみ導入する。schema.review.sql → quotes.review.sql → mail-budget.review.sql → followup.review.sql → closed-no-order-retention.review.sql の依存順。各ファイルはレビュー用なので、そのまま無確認で実行せず、本番専用migrationとして内容と権限を固定する。
 4. 初回導入のquotes.review.sqlには継続相談の期限修正が含まれる。既存quote RPCの更新環境だけで active-consultation-expiry.review.sql を使う。両方を重複実施する必要はない。
-5. RLS/権限、operator所属の実在、service-only RPC、暗号化鍵の有効性、外部サービス設定を確認。ブラウザからoperator所属表を直接読める前提が現行ポリシーと整合するかも確認する。
+5. RLS/権限、operator所属の実在、service-only RPC、暗号化鍵の有効性、外部サービス設定を確認。管理者画面は所属表を直接参照せず、保護されたAPIのgetUser＋operator所属確認を使う。未所属ユーザーへの一覧拒否を確認する。
 6. 関数・サイトの対象差分を反映し、受付OFF状態と未ログイン拒否、ブラウザの参照先、本番/検証環境の混在がないことを確認。
 7. 下書き削除、終了案件削除、失敗監視を本番用名で設定。staging用scheduleファイルを無変更で実行しない。作成直後から既存案件を削除対象に推定しない。
 8. 公開経路の通し試験は対象・宛先・送信回数を限定した計画を先に作る。受付ONや実メールが必要な段階は明示承認後のみ。所有者専用テストの繰り返しで代替しない。

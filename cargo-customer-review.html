@@ -321,7 +321,10 @@ async function load(allowWhileBusy=false){
   if(data?.ok!==true||!Array.isArray(data.items))throw Error();
   render(data.items);
   text("auth","管理者確認済み。表示は最大20件。お客様への自動通知・受注確定はありません。");
- }catch{text("auth","審査待ちを取得できません。機能の導入状況・権限・通信を確認してください。")}
+ }catch{
+  $("requests").replaceChildren();
+  text("auth","審査待ちを取得できません。機能の導入状況・権限・通信を確認してください。");
+ }
  finally{$("refresh").disabled=!user;$("retentionView").disabled=!user}
 }
 async function init(){
@@ -334,9 +337,7 @@ async function init(){
  try{
   const {data,error}=await db.auth.getUser();
   if(error||!data?.user)throw Error();
-  const {data:account,error:e}=await db.from("cargo_operator_accounts")
-   .select("user_id").eq("user_id",data.user.id).maybeSingle();
-  if(e||!account)throw Error();
+  // The protected API checks operator membership; the browser has no direct table access.
   user=data.user;$("refresh").disabled=false;
   await load();
  }catch{text("auth","軽貨物管理者としてログインしてください。");}

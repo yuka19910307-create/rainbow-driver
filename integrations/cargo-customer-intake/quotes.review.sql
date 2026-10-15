@@ -57,8 +57,7 @@ begin
  end if;
  select * into v_request from public.cargo_customer_intake_requests
   where id=p_request_id for update;
- if not found or v_request.status<>'operator_reviewing'
-  or v_request.delete_after<=clock_timestamp() then
+ if not found or v_request.status<>'operator_reviewing' then
   return jsonb_build_object('ok',false,'reason','REQUEST_NOT_REVIEWABLE');
  end if;
  select * into v_existing from public.cargo_customer_quote_replies
@@ -114,7 +113,7 @@ begin
   return jsonb_build_object('ok',false,'reason','DELIVERY_ALREADY_ATTEMPTED');
  end if;
  v_now:=clock_timestamp();
- if v_quote.valid_until<=v_now or v_request.delete_after<=v_now then
+ if v_quote.valid_until<=v_now then
   return jsonb_build_object('ok',false,'reason','EXPIRED');
  end if;
  update public.cargo_customer_quote_replies
@@ -217,7 +216,7 @@ begin
   return jsonb_build_object('ok',false,'reason','QUOTE_NOT_AVAILABLE');
  end if;
  v_now:=clock_timestamp();
- if v_quote.valid_until<=v_now or v_request.delete_after<=v_now then
+ if v_quote.valid_until<=v_now then
   return jsonb_build_object('ok',false,'reason','EXPIRED');
  end if;
  if p_choice is null then

@@ -36,13 +36,24 @@
     var length=number(raw.length,'長さ',0.1,500,false);
     var width=number(raw.width,'幅',0.1,500,false);
     var height=number(raw.height,'高さ',0.1,500,false);
-    if(raw.today!==true)throw Error('即時・当日集荷の確認が必要です。');
+
+    if(typeof raw.today!=='boolean')throw Error('集荷希望を選択してください。');
+    var preferred=raw.preferredPickupAt||'';
+    if(raw.today){
+      if(preferred!=='')throw Error('当日希望と日時指定を同時に選択できません。');
+    }else{
+      if(typeof preferred!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(preferred))throw Error('希望集荷日時を入力してください。');
+      var stamp=Date.parse(preferred+':00+09:00');
+      if(!Number.isFinite(stamp)||new Date(stamp+9*3600000).toISOString().slice(0,16)!==preferred||stamp<=Date.now())throw Error('希望集荷日時は日本時間の未来の日時を指定してください。');
+    }
+
     if(raw.reviewConfirm!==true)throw Error('未送信であることの確認が必要です。');
     if(!['ready','preparing','unknown'].includes(raw.readiness))
       throw Error('荷物の準備状況を選択してください。');
     if(!['no','yes','unknown'].includes(raw.handling))
       throw Error('積み降ろし補助を選択してください。');
     var reasons=[];
+    if(!raw.today)reasons.push("希望集荷日時の対応可否は担当者の確認が必要です。日時はまだ確定していません。");
     if(raw.readiness==='preparing')reasons.push('荷物が準備中のため集荷可能時刻の確認が必要です。');
     if(raw.readiness==='unknown')reasons.push('集荷準備状況の確認が必要です。');
     if(raw.handling==='yes')reasons.push('積み降ろし補助の可否・条件確認が必要です。');

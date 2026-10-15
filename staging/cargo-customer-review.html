@@ -18,7 +18,8 @@ button:disabled{opacity:.45}a{color:#2b659b}
 <main>
 <section class="card"><p><a href="./cargo-operator-login.html">管理者ログイン</a> ／ <a href="./cargo-request-preview.html">申込プレビュー</a></p>
 <p id="auth" class="msg" role="status">管理者のログイン状態を確認しています…</p>
-<p><button type="button" id="refresh" disabled>審査待ちの申込を更新</button></p>
+<p><button type="button" id="refresh" disabled>申込一覧を更新</button>
+<button type="button" id="retentionView" disabled>終了・保存保留の記録を表示</button></p>
 <p><small>お客様の個人情報は業務目的でのみ扱ってください。画面の内容を共有端末に残さないでください。自動通知・決済・運行依頼はありません。</small></p>
 </section>
 <section id="requests" aria-live="polite"></section>
@@ -27,7 +28,7 @@ button:disabled{opacity:.45}a{color:#2b659b}
 <script>
 (()=>{"use strict";
 const $=id=>document.getElementById(id);
-let db=null,user=null,busy=false;
+let db=null,user=null,busy=false,showRetention=false;
 function label(text){const e=document.createElement("p");e.textContent=text;return e}
 function button(text,action){
  const el=document.createElement("button");el.type="button";el.textContent=text;el.onclick=action;return el;
@@ -210,15 +211,70 @@ function followupPane(item){
  return panel;
 }
 
+function localDate(value){
+ const date=new Date(value);
+ return Number.isFinite(date.valueOf())?date.toLocaleString("ja-JP",{timeZone:"Asia/Tokyo"}):"確認できません";
+}
+async function retentionChange(item,action,hold){
+ if(busy)return;
+ const closing=action==="close_no_order";
+ const message=closing
+  ?"契約・受注がなく、相談対応は終了していますか？契約・会計・紛争対応などで保存が必要な記録がないことを確認してください。終了から30日後に申込・見積もり・対応履歴が削除対象になります。"
+  :hold?"保存保留にしますか？保留中は自動削除されません。"
+  :"保存が必要な理由がなくなったことを確認してください。保留を解除すると、解除した日から改めて30日後に削除対象になります。";
+ if(!confirm(message))return;
+ busy=true;$("refresh").disabled=true;$("retentionView").disabled=true;
+ try{
+  const body=closing?{action,id:item.id,confirmation:"CLOSE_WITHOUT_ORDER_OR_RETENTION_NEED"}:
+   {action,id:item.id,hold,confirmation:hold?"KEEP_REQUIRED_RECORD":"RELEASE_WITHOUT_RETENTION_NEED"};
+  const result=await invoke(body);
+  if(result?.ok!==true){
+   const reasons={
+    FOLLOWUP_NOT_CLOSED_NO_ORDER:"対応履歴を「受注に至らず終了した」にしてから操作してください。",
+    DELIVERY_RECONCILIATION_REQUIRED:"見積もりメールの送信結果を確認してから操作してください。",
+    CLOSURE_REQUIRED:"先に契約なしでの対応終了を記録してください。",
+    ALREADY_CLOSED:"すでに終了しています。一覧を更新して確認してください。"
+   };
+   throw Error(reasons[result?.reason]||"保存できませんでした。一覧を更新して確認してください。");
+  }
+  await load(true);
+  text("auth",closing?"契約なしでの対応終了を記録しました。削除予定："+localDate(result.delete_after):
+   hold?"保存保留にしました。自動削除の対象から外れます。":
+   "保留を解除しました。解除日から30日後に削除対象になります。");
+ }catch(error){text("auth",error?.message||"保存結果を確認できません。一覧を更新してください。")}
+ finally{busy=false;$("refresh").disabled=!user;$("retentionView").disabled=!user}
+}
+function retentionPane(item){
+ const panel=document.createElement("section");panel.className="card";
+ const title=document.createElement("h3");title.textContent="対応終了・記録の保存";panel.append(title);
+ if(item.closed_no_order_at){
+  panel.append(label("30日間の保存期間の起算日（終了・保留解除）："+localDate(item.closed_no_order_at)));
+  panel.append(label(item.retention_hold===true?"保存保留中（自動削除しません）":
+   "削除予定："+localDate(item.delete_after)+"以降の定期処理"));
+  panel.append(button(item.retention_hold===true?"保存保留を解除する（30日後に削除）":"保存を保留する",
+   ()=>retentionChange(item,"retention_hold",item.retention_hold!==true)));
+ }else{
+  panel.append(label("相談中・保存が必要な記録は削除対象になりません。契約なしで対応が終了した場合のみ、下の操作で30日の保存期間を開始します。"));
+  const unresolved=item.followup&&item.followup.stage!=="closed_no_order";
+  const uncertain=["sending","delivery_unknown"].includes(item.quote?.delivery_status);
+  if(unresolved)panel.append(label("対応履歴が継続中または別途対応済みのため、終了登録はできません。"));
+  else if(uncertain)panel.append(label("見積もりメールの送信結果を確認するまで、終了登録はできません。"));
+  else panel.append(button("契約なしで対応終了（30日後に削除）",
+   ()=>retentionChange(item,"close_no_order")));
+ }
+ return panel;
+}
+
 function render(items){
  const root=$("requests");root.replaceChildren();
  if(items.length===0){const e=document.createElement("section");e.className="card";
-  e.append(label("審査待ち・審査中の申込はありません。"));root.append(e);return}
+  e.append(label(showRetention?"終了・辞退の記録はありません。":"審査待ち・審査中の申込はありません。"));root.append(e);return}
  for(const item of items){
   const card=document.createElement("section");card.className="card";
   const title=document.createElement("h2");title.textContent=
    (item.status==="pending_operator_review"?"未審査":
-    item.status==="operator_reviewing"?"確認中":"見積もり送信済み")+
+    item.status==="operator_reviewing"?"確認中":
+    item.status==="closed"?"対応終了":item.status==="declined"?"辞退":"見積もり送信済み")+
    " ／ "+String(item.created_at||"");
   card.append(title);
   const content=document.createElement("p");content.className="details";
@@ -237,11 +293,11 @@ function render(items){
    card.append(button("辞退として記録",()=>change(item,"declined")));
   }else if(item.status==="operator_reviewing"){
    card.append(quotePane(item));
-   card.append(button("対応終了として閉じる",()=>change(item,"closed")));
   }else if(item.status==="quoted"&&item.quote?.response_state==="interested"){
    const pane=followupPane(item);
    if(pane)card.append(pane);
   }
+  card.append(retentionPane(item));
   root.append(card);
  }
 }
@@ -250,12 +306,12 @@ async function load(allowWhileBusy=false){
  $("refresh").disabled=true;
  text("auth","暗号化された審査待ち申込を取得しています…");
  try{
-  const data=await invoke({action:"list"});
+  const data=await invoke({action:showRetention?"list_retention":"list"});
   if(data?.ok!==true||!Array.isArray(data.items))throw Error();
   render(data.items);
   text("auth","管理者確認済み。表示は最大20件。お客様への自動通知・受注確定はありません。");
  }catch{text("auth","審査待ちを取得できません。機能の導入状況・権限・通信を確認してください。")}
- finally{$("refresh").disabled=!user}
+ finally{$("refresh").disabled=!user;$("retentionView").disabled=!user}
 }
 async function init(){
  if(!window.supabase){text("auth","認証ライブラリがありません。");return}
@@ -272,6 +328,12 @@ async function init(){
   await load();
  }catch{text("auth","軽貨物管理者としてログインしてください。");}
 }
-$("refresh").onclick=()=>load();init();
+$("refresh").onclick=()=>load();
+$("retentionView").onclick=()=>{
+ if(busy)return;
+ showRetention=!showRetention;
+ $("retentionView").textContent=showRetention?"審査中の申込に戻る":"終了・保存保留の記録を表示";
+ load();
+};init();
 })();
 </script></body></html>

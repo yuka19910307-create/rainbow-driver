@@ -22,7 +22,8 @@ begin
   where source_draft_id='cccccccc-cccc-4ccc-8ccc-ccccccccccc1'::uuid;
  if v_one is null then raise exception 'CUSTOMER_TEST_REQUEST_NOT_FOUND'; end if;
  update public.cargo_customer_intake_requests
-  set status='operator_reviewing' where id=v_one;
+  set status='operator_reviewing',created_at=now()-interval '31 days',
+   delete_after=now()-interval '1 day' where id=v_one;
  v_a:=public.cargo_customer_quote_prepare(v_one,v_not_operator,25000,v_terms,now()+interval '2 days');
  if v_a->>'reason'<>'OPERATOR_ONLY' then raise exception 'QUOTE_NON_OPERATOR_ALLOWED %',v_a; end if;
  v_a:=public.cargo_customer_quote_prepare(v_one,v_operator,25000,'短い',now()+interval '2 days');
@@ -57,6 +58,13 @@ begin
  v_a:=public.cargo_customer_quote_reply(v_one,decode(repeat('aa',32),'hex'),null);
  if v_a->>'reason'<>'QUOTE_VIEW' or (v_a->>'amount_yen')::integer<>26000 then
   raise exception 'QUOTED_AMOUNT_UNAVAILABLE %',v_a; end if;
+ -- The quote's own deadline still expires access, even for a retained request.
+ update public.cargo_customer_quote_replies set valid_until=now()-interval '1 second'
+  where request_id=v_one;
+ v_a:=public.cargo_customer_quote_reply(v_one,decode(repeat('aa',32),'hex'),null);
+ if v_a->>'reason'<>'EXPIRED' then raise exception 'QUOTE_OWN_EXPIRY_BYPASSED %',v_a; end if;
+ update public.cargo_customer_quote_replies set valid_until=now()+interval '2 days'
+  where request_id=v_one;
  v_a:=public.cargo_customer_quote_reply(v_one,decode(repeat('aa',32),'hex'),'interested');
  if v_a->>'reason'<>'INTEREST_RECORDED'
   or v_a->>'contract_confirmed'<>'false'

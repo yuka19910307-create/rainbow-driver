@@ -14,7 +14,8 @@ select jsonb_build_object(
     'present',to_regclass('public.'||x.name) is not null))
   from (values ('cargo_customer_intake_drafts'),('cargo_customer_intake_requests'),
    ('cargo_customer_quote_replies'),('cargo_customer_quote_followups'),
-   ('cargo_customer_quote_followup_events'),('cargo_customer_retention_runs')) x(name)),
+   ('cargo_customer_quote_followup_events'),('cargo_customer_retention_runs'),
+   ('cargo_customer_mail_budget')) x(name)),
  'customer_routines',(select coalesce(jsonb_agg(jsonb_build_object(
    'name',proname,'security_definer',prosecdef)),'[]'::jsonb)
   from pg_proc where pronamespace='public'::regnamespace and proname like 'cargo_customer_%')

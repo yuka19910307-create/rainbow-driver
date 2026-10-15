@@ -142,8 +142,9 @@ async function initialize(){
   }
   ready=true;sent=result.mail_attempted===true;
   $("reviewButton").disabled=false;
-  status("availability","申込内容を入力してください。確認後にメール認証へ進みます。");
+  status("availability",sent?"このテストのメールは送信操作済みです。内容は確認できます。":"申込内容を確認してください。確認後にメール認証へ進みます。");
   loadTurnstile(result.captcha_site_key);await loadOwnerItem();
+  if(sent&&!result.resume_challenge&&!ownerRowId){status('availability','前回のメール認証は期限切れ、または再開できない状態です。内容は確認できますが、再送と登録は停止しています。担当者が再開方法を確認します。');status('sendStatus','前回の認証は再開できません。メールは再送していません。');}
   if(result.resume_challenge){challenge=result.resume_challenge.id;until=Date.parse(result.resume_challenge.expires_at);$('verificationPane').hidden=false;status('sendStatus','送信済みです。Gmailに届いたコードを入力してください。再送はしません。');}
  }catch(e){status("availability",e.message||"接続確認に失敗しました。")}
 }
@@ -154,13 +155,13 @@ allFields.forEach(k=>$(k).addEventListener(k==="today"||k==="reviewConfirm"?"cha
 }));
 $("requestForm").onsubmit=e=>{
  e.preventDefault();
- if(!ready||sent||busy)return;
+ if(!ready||busy)return;
  try{
   if(!$("requestForm").reportValidity())return;
   checked=snapshot();
   renderSummary(checked);
   $("reviewPane").hidden=false;
-  $("sendEmail").disabled=!turnstileToken;
+  $("sendEmail").disabled=sent||!turnstileToken;
   $("reviewPane").scrollIntoView({behavior:"smooth",block:"start"});
  }catch(e){status("availability",e?.message||"入力内容を確認してください。")}
 };
@@ -191,7 +192,7 @@ $("verify").onclick=async()=>{
  if(!ready||busy||!challenge)return;
  const code=$("code").value.trim();
  if(!/^[0-9]{6}$/.test(code)){status("verifyStatus","6桁の数字を入力してください。");return}
- if(Date.now()>=until){challenge=null;status("verifyStatus","認証期限を過ぎました。最初からお申し込みください。");return}
+ if(Date.now()>=until){challenge=null;status("verifyStatus","認証期限を過ぎました。再送せず、担当者へお知らせください。");return}
  busy=true;$("verify").disabled=true;$("code").value="";
  try{
   const result=await invoke("verify",{challenge_id:challenge,code});

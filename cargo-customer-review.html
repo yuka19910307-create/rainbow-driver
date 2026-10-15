@@ -50,6 +50,7 @@ async function invoke(body){
 }
 function detail(d){
  return [
+  ["希望集荷",d.preferredPickupAt?String(d.preferredPickupAt).replace("T"," ")+"（日本時間・希望）":"即時・当日（担当者確認後に決定）"],
   ["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
   ["個数",d.pieces],["重量",String(d.weight)+"kg"],
   ["寸法",String(d.length)+"×"+d.width+"×"+d.height+"cm"],

@@ -13,6 +13,31 @@ const fixture={pickup:'テスト集荷地・さいたま市',delivery:'テスト
 const start=()=>({action:'start',attempt_id:crypto.randomUUID(),email:'synthetic@example.invalid',request:fixture,captcha_token:'synthetic-token'});
 async function call(body){const r=await intake.handler(new Request('https://synthetic.invalid',{method:'POST',headers:{origin:'https://app.rainbow-driver.com','Content-Type':'application/json'},body:JSON.stringify(body)}));return{status:r.status,data:await r.json()}}
 function reset(){gateReads=0;draft=null;saved=null;mail=null;mailCount=0;flipBeforeMail=false;captchaValid=true;providerId=true;commits=0;budgetAllowed=true;budgetError=false}
+
+async function checkBudgetPages(){
+ const base=process.argv[4]||'.';
+ for(const file of ['cargo-customer-intake.html','staging/cargo-customer-intake.html','cargo-customer-review.html','staging/cargo-customer-review.html']){
+  const html=fs.readFileSync(base+'/'+file,'utf8');
+  const from=html.indexOf('async function invoke(');
+  const to=html.indexOf(file.includes('intake')?'\nfunction loadTurnstile(':'\nfunction detail(',from);
+  assert(from>=0&&to>from);
+  let response;
+  const page={db:{functions:{invoke:async()=>response}}};
+  vm.createContext(page);vm.runInContext(html.slice(from,to),page);
+  for(const reason of ['MAIL_BUDGET_EXHAUSTED','MAIL_BUDGET_UNAVAILABLE']){
+   response={error:{context:Response.json({error:reason},{status:429})}};
+   const result=await vm.runInContext('invoke({action:"start"})',page);
+   assert.equal(result.ok,false);assert.equal(result.reason,reason);
+   response={error:{context:Response.json({ok:false,reason},{status:422})}};
+   assert.equal((await vm.runInContext('invoke({action:"quote_send"})',page)).reason,reason);
+  }
+  response={error:{context:Response.json({error:'UNRELATED_ERROR'},{status:503})}};
+  await assert.rejects(vm.runInContext('invoke({action:"start"})',page));
+  response={data:{ok:true}};
+  assert.equal((await vm.runInContext('invoke({action:"start"})',page)).ok,true);
+ }
+}
+
 (async()=>{
 reset();let r=await call(start());assert.equal(r.status,423);assert.equal(draft,null);assert.equal(mailCount,0);
 enabled=true;reset();captchaValid=false;r=await call(start());assert.equal(r.status,422);assert.equal(draft,null);assert.equal(mailCount,0);
@@ -27,5 +52,6 @@ r=await call({action:'verify',challenge_id:id,code});assert.equal(r.status,200);
 const key=await crypto.subtle.importKey('raw',aes,'AES-GCM',false,['decrypt']);operator.ctx.testKey=key;operator.ctx.testCipher=saved.encrypted_payload;const details=await vm.runInContext('decrypt(testKey,testCipher)',operator.ctx);assert.equal(details.email,'synthetic@example.invalid');for(const k of ['pickup','delivery','cargo','pieces','weight','length','width','height','clientName'])assert.equal(details[k],fixture[k]);
 r=await call({action:'verify',challenge_id:id,code});assert.equal(r.status,422);assert.equal(commits,1);assert.equal(mailCount,1);
 operator.ctx.testCipher=saved.encrypted_payload.slice(0,-2)+(parseInt(saved.encrypted_payload.slice(-2),16)^1).toString(16).padStart(2,'0');await assert.rejects(vm.runInContext('decrypt(testKey,testCipher)',operator.ctx));
+await checkBudgetPages();
 console.log('PASS: exact intake handler → encrypted draft → OTP HMAC → review payload → exact operator decrypt; OFF/CAPTCHA/mail-failure/replay guards. No external requests. SQL commit mocked; real SQL covered separately.');
 })().catch(e=>{console.error(e);process.exitCode=1});

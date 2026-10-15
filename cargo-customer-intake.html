@@ -18,7 +18,7 @@ button{font:inherit;font-weight:700;background:#24476d;color:white;border:0;bord
 button:disabled{opacity:.45;cursor:default}.secondary{background:#e9f0f8;color:#24476d}
 .summary{white-space:pre-wrap;padding:13px;background:#edf3f9;border-radius:9px;overflow-wrap:anywhere}
 .status{white-space:pre-wrap;padding:13px;background:#edf3f9;border-radius:9px}
-small{color:#66798c}a{color:#235c96}
+small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 @media(max-width:480px){.grid{grid-template-columns:1fr}}
 </style></head>
 <body><header><div><small style="color:#c0d5e8">RAINBOW DRIVER / CARGO</small>
@@ -48,14 +48,20 @@ small{color:#66798c}a{color:#235c96}
 <section><h2>3. お客様の連絡先</h2>
 <label for="clientName">担当者名（任意）</label><input id="clientName" maxlength="80" autocomplete="name">
 <label for="email">認証するメールアドレス *</label><input id="email" type="email" maxlength="254" autocomplete="email" required>
-<label><input id="reviewConfirm" type="checkbox" required> 申込内容・個人情報の取扱いを確認し、メールによる本人確認と担当者からの返信に同意します。</label>
+<div id="informationUse" class="status">
+<strong>送信前にご確認ください</strong>
+<p>入力したお名前・メールアドレス・集荷地・配送先・荷物の情報は、メール認証、配送可否の確認、見積もり・返信、対応記録の管理、不正利用の防止に利用します。</p>
+<p>申込・メール認証だけでは、配送の受諾・料金・契約は確定しません。担当者が内容を確認し、ご案内します。自動決済やドライバーへの出動指示は行いません。</p>
+<p>お問い合わせは<a href="#contact">メール・LINEの窓口</a>へお願いします。</p>
+</div>
+<label><input aria-describedby="informationUse" id="reviewConfirm" type="checkbox" required> 申込内容・個人情報の取扱いを確認し、メールによる本人確認と担当者からの返信に同意します。</label>
 <p><small>認証後も即時受諾や料金確定にはなりません。公開開始時にはプライバシー案内と保存期間を表示します。</small></p>
 <button type="submit" id="reviewButton" disabled>申込内容を確認</button>
 </section></form>
 <section id="reviewPane" hidden>
 <h2>4. 内容確認（まだ送信していません）</h2>
 <div id="summary" class="summary"></div>
-<p><small>表示内容は手動審査が必要です。メール認証が完了するまで正式受付は発生しません。</small></p>
+<p><small>メール認証後、担当者による審査待ちとして登録します。配送・料金・契約はまだ確定しません。</small></p>
 <div id="captcha" aria-label="メール送信前の不正利用防止認証"></div>
 <p><button id="sendEmail" type="button" disabled>メール認証コードを送信する</button>
 <button id="edit" type="button" class="secondary">修正する</button></p>
@@ -69,6 +75,13 @@ small{color:#66798c}a{color:#235c96}
 <section id="completedPane" hidden aria-live="polite">
 <h2>6. 受付確認</h2><p class="status" id="completedText"></p>
 <p><small>担当者からの見積もり・受諾確認があるまで配送は確定しません。自動決済・ドライバーへの出動指示は行われません。</small></p></section>
+<section id="contact" aria-labelledby="contactTitle">
+<h2 id="contactTitle">お問い合わせ</h2>
+<p>申込内容のご相談や、入力情報の取扱いに関するお問い合わせはこちらへお願いします。</p>
+<p>メール：<a href="mailto:rainbow.driver.saitama@gmail.com">rainbow.driver.saitama@gmail.com</a></p>
+<p><a href="https://lin.ee/8YNhfM5" target="_blank" rel="noopener noreferrer">LINEで相談する（別の画面で開きます）</a></p>
+<p><small>お問い合わせだけでは配送・料金は確定しません。</small></p>
+</section>
 </main>
 <script src="./cargo-pwa/request-review-rules.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>

@@ -18,6 +18,7 @@ on:
       - "tests/cargo-request-review.test.cjs"
       - "tests/cargo-customer-email-acceptance.test.cjs"
       - "tests/cargo-customer-pipeline.test.cjs"
+      - "tests/cargo-customer-retention-operator.test.cjs"
       - "tests/cargo-draft-otp-*.test.cjs"
       - "tests/cargo-otp-pg-*.sql"
       - "tests/cargo-otp-pg-concurrency.py"
@@ -41,7 +42,7 @@ jobs:
         with:
           node-version: '24'
       - name: Run offline contract tests (no secrets or network requests)
-        run: node --test tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs tests/cargo-customer-email-acceptance.test.cjs tests/cargo-customer-pipeline.test.cjs
+        run: node --test tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs tests/cargo-customer-email-acceptance.test.cjs tests/cargo-customer-pipeline.test.cjs tests/cargo-customer-retention-operator.test.cjs
 
   staging-live-smoke:
     runs-on: ubuntu-latest
@@ -106,6 +107,10 @@ jobs:
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/followup.review.sql
       - name: Check customer-interest follow-up without booking or payment
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/followup-smoke.review.sql
+      - name: Apply approved closed-consultation retention (disposable only)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/closed-no-order-retention.review.sql
+      - name: Check closure, retention holds and dependent-record cleanup
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/closed-no-order-retention.test.sql
       - name: Remove disposable database
         if: always()
         run: docker rm -f cargo-otp-ci-postgres || true

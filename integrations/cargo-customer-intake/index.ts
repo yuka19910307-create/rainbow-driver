@@ -45,10 +45,20 @@ function validateRequest(v:unknown){
  if(!v||typeof v!=="object"||Array.isArray(v))throw Error("INVALID_INPUT");
  const d=v as Record<string,unknown>;
  const accepted=["pickup","delivery","cargo","pieces","weight","length","width",
-  "height","handling","readiness","note","clientName","today","reviewConfirm"];
+  "height","handling","readiness","note","clientName","today","reviewConfirm","preferredPickupAt"];
  if(Object.keys(d).some(k=>!accepted.includes(k)))throw Error("UNEXPECTED_INPUT");
- if(d.today!==true||d.reviewConfirm!==true)throw Error("CONSENT_REQUIRED");
+ if(typeof d.today!=="boolean"||d.reviewConfirm!==true)throw Error("CONSENT_REQUIRED");
+ const preferredPickupAt=d.preferredPickupAt??"";
+ if(typeof preferredPickupAt!=="string")throw Error("INVALID_INPUT");
+ if(d.today){
+  if(preferredPickupAt!=="")throw Error("INVALID_INPUT");
+ }else{
+  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(preferredPickupAt))throw Error("INVALID_INPUT");
+  const stamp=Date.parse(preferredPickupAt+":00+09:00");
+  if(!Number.isFinite(stamp)||new Date(stamp+9*3600000).toISOString().slice(0,16)!==preferredPickupAt||stamp<=Date.now())throw Error("INVALID_INPUT");
+ }
  const result={
+  today:d.today,preferredPickupAt,
   pickup:str(d.pickup,250,3),delivery:str(d.delivery,250,3),
   cargo:str(d.cargo,500,2),pieces:number(d.pieces,1,99,true),
   weight:number(d.weight,.01,350),length:number(d.length,.1,500),

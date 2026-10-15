@@ -1,6 +1,6 @@
 {
   "purpose": "Review-only scoped release candidate; does not authorize deployment or intake enablement",
-  "source_commit": "e4435649a18bbb0ff15b0ec7fea7bf579ce5dabb",
+  "source_commit": "de57a09510637144c108ac525f2fd82b18fab337",
   "main_baseline": "3e7f7db4883020f6bed3c1a2dca593f278ae2d8c",
   "public_intake_enabled": false,
   "files": [
@@ -16,7 +16,7 @@
     },
     {
       "path": "cargo-customer-quote-reply.html",
-      "git_blob_sha": "e474b90f1124d0b34311b62d546cdc2c81b1d81e",
+      "git_blob_sha": "d238355a00103bc506876580caf61281e5a415fe",
       "kind": "site"
     },
     {

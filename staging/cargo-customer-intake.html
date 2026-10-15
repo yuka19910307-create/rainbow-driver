@@ -2,7 +2,7 @@
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>【検証環境】軽貨物 即時配送のお申し込み｜Rainbow Driver</title>
+<title>【検証環境】軽貨物配送のご相談｜Rainbow Driver</title>
 <style>
 :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1d3855;background:#f1f5fa}
 *{box-sizing:border-box}body{margin:0;line-height:1.7}
@@ -22,7 +22,7 @@ small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 @media(max-width:480px){.grid{grid-template-columns:1fr}}
 </style></head>
 <body><div style="background:#8b1e24;color:white;padding:12px;text-align:center;font-weight:bold">検証環境：本番ではありません／一般受付OFF・メール送信禁止</div><header><div><small style="color:#c0d5e8">RAINBOW DRIVER / CARGO</small>
-<h1>軽貨物・即時配送のお申し込み</h1><p style="margin:0">お申し込み内容の確認 → メール認証 → 担当者の審査</p></div></header>
+<h1>軽貨物配送のご相談</h1><p style="margin:0">お申し込み内容の確認 → メール認証 → 担当者の審査</p></div></header>
 <main>
 <section><p class="note"><strong>一般受付準備中。</strong> 受付開始まではメール送信・依頼登録ができません。運賃は担当者が荷姿・距離・対応可否を確認後にご案内します。画面確認中は実際の個人情報を入力しないでください。</p>
 <p id="availability" role="status" class="status">受付状況を確認しています…</p>
@@ -30,7 +30,8 @@ small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 <form id="requestForm"><section><h2>1. 集荷・配送</h2>
 <label for="pickup">集荷地 *</label><input id="pickup" minlength="3" maxlength="250" required>
 <label for="delivery">配送先 *</label><input id="delivery" minlength="3" maxlength="250" required>
-<label><input id="today" type="checkbox" required> 即時・当日集荷を希望する（日時指定予約ではありません）</label>
+<label><input id="today" type="checkbox" checked> 即時・当日の集荷を希望する</label>
+<div id="preferredPickupPane" hidden><label for="preferredPickupAt">希望集荷日時（日本時間） *</label><input id="preferredPickupAt" type="datetime-local"><p><small>ご希望の日時です。担当者の確認後に決定します。</small></p></div>
 <label for="readiness">集荷準備</label><select id="readiness"><option value="ready">集荷可能</option><option value="preparing">準備中</option><option value="unknown">要確認</option></select>
 </section>
 <section><h2>2. 荷物</h2>
@@ -89,7 +90,7 @@ small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 (()=>{
 "use strict";
 const $=id=>document.getElementById(id);
-const fieldIds=["pickup","delivery","cargo","pieces","weight","length","width","height","handling","readiness","note","clientName"];
+const fieldIds=["pickup","delivery","cargo","pieces","weight","length","width","height","handling","readiness","note","clientName","preferredPickupAt"];
 const allFields=[...fieldIds,"email","today","reviewConfirm"];
 let db=null,ready=false,busy=false,sent=false,checked=null,challenge=null,until=0,turnstileToken="",widgetId=null;
 const status=(id,text)=>{$(id).textContent=text};
@@ -99,7 +100,8 @@ function disableSending(){
 }
 function snapshot(){
  const request=Object.fromEntries(fieldIds.map(k=>[k,$(k).value.trim()]));
- request.today=$("today").checked;request.reviewConfirm=$("reviewConfirm").checked;
+ request.today=$("today").checked;
+ if(request.today)request.preferredPickupAt="";request.reviewConfirm=$("reviewConfirm").checked;
  const decision=window.CargoRequestReview.review({...request,clientContact:""});
  const email=$("email").value.trim().toLowerCase();
  if(email.length>254||!(/^[^\s@]{1,64}@[^\s@]{1,190}$/.test(email)))
@@ -109,7 +111,7 @@ function snapshot(){
 function renderSummary(p){
  const d=p.request;
  const parts=[
-  ["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
+  ["希望集荷",d.today?"即時・当日（担当者確認後に決定）":d.preferredPickupAt.replace("T"," ")+"（日本時間・希望）"],["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
   ["個数",d.pieces],["重量",d.weight+"kg"],
   ["寸法",d.length+" × "+d.width+" × "+d.height+" cm"],
   ["集荷準備",({ready:"集荷可能",preparing:"準備中",unknown:"要確認"})[d.readiness]||"要確認"],
@@ -170,6 +172,10 @@ async function initialize(){
   loadTurnstile(result.captcha_site_key);
  }catch{status("availability","一般受付は準備中です。現在、送信はできません。")}
 }
+$("today").addEventListener("change",()=>{
+ $("preferredPickupPane").hidden=$("today").checked;
+ $("preferredPickupAt").required=!$("today").checked;
+});
 allFields.forEach(k=>$(k).addEventListener(k==="today"||k==="reviewConfirm"?"change":"input",()=>{
  checked=null;turnstileToken="";
  $("reviewPane").hidden=true;$("sendEmail").disabled=true;

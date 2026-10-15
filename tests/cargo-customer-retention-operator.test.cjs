@@ -20,10 +20,10 @@ async function call(body,auth='Bearer synthetic',origin='https://app.rainbow-dri
 async function ui(file){
  class El{constructor(tag){this.tagName=tag;this.children=[];this.style={};this.textContent='';this.disabled=false}append(...nodes){this.children.push(...nodes)}replaceChildren(...nodes){this.children=nodes} }
  const nodes=Object.fromEntries(['auth','refresh','retentionView','requests'].map(k=>[k,new El('div')]));
- let closed=false,hold=false,confirmed=false,bodies=[];
+ let closed=false,hold=false,confirmed=false,bodies=[],denied=false;
  const record=()=>({id,status:closed?'closed':'operator_reviewing',details:{},created_at:'2026-10-15T00:00:00Z',retention_hold:closed?hold:true,closed_no_order_at:closed?'2026-10-15T02:00:00Z':null,delete_after:'2026-11-14T02:00:00Z'});
- const uiDb={auth:{getUser:async()=>({data:{user:{id:owner}}})},from:()=>({select(){return this},eq(){return this},maybeSingle:async()=>({data:{user_id:owner}})}),functions:{invoke:async(name,{body})=>{
-  bodies.push(body);if(body.action==='close_no_order'){closed=true;return{data:{ok:true,reason:'CLOSED_NO_ORDER',delete_after:'2026-11-14T02:00:00Z'}}}
+ const uiDb={auth:{getUser:async()=>({data:{user:{id:owner}}})},from:()=>{throw Error('Browser must not read operator membership tables')},functions:{invoke:async(name,{body})=>{
+  bodies.push(body);if(denied)return{error:new Error('Forbidden')};if(body.action==='close_no_order'){closed=true;return{data:{ok:true,reason:'CLOSED_NO_ORDER',delete_after:'2026-11-14T02:00:00Z'}}}
   if(body.action==='retention_hold'){hold=body.hold;return{data:{ok:true,reason:'RETENTION_HOLD_UPDATED'}}}
   return{data:{ok:true,items:body.action===(closed?'list_retention':'list')?[record()]:[]}};
  }}};
@@ -45,12 +45,16 @@ async function ui(file){
  await find('保存保留を解除する（30日後に削除）').onclick();
  assert.equal(bodies.filter(b=>b.action==='retention_hold').at(-1).hold,false);
  assert(!bodies.some(b=>b.action==='quote_send'));
+ denied=true;await nodes.refresh.onclick();
+ assert.equal(nodes.requests.children.length,0,'Discard previously displayed personal data on API failure');
+ assert.match(nodes.auth.textContent,/取得できません/);
+ assert(!nodes.auth.textContent.includes('管理者確認済み'));
 }
 (async()=>{
  const close={action:'close_no_order',id,confirmation:'CLOSE_WITHOUT_ORDER_OR_RETENTION_NEED'};
  assert.equal((await call(close,'')).status,401);assert.equal((await call(close,'Bearer synthetic','https://bad.invalid')).status,403);
  assert.equal((await call({...close,operator_id:owner})).status,422);assert.equal((await call({...close,confirmation:'wrong'})).status,422);
- loggedIn=false;assert.equal((await call(close)).status,401);loggedIn=true;operator=false;assert.equal((await call(close)).status,403);operator=true;assert.equal(calls.length,0);
+ loggedIn=false;assert.equal((await call(close)).status,401);loggedIn=true;operator=false;assert.equal((await call(close)).status,403);assert.equal((await call({action:'list'})).status,403);assert.equal((await call({action:'list_retention'})).status,403);operator=true;assert.equal(calls.length,0);
  let r=await call(close);assert.equal(r.status,200);assert.equal(r.data.customer_notified,false);assert.equal(calls[0].name,'cargo_customer_close_no_order');assert.equal(calls[0].args.p_operator_id,owner);
  result={ok:false,reason:'FOLLOWUP_NOT_CLOSED_NO_ORDER'};r=await call(close);assert.equal(r.status,422);assert.equal(r.data.reason,result.reason);
  result={ok:true,reason:'RETENTION_HOLD_UPDATED'};

@@ -154,3 +154,11 @@ test('unauthenticated users and edited drafts never see OTP handoff',async()=>{
  s.element('edit').onclick();
  assert.equal(s.element('otpHandoff').hidden,true);
 });
+
+test('future Japan-time collection is a request, not a booking',()=>{
+ const preferredPickupAt=new Date(Date.now()+2*86400000+9*3600000).toISOString().slice(0,16);
+ const result=rules.review({...sample(),today:false,preferredPickupAt});
+ assert.equal(result.canBook,false);assert.equal(result.requiresOperatorReview,true);
+ for(const value of ['', '2020-01-01T10:00','2099-02-30T10:00','2099-01-01T25:00','2099-01-01T10:00Z'])assert.throws(()=>rules.review({...sample(),today:false,preferredPickupAt:value}));
+ assert.throws(()=>rules.review({...sample(),preferredPickupAt}));
+});

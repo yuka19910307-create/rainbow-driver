@@ -10,6 +10,15 @@ const db={from(table){let removing=false;const chain={select(){return chain},eq(
 function context(path,db){let handler;const ctx={createClient:()=>db,Deno:{serve:f=>handler=f,env:{get:k=>env[k]||''}},TextEncoder,TextDecoder,Uint8Array,Uint32Array,URLSearchParams,Response,Request,AbortController,atob,crypto,setTimeout,clearTimeout,fetch:async(url,options)=>{if(url.includes('siteverify'))return Response.json({success:captchaValid,hostname:'app.rainbow-driver.com',action:'cargo_customer_intake'});assert.equal(url,'https://api.resend.com/emails');mailCount++;mail=JSON.parse(options.body);return Response.json(providerId?{id:'synthetic-provider-id'}:{})}};vm.createContext(ctx);vm.runInContext(stripTypeScriptTypes(fs.readFileSync(path,'utf8').replace(/^import .*;\n/,'')),ctx);return{ctx,handler}}
 const intake=context(intakePath,db),operator=context(operatorPath,{});
 const fixture={pickup:'テスト集荷地・さいたま市',delivery:'テスト配送先・東京都内',cargo:'テスト用・精密機器の箱',pieces:2,weight:8.5,length:40,width:30,height:25,handling:'unknown',readiness:'ready',note:'架空案件',clientName:'テスト担当者',today:true,reviewConfirm:true};
+// Exercise the exact server validator before any mocked delivery.
+intake.ctx.scheduleFixture=fixture;
+assert.equal(vm.runInContext('validateRequest(scheduleFixture).today',intake.ctx),true);
+for(const bad of ['', '2020-01-01T10:00','2099-02-30T10:00','2099-01-01T25:00','2099-01-01T10:00Z']){
+ intake.ctx.badTime=bad;
+ assert.throws(()=>vm.runInContext('validateRequest({...scheduleFixture,today:false,preferredPickupAt:badTime})',intake.ctx));
+}
+fixture.today=false;
+fixture.preferredPickupAt=new Date(Date.now()+2*86400000+9*3600000).toISOString().slice(0,16);
 const start=()=>({action:'start',attempt_id:crypto.randomUUID(),email:'synthetic@example.invalid',request:fixture,captcha_token:'synthetic-token'});
 async function call(body){const r=await intake.handler(new Request('https://synthetic.invalid',{method:'POST',headers:{origin:'https://app.rainbow-driver.com','Content-Type':'application/json'},body:JSON.stringify(body)}));return{status:r.status,data:await r.json()}}
 function reset(){gateReads=0;draft=null;saved=null;mail=null;mailCount=0;flipBeforeMail=false;captchaValid=true;providerId=true;commits=0;budgetAllowed=true;budgetError=false}
@@ -49,7 +58,7 @@ reset();r=await call(start());assert.equal(r.status,202);assert.equal(saved,null
 const code=mail.text.match(/ ([0-9]{6}) /)[1];const wrong=code==='000000'?'000001':'000000';const id=r.data.challenge_id;
 r=await call({action:'verify',challenge_id:id,code:wrong});assert.equal(r.status,422);assert.equal(saved,null);
 r=await call({action:'verify',challenge_id:id,code});assert.equal(r.status,200);assert.equal(r.data.reason,'PENDING_OPERATOR_REVIEW');assert.equal(r.data.automatic_dispatch,false);assert.equal(r.data.payment_enabled,false);assert.equal(draft.encrypted_payload,null);assert.equal(commits,1);
-const key=await crypto.subtle.importKey('raw',aes,'AES-GCM',false,['decrypt']);operator.ctx.testKey=key;operator.ctx.testCipher=saved.encrypted_payload;const details=await vm.runInContext('decrypt(testKey,testCipher)',operator.ctx);assert.equal(details.email,'synthetic@example.invalid');for(const k of ['pickup','delivery','cargo','pieces','weight','length','width','height','clientName'])assert.equal(details[k],fixture[k]);
+const key=await crypto.subtle.importKey('raw',aes,'AES-GCM',false,['decrypt']);operator.ctx.testKey=key;operator.ctx.testCipher=saved.encrypted_payload;const details=await vm.runInContext('decrypt(testKey,testCipher)',operator.ctx);assert.equal(details.email,'synthetic@example.invalid');for(const k of ['pickup','delivery','cargo','pieces','weight','length','width','height','clientName','today','preferredPickupAt'])assert.equal(details[k],fixture[k]);
 r=await call({action:'verify',challenge_id:id,code});assert.equal(r.status,422);assert.equal(commits,1);assert.equal(mailCount,1);
 operator.ctx.testCipher=saved.encrypted_payload.slice(0,-2)+(parseInt(saved.encrypted_payload.slice(-2),16)^1).toString(16).padStart(2,'0');await assert.rejects(vm.runInContext('decrypt(testKey,testCipher)',operator.ctx));
 await checkBudgetPages();

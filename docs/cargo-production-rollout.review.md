@@ -45,7 +45,7 @@
 ## 実施順（準備済みの設計。まだ本番未実施）
 1. production-preflight.review.sql で選択プロジェクトと現状を再確認。顧客データや秘密値を取得しない。
 2. 既存mainのSHA、配備済み関数版、対象テーブル/RPC定義、受付スイッチを記録。復旧時に戻す版を特定する。
-3. 現在の受付OFFを維持して新しい顧客テーブル/RPCのみ導入する。schema.review.sql → quotes.review.sql → followup.review.sql → closed-no-order-retention.review.sql の依存順。各ファイルはレビュー用なので、そのまま無確認で実行せず、本番専用migrationとして内容と権限を固定する。
+3. 現在の受付OFFを維持して新しい顧客テーブル/RPCのみ導入する。schema.review.sql → quotes.review.sql → mail-budget.review.sql → followup.review.sql → closed-no-order-retention.review.sql の依存順。各ファイルはレビュー用なので、そのまま無確認で実行せず、本番専用migrationとして内容と権限を固定する。
 4. 初回導入のquotes.review.sqlには継続相談の期限修正が含まれる。既存quote RPCの更新環境だけで active-consultation-expiry.review.sql を使う。両方を重複実施する必要はない。
 5. RLS/権限、operator所属の実在、service-only RPC、暗号化鍵の有効性、外部サービス設定を確認。ブラウザからoperator所属表を直接読める前提が現行ポリシーと整合するかも確認する。
 6. 関数・サイトの対象差分を反映し、受付OFF状態と未ログイン拒否、ブラウザの参照先、本番/検証環境の混在がないことを確認。
@@ -68,3 +68,11 @@
 - 税区分、高速・駐車・待機・荷役等の扱い
 - 本番の保管サービス/取扱国、メール履歴・バックアップ等の保存運用
 未回答の内容をシステム側で推測して確定しない。
+
+## 顧客メールの全体送信枠（検証環境に追加）
+- mail-budget.review.sql をquoteテーブル/RPCの後に導入する。OTPと見積もり送信を合算する。
+- 検証用初期値は時間枠10回・JST暦日50回。これはResendアカウント全体の利用量や無料枠の保証ではない。所有者用テスト送信・他アプリはカウント対象外。
+- 本番の件数は運用量と他の送信経路を含めて公開前に確認する。レート制限は予約枠を消費し、失敗・不明時に返還しない。
+- RPC/table不在・停止・取得失敗時は送信禁止。枠の確保はDB行ロックで直列化し、見積もりは不可逆な送信claimと同じトランザクションで確保する。
+- 新規 cargo_customer_mail_budget を反映候補に追加。個人情報・IP・メールアドレスは保持しない。
+- 関数/APIの上限を迂回する他のメール送信経路は別途確認が必要。IPごとの制御・信頼できる接続元ヘッダーの確認は引き続き未完了。

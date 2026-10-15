@@ -101,6 +101,10 @@ jobs:
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/schema-smoke.review.sql
       - name: Apply manual quote and customer reply schema (disposable only)
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/quotes.review.sql
+      - name: Apply shared customer mail budget (disposable only)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/mail-budget.review.sql
+      - name: Verify mail budget hour/day caps and fail-closed behavior
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/mail-budget.test.sql
       - name: Verify operator approval, public intake OFF and one-time email attempt
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/quotes-smoke.review.sql
       - name: Apply quote follow-up ledger (disposable database only)

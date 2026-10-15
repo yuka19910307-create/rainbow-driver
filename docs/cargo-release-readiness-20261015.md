@@ -32,7 +32,7 @@ This record supersedes older progress statements, not security constraints. Publ
 
 ## Remaining public-launch gates
 
-1. Finish privacy notice and production implementation of the approved retention policy. Contact channels and the 30-day-after-no-order-closure policy are decided. Operator closure/hold UI/API tests passed; validate existing request-expiry behavior, production scheduling/failure monitoring, and external-service retention.
+1. Finish privacy notice and production implementation of the approved retention policy. Contact channels and the 30-day-after-no-order-closure policy are decided. Operator closure/hold UI/API tests passed; existing request-expiry behavior is corrected in staging. Validate production scheduling/failure monitoring and external-service retention.
 2. Review customer terms: when a contract forms, cancellation handling, tax/tolls/waiting/handling conditions. A quote reply remains an expression of interest, not automatic dispatch or payment.
 3. Review abuse controls, IP-side limits and monitoring; verify public-path and quote/reply behavior in an explicitly scoped environment. Do not repeat completed owner tests without a concrete reason.
 4. Prepare and review production configuration/migration/site changes and rollback plan. Do not copy secrets through chat or GitHub. Do not merge the entire development branch blindly.
@@ -58,3 +58,13 @@ No production deployment or public intake enablement was performed in this step.
 - Commit 3060ef2047fa429fdb4bc73c34a907083da75d76: security/disposable-SQL workflow 38671675886 succeeded; customer form browser workflow 38671675951 succeeded; live staging OFF/auth smoke 38671676074 succeeded.
 - Development page changes are not yet published. Owner does not need to repeat the completed OTP test.
 - Cron execution at 11:17 JST succeeded; read-only check shows customer request count 0, deleted request count 0, intake_enabled=false.
+
+## Active consultation versus quote expiry — 2026-10-15
+
+- Removed the legacy request-created-plus-30-days condition from quote preparation, send claim and customer reply. An ongoing consultation is no longer blocked merely by its old delete_after field.
+- Request status guards still exclude closed/declined consultations. Operator membership, public intake OFF, single-send claim, matching response HMAC, one-time response and quote valid_until checks are preserved.
+- Staging migration staging_separate_quote_expiry_from_retention applied only to hvdoqcrnztqmbzgwrovd. Upgrade SQL: integrations/cargo-customer-intake/active-consultation-expiry.review.sql.
+- Rollback-only service_role test passed for an old active request with a past delete_after preparing a new quote, rejecting a past quote deadline, rejecting closed-request quoting and preserving protected records.
+- Disposable quote test now uses a request created 31 days ago throughout the claim/reply flow and separately verifies EXPIRED on the quote's own deadline.
+- Commit 5124254a965abd4c4430495cce1f9388abb7551e: security/disposable-SQL workflow 38672944798 and live OFF/auth smoke 38672944809 succeeded.
+- Read-only verification: old request-age checks 0; quote deadline guards 2; real customer request count 0; intake_enabled=false. No production deployment or real mail.

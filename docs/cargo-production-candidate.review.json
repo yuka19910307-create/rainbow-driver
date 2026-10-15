@@ -1,6 +1,6 @@
 {
   "purpose": "Review-only scoped release candidate; does not authorize deployment or intake enablement",
-  "source_commit": "b5dd558b03bfb48d178b9bbb7261088e242d7f3c",
+  "source_commit": "8bdd8fe471bad6a77debc1f1bbe376e7ab9144e6",
   "main_baseline": "3e7f7db4883020f6bed3c1a2dca593f278ae2d8c",
   "public_intake_enabled": false,
   "files": [
@@ -11,7 +11,7 @@
     },
     {
       "path": "cargo-customer-review.html",
-      "git_blob_sha": "2f4871e86a7d49416f2e9f965d26c2cd1468dd03",
+      "git_blob_sha": "aeb18e9693b9b67716a8897b206e7e224fa449e1",
       "kind": "site"
     },
     {

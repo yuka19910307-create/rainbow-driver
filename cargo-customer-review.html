@@ -80,6 +80,7 @@ function quotePane(item){
  const container=document.createElement("div");container.className="card";
  const heading=document.createElement("h3");heading.textContent="手動見積もり・回答";
  container.append(heading);
+ container.append(label("料金は案件ごとに入力してください。共通の料金表・距離単価・最低料金は未設定です。税の扱い・追加費用の条件も確認して記入してください。"));
  const existing=item.quote;
  if(existing){
   const prior=document.createElement("p");prior.className="details";
@@ -145,7 +146,7 @@ function quotePane(item){
  });
  container.append(save);
  if(existing?.delivery_status==="ready_to_send"){
-  container.append(button("承認済み見積もりをお客様へ1通送信",async()=>{
+  const sendQuote=button("保存済み見積もりをお客様へ1通送信",async()=>{
    if(busy)return;
    if(!confirm("保存済みのお見積もりをお客様の認証済みメールへ送信します。実メールが1通送られる可能性があります。送信後の訂正・自動再送はできません。実行しますか？"))return;
    busy=true;$("refresh").disabled=true;
@@ -161,7 +162,15 @@ function quotePane(item){
     busy=false;$("refresh").disabled=!user;
     await load();
    }
-  }));
+  });
+  const unsaved=label("送信対象は保存済みの金額・条件・期限です。");
+  for(const input of [amount,terms,dateInput]){
+   input.addEventListener("input",()=>{
+    sendQuote.disabled=true;
+    unsaved.textContent="変更は未保存です。下書きを保存し直してから送信してください。";
+   });
+  }
+  container.append(unsaved,sendQuote);
  }
  return container;
 }

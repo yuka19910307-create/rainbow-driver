@@ -120,3 +120,12 @@
 - Supports immediate/today or a strictly validated future Japan-local pickup time, retained in encrypted request data. This is a requested time, not a confirmed booking.
 - Live verification: status HTTP 200 reports public_intake_enabled=false, accepts_orders=false, automatic_dispatch=false, payment_enabled=false. Payloads containing only action=start or action=verify both return HTTP 423 PUBLIC_INTAKE_DISABLED before writes/mail.
 - Customer UI changes remain on the development branch; no public UI deployment in this step. Future-time authenticated live end-to-end flow remains untested; prior local pipeline and CI checks are not a substitute for that launch gate.
+
+
+## 2026-10-16 反映対象の取り出しと画面検証
+
+- `node scripts/package-cargo-candidate.cjs <repo-root> <new-output-directory>` を追加。事前に既存のSHA・リンク・検証環境混入検査を実行し、候補12点のみを取り出す。既存出力先には上書きしない。
+- `site/` は追加候補4点だけであり、既存サイト全体との置換は禁止。既存ログイン等は維持する。関数3点・SQL案5点は公開用ディレクトリと分離し、それぞれレビュー専用と明示する。
+- 固定ソースの12点で生成・内容照合が成功。main基準 `3e7f7db4883020f6bed3c1a2dca593f278ae2d8c` は再取得して一致。SQL実行・本番反映・一般受付ONは行っていない。
+- 希望日時のスマホ幅ブラウザー検査を既存CIへ追加。コミット `45c9b4fd13f86a2e80c43a0fb17d1714e4573b38`、run `38815530147` 成功。未入力/過去日時拒否、日本時間の確認表示、当日/日時指定切り替え、模擬送信データへの保持を確認。外部通信はすべて模擬応答で、実メールの通し検査とは別。
+- 公開用案内、実メールを含む限定通し試験、本番専用migrationの確定、公開判断は引き続き未完了。

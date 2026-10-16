@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<title>軽貨物のお見積もりへのご回答｜Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#243a52;background:#f1f5fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.75}
+header{background:#1d3c5d;color:white;padding:26px 17px}
+header>div,main{max-width:700px;margin:auto}
+main{padding:17px}h1{font-size:23px;margin:0}h2{font-size:18px}
+.panel{background:white;border:1px solid #d6e3ee;border-radius:13px;padding:20px;margin-bottom:15px}
+.notice{background:#e9f0f8;padding:12px;border-radius:8px}
+#terms{white-space:pre-wrap;overflow-wrap:anywhere}
+button{font:inherit;font-weight:700;color:white;background:#285b85;border:0;border-radius:9px;padding:13px 18px;margin:8px 6px 8px 0;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+.secondary{background:#53687d}small{color:#68798a}
+a{color:#235c96;overflow-wrap:anywhere}
+[hidden]{display:none!important}
+</style></head><body>
+<header><div><small style="color:#d6e4f4">RAINBOW DRIVER / CARGO</small>
+<h1>軽貨物・お見積もりへのご回答</h1></div></header>
+<main>
+<section class="panel">
+<p class="notice">この画面は見積もりの内容確認と、ご希望の回答専用です。
+<strong>「利用を希望する」を押しても配送契約・予約・配車・決済は確定しません。</strong>
+担当者からの別途確認が必要です。</p>
+<p id="status" role="status">ご案内内容を確認しています…</p>
+</section>
+<section class="panel" id="quote" hidden>
+<h2>お見積もり内容</h2>
+<p id="amount"></p>
+<p>有効期限：<strong id="validUntil"></strong></p>
+<h3>適用条件</h3><p id="terms"></p>
+<div id="actions" hidden>
+<button type="button" id="interested">この条件で利用を希望する</button>
+<button type="button" id="declined" class="secondary">今回は見送る</button>
+</div>
+<p><small>ご回答は一度のみ有効です。内容に不明点がある場合は、回答せず直接担当者にご確認ください。</small></p>
+</section>
+<section class="panel"><p><a href="./cargo-customer-intake.html">Rainbow Driver軽貨物のご案内へ</a></p>
+<p><small>メールに記載されたリンクは第三者へ共有しないでください。受付停止中や期限切れの場合、この画面からお申し込み・回答はできません。</small></p></section>
+<section class="panel" id="contact" aria-labelledby="contactTitle">
+<h2 id="contactTitle">お見積もりのお問い合わせ</h2>
+<p>内容のご相談、期限切れ、回答できない場合は、メールまたはLINEへご連絡ください。</p>
+<p>メール：<a href="mailto:rainbow.driver.saitama@gmail.com">rainbow.driver.saitama@gmail.com</a></p>
+<p><a href="https://lin.ee/8YNhfM5" target="_blank" rel="noopener noreferrer">LINEで相談する（別の画面で開きます）</a></p>
+<p><small>見積もりメールの受付IDをお知らせください。認証コードや見積もり回答用リンクを送る必要はありません。</small></p>
+</section>
+</main>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const SUPABASE="https://kvoaorzdewwirqryeizq.supabase.co";
+const KEY="sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms";
+const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const tokenPattern=/^[0-9a-f]{64}$/i;
+// Remove opaque token from browser location before any request or UI rendering.
+const fragment=location.hash.slice(1);
+history.replaceState(null,"",location.pathname);
+let requestId=null,secret=null,busy=false,loaded=false;
+try{
+ const params=new URLSearchParams(fragment);
+ if([...params.keys()].sort().join(",")==="r,t"){
+  const id=params.get("r"),token=params.get("t");
+  if(id&&uuid.test(id)&&token&&tokenPattern.test(token)){
+   requestId=id;secret=token.toLowerCase();
+  }
+ }
+}catch{}
+function set(message){$("status").textContent=message}
+function close(){
+ $("actions").hidden=true;
+ $("interested").disabled=true;$("declined").disabled=true;
+}
+async function invoke(action,more={}){
+ const response=await fetch(SUPABASE+"/functions/v1/cargo-customer-quote-reply",{
+  method:"POST",cache:"no-store",referrerPolicy:"no-referrer",
+  headers:{"Content-Type":"application/json","apikey":KEY},
+  body:JSON.stringify({action,id:requestId,token:secret,...more})
+ });
+ if(!response.ok)throw Error("QUOTE_UNAVAILABLE");
+ return await response.json();
+}
+async function show(){
+ if(!requestId||!secret){set("有効なお見積もりリンクを確認できません。");return}
+ try{
+  const data=await invoke("view");
+  if(data?.ok!==true||data.booking_confirmed!==false||
+     data.payment_created!==false||data.driver_assigned!==false||
+     !Number.isSafeInteger(data.amount_yen)||typeof data.terms!=="string"||
+     !Number.isFinite(Date.parse(data.valid_until)))
+   throw Error("BAD_RESPONSE");
+  $("amount").textContent="見積もり金額："+
+   data.amount_yen.toLocaleString("ja-JP")+"円";
+  $("terms").textContent=data.terms;
+  $("validUntil").textContent=new Date(data.valid_until)
+   .toLocaleString("ja-JP",{timeZone:"Asia/Tokyo"});
+  $("quote").hidden=false;
+  const expired=Date.now()>=Date.parse(data.valid_until);
+  if(data.reply_state){
+   close();set("このお見積もりにはすでに回答済みです。担当者の確認をお待ちください。");
+  }else if(expired){
+   close();set("見積もりの期限が終了しました。担当者へお問い合わせください。");
+  }else{
+   loaded=true;$("actions").hidden=false;
+   $("interested").disabled=false;$("declined").disabled=false;
+   set("内容をご確認のうえ、ご希望をお選びください。");
+  }
+ }catch{
+  secret=null;close();
+  set("お見積もりを表示できません。期限切れ・受付停止中・無効なリンクの可能性があります。");
+ }
+}
+async function answer(choice){
+ if(!loaded||busy||!secret||!requestId)return;
+ if(!confirm(choice==="interested"
+  ?"この見積もりで利用を希望する旨を担当者へ伝えます。配車や料金支払いは確定しません。よろしいですか？"
+  :"今回は利用を見送る旨を担当者へ伝えます。よろしいですか？"))return;
+ busy=true;close();set("回答を記録しています…");
+ try{
+  const r=await invoke("reply",{choice});
+  if(r?.ok!==true||r?.operator_review_required!==true||
+     r?.booking_confirmed!==false||r?.payment_created!==false)
+   throw Error("BAD_RESPONSE");
+  loaded=false;secret=null;
+  set(choice==="interested"
+   ?"利用希望を記録しました。担当者からの確認をお待ちください。配送・決済は確定していません。"
+   :"見送りのご希望を記録しました。ご回答ありがとうございます。");
+ }catch{
+  loaded=false;secret=null;
+  set("回答の成否を確認できません。二重回答を避けるため、メールの再操作はせず担当者へご確認ください。");
+ }finally{busy=false}
+}
+$("interested").onclick=()=>answer("interested");
+$("declined").onclick=()=>answer("declined");
+show();
+})();
+</script></body></html>

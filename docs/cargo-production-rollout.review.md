@@ -1,6 +1,9 @@
 # 軽貨物受付：本番反映の準備と復旧手順
 更新：2026-10-16 19:22 JST。実施計画であり、本番変更・一般受付ON・顧客メール送信の承認ではない。
 
+## 現在の本番状態（2026-10-17 00:20 JST）
+
+運営者承認後、顧客用7テーブル/11関数を初回導入済み。一般受付OFF、メール枠無効、顧客データ0件、RLS/通常クライアント拒否を確認。本番API・画面・秘密値・削除/監視ジョブの導入は今回の範囲外。下記の「本番未導入」は過去時点の記録。
 ## 最新の確認結果（2026-10-16 19:20 JST）
 
 **本人限定の検証環境で、実メールを含む顧客用APIの通し確認が完了。** 認証メール→コード確認→暗号化保存→管理者審査→見積もり下書き→見積もりメール→別ブラウザーで本人ログイン→利用希望の回答保存まで成功した。試験は期限でCLOSEDとなり、内部intake_enabled=falseを読取確認した。新たな試験や再送は不要。
@@ -231,3 +234,17 @@
 - 本番へ初めてデータベース変更を加える工程のため、この具体的な反映範囲を運営者へ提示して確認する。承認後も直前の状態再取得、SQLハッシュ照合、適用後のRLS/権限/OFF/枠無効/空テーブル確認を行う。今回の準備を一般受付開始の承認に読み替えない。
 
 詳細はdocs/cargo-production-install.review.md。読取と準備のみで本番変更は行っていない。
+
+## 2026-10-17 00:16〜00:20 JST：承認範囲で本番DBへ反映済み
+
+- 00:16 JST、運営者が「一般受付OFF・メール送信停止のまま、本番に保存機能を追加」の具体的範囲に対して「進めて」と承認。今回の承認はDB初回導入だけで、一般受付ON・実メール・API/サイト/秘密値/cron配備の承認に拡張しない。
+- 対象：`kvoaorzdewwirqryeizq`。承認済みSQL blob `14219afecf1f2dd392c3d8fb5e321c9fbf64db74` を再取得して一致確認。直前の読取で保護されたOFF・コア権限・operator1行・control1行・顧客テーブル0/関数0を確認した。
+- `cargo_customer_initial_schema_protected_off` をapply_migrationで適用し成功。新しい7テーブルと11関数を追加。既存control/operator行の変更は行っていない。
+- 00:19 JSTの適用後検証：7テーブルすべてRLS有効、anon/authenticatedのSELECT/INSERT/UPDATE/DELETE権限なし。11関数すべてSECURITY INVOKER、anon/authenticatedのEXECUTEなし。顧客の下書き・依頼・見積もり・フォロー・イベント・削除履歴はすべて0行。
+- 内部受付false、CAPTCHA/メール確認trueを維持。メール全体枠はenabled=false、上限1/1の停止用プレースホルダー、使用回数0。control1行・operator1行を維持。メール送信・テスト案件投入・自動削除の起動なし。
+- advisorはservice専用RLS/no-policyのINFO、および今回のSQLで変更しない既存pg_net配置/漏洩パスワード保護のWARN。新しい通常クライアント権限を開けてINFOを解消しない。参照：
+  - https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy
+  - https://supabase.com/docs/guides/database/database-linter?lint=0014_extension_in_public
+  - https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+- 初回導入SQLの再実行は禁止。今後は既存スキーマの前提で変更をレビューする。空のテーブルを作れたことを、公開顧客経路や本番メールE2E成功と扱わない。
+- 次の工程：本番用API/設定/画面の限定レビュー、メール上限と外部取扱い、削除/監視、本番経路の限定試験と公開条件。不正利用対策・契約/費用/キャンセル条件の確認、一般受付開始の判断は引き続き未完了。

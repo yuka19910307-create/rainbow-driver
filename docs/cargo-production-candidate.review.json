@@ -1,6 +1,6 @@
 {
   "purpose": "Review-only scoped release candidate; does not authorize deployment or intake enablement",
-  "source_commit": "52361dae969a178f91861438709bf939476fd406",
+  "source_commit": "e159d145a3f5339fb1af5dde2b9173405b12ae28",
   "main_baseline": "3e7f7db4883020f6bed3c1a2dca593f278ae2d8c",
   "public_intake_enabled": false,
   "files": [
@@ -31,7 +31,7 @@
     },
     {
       "path": "integrations/cargo-customer-intake/operator.ts",
-      "git_blob_sha": "313c0e5fb3b4ab3c018c79a16837376ae46527ae",
+      "git_blob_sha": "7b651c40a02d33fca9db9bb9fc3bc0ec75d147ce",
       "kind": "edge_function"
     },
     {

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "scope": "production-cargo-owner-trial-preparation",
+  "enabled": false,
+  "owner_account_id": null,
+  "planned_start_at": null,
+  "window_seconds": null,
+  "total_mail_attempt_limit": null,
+  "otp_mail_attempt_limit": null,
+  "quote_mail_attempt_limit": null,
+  "fixture_request": null,
+  "quote_amount_yen": null,
+  "quote_terms": null,
+  "execution_approval": null
+}

@@ -174,3 +174,18 @@
 - 配備後、試験台帳0件、intake_enabled=false、captcha_required/contact_verification_required=true、anon台帳SELECT不可、authenticated認可RPC実行不可を確認。試験枠は作っていない。実メール送信もなし。
 - security advisorのRLS有効/ポリシーなしINFOはservice_role専用の閉鎖設計として維持。匿名・ログイン利用者への権限追加で解消しない。既存Authの漏洩パスワード保護WARNは今回変更なし（https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection）。
 - 残作業：開始・停止と30分枠の有効化方法、固定fixture/attempt_idで実際の入力→OTP→審査→見積もり送信を行う試験画面への接続。これらが完成する前に内部スイッチをONにしない。本項は実メールE2E成功を示さない。
+
+## 2026-10-16 18:27 JST以降：本人限定メール試験の開始画面まで接続
+
+- staging/cargo-owner-mail-test.htmlを追加。本人ログイン→試験開始（送信なし）→Turnstile→本人宛てOTP1通→コード入力/暗号化保存→審査→金額/条件入力→保存済み内容の確認→本人宛て見積もり1通→メール内リンクで回答→回答結果確認→終了、を操作できる。金額は空欄開始で正式料金を決めない。
+- 新規cargo-staging-owner-mail-test関数は検証プロジェクト固定、getUserと確認済みowner UUIDを要求。beginには固定の確認文字列を要求。状態/開始/終了だけを扱い、メール送信処理は持たない。provider等の設定不備では開始しない。
+- staging専用session SQLを追加。開始時だけ1件の30分台帳と内部制御スイッチを同一トランザクションで有効化。全顧客APIは既存の強制owner制限で匿名・別ユーザーを拒否するため、一般のお客様への開放にはならない。再度beginしても期限や送信枠をリセットしない。終了/期限後の同じ枠は再開しない。
+- finishは台帳と内部スイッチを停止。expire関数は期限切れを停止。検証プロジェクトのcron job3（cargo-staging-owner-mail-trial-expire、毎分）を登録し、画面を閉じても内部スイッチが停止する。メール/認証/回答の許可はguardの期限判定で30分を越えない。
+- メールを別ブラウザーで開いたとき、view失敗だけでメモリー内のリンク秘密値を消していた問題を修正。本人ログイン後に再度viewできる。回答の成否不明時は引き続き秘密値を消し、再送/再回答しない。
+- 初回CIで、期限停止の観測を関数実行と同じSQL式にした検査コードと、Playwrightのpredicate評価がページCSPに止められる検査コードを修正。配信用CSPは弱めず、外部通信を全遮断した模擬ブラウザー側だけbypassCSPを使用する。
+- head8ad5a48093622830f08691f6a6065090a1b8c61bで、security/SQL run38882325398、mobile browser run38882325311、staging smoke run38882325297が成功。新規ブラウザー検査は390px幅で1通ずつ・変更後の送信禁止・別ブラウザーの本人ログイン/秘密fragment除去・回答記録確認・終了を検査。全ネットワークは模擬応答で、実メール到着の証明ではない。
+- 検証プロジェクトへsession SQLと新規管理関数v1/verify_jwt=trueを配備。配備ソースはblob557b294867d2ed939e2c8ed515984c8b813bc80fと一致。
+- main commit e6d7d128ffd560c9c159b0c9348cdef9ce0eedd8ではstagingのHTML2点だけを反映。Pages run38882622153成功。実配信がHTTP200で、trial画面blob284266139f233691ad089b9281096779a49ec4e4、reply画面blobc99fa75423db014a8c60ace33ed60760153eac3dに一致。本番顧客APIや本番DBの導入はしていない。
+- ライブ確認：未ログインの管理APIはHTTP401 LOGIN_REQUIRED。session statusはNOT_STARTED、台帳0件、内部intake_enabled=false、anonのsession RPC実行不可、authenticatedのexpire RPC実行不可。試験はまだ開始せず、実メール0通。
+- 次は運営者が https://app.rainbow-driver.com/staging/cargo-owner-mail-test.html で検証用アカウントにログインし、送信なしの開始を行う。認証コードは本人が画面に入力し、チャットやGitへ送らない。メール到着・実DB連携・実リンク回答の最終確認は本人の操作待ち。
+- security advisorは既存のservice専用RLS/no-policy INFOと漏洩パスワード保護未有効WARNのみ。一般向け顧客ページ・本番設定の公開判断は引き続き別。

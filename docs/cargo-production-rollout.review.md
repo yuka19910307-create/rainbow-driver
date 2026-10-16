@@ -158,3 +158,19 @@
 - controlはintake_enabled=false/captcha_required=true/contact_verification_required=trueを再確認。DB設定変更・メール送信なし。
 - 開発修正e795d45657930b3275cf6b3b29fa51264d66824bに対するsecurity/SQL、browser、staging smokeの3CI成功。
 - 残る限定通し試験の条件：現状の一般受付スイッチだけをONにすると対象外の開始/回答も許可し得るため、その操作は行わない。本人のみ・架空案件1件・期限付きの試験制限を先に実装/検証し、送信対象と上限が確認できてから実メール2通の試験へ進む。今回の反映を実メールE2E成功とは扱わない。
+
+## 2026-10-16 18:02 JST以降：本人限定・1案件・30分・各1回の試験制限
+
+- stagingの3顧客関数へ同一のサーバー制限を追加。確認済みメールを持つ固定ownerのgetUser検証、固定の架空データ、本人の認証メール宛先、固定draft_idとsource_draft_idで結び付く1件だけを許可する。検証プロジェクト以外ではこの追加制限は適用しない。
+- 新規staging専用cargo_staging_owner_test_runsはRLS有効、public/anon/authenticatedの権限を撤回。service_roleだけが行を取得・登録・更新し、認可RPCを実行できる。作成だけでは試験を開始しない。owner固定、最大30分、初期enabled=falseをDB制約で強制。
+- 行ロックを使い、OTP送信開始と見積もり送信の枠を各1回だけ確保する。不明な送信でも枠を戻さない。送信直前にも期限・本人・対象を再確認する。
+- 期限切れ/無効/取得失敗/本人以外/別宛先/別fixture/別案件は拒否。既存のDB受付スイッチ、Turnstile、OTP、メール全体枠、原子的な回答処理を迂回しない。
+- 匿名のstaging status/start/verifyは、内部スイッチを有効とした模擬条件でも公開利用不可。既存の本番処理を対象とした連携試験と、本番/検証メールパスの確認も継続。
+- 回答ページに本人ログイン欄を追加。パスワードは送信後に画面から消去し、保存しない。パスワードをURLへ送るHTMLフォームは使わない。回答用秘密fragmentの即時除去を維持。
+- コードcommit 2eecc208481488c3309c6f76c51eaaa48dfa6e34、固定manifest 7e286a5d620f44d490bba002c19ae605fb0c028a。mainの既存検証ツールを開発ブランチへ取り込み、回答ページの追加競合は本人確認版で解決。mainへのブランチ全体マージは実施しない。
+- 検査対象head 18531c23282298f140aed6d3392c89df6d32c308、security/SQL run38879938532、browser run38879938384、smoke run38879938484が成功。隔離PostgreSQLで権限、owner/対象/期限、再使用拒否、並列start/quoteの各1回claimを確認。外部メールなし。
+- 検証プロジェクトにSQL制限のみ導入し、intake v14/verify_jwt=false、operator v13/verify_jwt=true、quote-reply v11/verify_jwt=falseへ配備。3つの配備ソースを取得して完全一致確認。
+- 回答ページだけmain更新commit70aa7b6fa1387bacda682061015ece473f95e13b、blob7f46ba997f825138bda99bc62efdf5e98e760990。顧客用本番APIは変更していない。
+- 配備後、試験台帳0件、intake_enabled=false、captcha_required/contact_verification_required=true、anon台帳SELECT不可、authenticated認可RPC実行不可を確認。試験枠は作っていない。実メール送信もなし。
+- security advisorのRLS有効/ポリシーなしINFOはservice_role専用の閉鎖設計として維持。匿名・ログイン利用者への権限追加で解消しない。既存Authの漏洩パスワード保護WARNは今回変更なし（https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection）。
+- 残作業：開始・停止と30分枠の有効化方法、固定fixture/attempt_idで実際の入力→OTP→審査→見積もり送信を行う試験画面への接続。これらが完成する前に内部スイッチをONにしない。本項は実メールE2E成功を示さない。

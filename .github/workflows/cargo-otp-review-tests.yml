@@ -16,6 +16,8 @@ on:
       - "tests/cargo-staging-owner-test*"
       - "tests/cargo-staging-live-smoke.mjs"
       - "integrations/cargo-customer-intake/**"
+      - "integrations/cargo-staging-owner-mail-test/**"
+      - "tests/cargo-staging-owner-mail-session.test.cjs"
       - "tests/cargo-request-review.test.cjs"
       - "tests/cargo-customer-email-acceptance.test.cjs"
       - "tests/cargo-customer-pipeline.test.cjs"
@@ -49,7 +51,7 @@ jobs:
       - name: Verify pinned production candidate (read-only; no deployment)
         run: node scripts/check-cargo-production-candidate.cjs
       - name: Run offline contract tests (no secrets or network requests)
-        run: node --test tests/cargo-staging-owner-test.test.cjs tests/cargo-customer-quote-flow.test.cjs tests/cargo-customer-quote-edit.test.cjs tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs tests/cargo-customer-email-acceptance.test.cjs tests/cargo-customer-pipeline.test.cjs tests/cargo-customer-retention-operator.test.cjs
+        run: node --test tests/cargo-staging-owner-mail-session.test.cjs tests/cargo-staging-owner-test.test.cjs tests/cargo-customer-quote-flow.test.cjs tests/cargo-customer-quote-edit.test.cjs tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs tests/cargo-customer-email-acceptance.test.cjs tests/cargo-customer-pipeline.test.cjs tests/cargo-customer-retention-operator.test.cjs
 
   staging-live-smoke:
     runs-on: ubuntu-latest
@@ -128,6 +130,10 @@ jobs:
         run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/staging-owner-test.assert.sql
       - name: Verify concurrent owner-test claims grant one attempt each
         run: python3 tests/cargo-staging-owner-test-concurrency.py
+      - name: Apply owner-test start and stop controls (disposable only)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/staging-owner-test-session.review.sql
+      - name: Verify one-time start, stop and automatic expiry
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/staging-owner-test-session.assert.sql
       - name: Remove disposable database
         if: always()
         run: docker rm -f cargo-otp-ci-postgres || true

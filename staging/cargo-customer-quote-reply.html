@@ -113,8 +113,8 @@ async function show(){
    set("内容をご確認のうえ、ご希望をお選びください。");
   }
  }catch{
-  secret=null;close();
-  set("お見積もりを表示できません。期限切れ・受付停止中・無効なリンクの可能性があります。");
+  loaded=false;close();
+  set("お見積もりを表示できません。本人確認欄のログイン、期限、試験枠の状態をご確認ください。");
  }
 }
 async function answer(choice){

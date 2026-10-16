@@ -1,0 +1,77 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://challenges.cloudflare.com; style-src 'unsafe-inline'; connect-src https://hvdoqcrnztqmbzgwrovd.supabase.co https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; base-uri 'none'; form-action 'none'; object-src 'none'"><title>本人限定・メールの通し確認｜Rainbow Driver</title><style>
+*{box-sizing:border-box}body{margin:0;background:#eef3f8;color:#203950;font:17px/1.75 system-ui,sans-serif}header{background:#213e60;color:white;padding:26px 18px}header>div,main{max-width:720px;margin:auto}main{padding:18px}.card{padding:22px;background:white;border:1px solid #d5e1ed;border-radius:16px;margin-bottom:18px}h1{font-size:25px;line-height:1.5;margin:8px 0}h2{font-size:21px;line-height:1.5;margin:0 0 15px}p{margin:10px 0}label{display:block;font-weight:650;margin-top:14px}input,textarea{display:block;width:100%;padding:13px;font:inherit;border:1px solid #afc1d4;border-radius:8px;color:inherit}button{font:inherit;font-weight:700;padding:14px 18px;background:#264b72;color:white;border:0;border-radius:10px;margin:12px 0;min-height:50px;max-width:100%;cursor:pointer}button:disabled{opacity:.45;cursor:default}.secondary{background:#e6edf5;color:#264b72}.notice{background:#eaf1f8;padding:15px;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere}.badge{font-size:14px}.muted{font-size:14px;color:#61758a}.error{color:#8f2635}#result{white-space:pre-wrap;overflow-wrap:anywhere}#fixtureText{font-size:15px}#captcha{min-height:70px;max-width:100%;overflow:hidden}[hidden]{display:none!important}a{color:#235c96;overflow-wrap:anywhere}</style></head><body>
+<header><div><span class="badge">検証専用・一般のお客様は受付していません</span><h1>本人限定・メールの通し確認</h1><p>架空案件1件／最大30分／認証用と見積もり用を各1通</p></div></header><main>
+<section class="card" id="loginPane"><h2>検証用アカウントでログイン</h2><p>これまでの検証で使った管理者アカウントです。送信先はログインした本人のメールに固定されます。</p><form id="loginForm"><label for="email">検証用メールアドレス</label><input id="email" type="email" autocomplete="username" required><label for="password">検証用パスワード</label><input id="password" type="password" autocomplete="current-password" required><button id="login" type="submit">ログインして準備状況を確認</button></form><p class="muted">ログインだけではメールを送りません。</p></section>
+<section class="card" id="trialPane" hidden><h2>試験の状態</h2><p id="recipient" class="notice"></p><p id="state" role="status"></p><p id="clock" class="muted"></p><button id="begin" hidden>本人限定の試験を開始（送信なし）</button><button id="reload" class="secondary">状態を再確認（送信なし）</button><button id="finish" class="secondary" hidden>試験を終了する</button><button id="logout" class="secondary">ログアウト</button><p class="muted">開始後は途中で画面を閉じても期限で停止します。使い終わった試験枠は、この画面から作り直せません。</p></section>
+<section class="card" id="casePane" hidden><h2>1. 固定の架空案件</h2><p id="fixtureText" class="notice"></p><p>配送・料金・契約・配車・決済は確定しません。</p><div id="captcha"></div><button id="sendOtp" disabled>自分のメールへ認証コードを1通送る</button><p id="otpState" class="muted"></p><div id="verifyPane" hidden><label for="code">Gmailに届いた6桁の認証コード</label><input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}"><button id="verify">認証して架空案件を保存</button><p class="muted">コードはこの欄に入力してください。チャットへ送る必要はありません。</p></div></section>
+<section class="card" id="reviewPane" hidden><h2>2. 管理者の審査・見積もり</h2><p id="requestState" class="notice"></p><button id="review">この架空案件の審査を開始</button><label for="amount">テスト用の見積もり金額（円）</label><input id="amount" type="number" min="1" max="10000000" step="1" placeholder="例：10000（実際の料金ではありません）"><label for="terms">テスト用の条件</label><textarea id="terms" rows="3">テスト用の見積もりです。実際の配送・料金・追加費用の条件ではありません。</textarea><button id="prepare">見積もり下書きを保存（送信なし）</button><p id="quoteText" class="notice"></p><button id="sendQuote" disabled>保存済み見積もりを自分へ1通送る</button><p class="muted">送信前に、保存済みの金額・条件・期限を確認します。金額や条件を変更したら、下書きを保存し直してください。</p></section>
+<section class="card" id="replyPane" hidden><h2>3. Gmailで見積もりに回答</h2><p>届いた見積もりメール内のリンクを開き、「この条件で利用を希望する」を押してください。必要な場合は、同じ検証用アカウントでログインします。</p><p>回答後、この画面へ戻って結果を確認してください。</p><button id="checkReply">回答結果を確認（送信なし）</button><p id="replyState" class="notice"></p><button id="complete" class="secondary" hidden>確認を終えて試験を終了</button></section>
+<section class="card"><p id="result" role="status" aria-live="polite">画面を準備しています…</p><p class="muted">送信結果が不明なときは再送しません。「状態を再確認」で保存状態を確認してください。パスワードや認証コードを他の人へ送る必要はありません。</p></section>
+</main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js" integrity="sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg" crossorigin="anonymous"></script><script>
+(()=>{'use strict';const $=id=>document.getElementById(id);
+const STAGE='https://hvdoqcrnztqmbzgwrovd.supabase.co',KEY='sb_publishable_A-f3WQb7Oh8uMqO4BJPPtg_l4c_JCfQ';
+if(location.origin!=='https://app.rainbow-driver.com'||!window.supabase){$('result').textContent='公式サイトの検証用URLから開き直してください。';$('login').disabled=true;return}
+const db=window.supabase.createClient(STAGE,KEY,{auth:{persistSession:true,autoRefreshToken:false,detectSessionInUrl:false,storageKey:'rd-cargo-staging-operator-auth-v1'}});
+let accessToken=null,trial=null,savedQuote=null,busy=false,dirty=false,captchaToken='',widgetId=null,scriptLoaded=false;
+const message=text=>{$('result').textContent=text};
+async function call(slug,body){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+ try{const response=await fetch(STAGE+'/functions/v1/'+slug,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer',signal:controller.signal});const data=await response.json();if(!response.ok||data.ok===false){const e=new Error(data.reason||data.error||'UNAVAILABLE');e.reason=data.reason||data.error;throw e}return data}finally{clearTimeout(timer)}
+}
+const session=action=>call('cargo-staging-owner-mail-test',action==='begin'?{action,confirmation:'BEGIN_OWNER_ONLY_MAIL_TRIAL'}:{action});
+function active(){return trial?.state==='ACTIVE'&&Date.parse(trial.expires_at)>Date.now()}
+function render(){
+ $('loginPane').hidden=!!accessToken;$('trialPane').hidden=!accessToken;
+ $('begin').hidden=trial?.state!=='NOT_STARTED';$('finish').hidden=!trial||trial.state==='NOT_STARTED';
+ $('casePane').hidden=!trial||trial.state==='NOT_STARTED';$('reviewPane').hidden=!trial?.request_id;$('replyPane').hidden=!trial?.quote_claimed;
+ $('state').textContent=trial?({NOT_STARTED:'まだ試験を開始していません。',ACTIVE:'本人限定の試験中です。',CLOSED:'試験枠は終了しました。新たな送信・認証・回答はできません。'})[trial.state]||'状態を確認できません。':'状態を確認中です。';
+ if(trial?.state==='ACTIVE'&&!active())$('state').textContent='制限時間を過ぎました。新たな送信・認証・回答はできません。';
+ $('recipient').textContent=trial?'送信先（本人のみ）：'+trial.email:'';
+ $('clock').textContent=trial?.expires_at?'期限：'+new Date(trial.expires_at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})+'（日本時間）':'';
+ if(trial?.fixture){const f=trial.fixture;$('fixtureText').textContent=['集荷：'+f.pickup,'配送先：'+f.delivery,'荷物：'+f.cargo,'2箱／8.5kg／40×30×25cm'].join('\n')}
+ $('verifyPane').hidden=!trial?.start_claimed||!trial?.draft_exists||!!trial?.request_id;
+ $('otpState').textContent=trial?.start_claimed?(trial.request_id?'認証・保存済みです。':trial.draft_exists?'メールの認証コードを入力してください。再送は行いません。':'送信を試行済みですが、認証用の保存状態を確認できません。再送せず、担当者にこの表示をお知らせください。'):'';
+ $('requestState').textContent=trial?.request_id?'受付ID：'+trial.request_id+'\n状態：'+({pending_operator_review:'審査待ち',operator_reviewing:'審査中',quoted:'見積もり案内済み'})[trial.request_status]:'まだ保存されていません。';
+ $('replyState').textContent=trial?.reply_state?'回答：'+({interested:'利用希望',declined:'今回は見送り'})[trial.reply_state]+'を保存しました。配送・契約・決済は確定していません。':trial?.delivery_status==='sent'?'メール送信を受け付けました。Gmailで到着と回答用リンクをご確認ください。':'送信の状態は未確定です。Gmailを確認し、再送せずに状態を再確認してください。';
+ $('complete').hidden=!trial?.reply_state;
+ for(const b of document.querySelectorAll('button'))b.disabled=busy;
+ $('sendOtp').disabled=busy||!active()||trial.start_claimed||!captchaToken;
+ $('verify').disabled=busy||!active()||!trial?.draft_exists||!!trial?.request_id;
+ $('review').disabled=busy||!active()||trial?.request_status!=='pending_operator_review';
+ $('prepare').disabled=busy||!active()||trial?.request_status!=='operator_reviewing'||trial?.quote_claimed;
+ $('sendQuote').disabled=busy||!active()||!savedQuote||savedQuote.delivery_status!=='ready_to_send'||dirty||trial?.quote_claimed;
+ $('amount').disabled=busy||!active()||trial?.quote_claimed;$('terms').disabled=$('amount').disabled;
+ $('checkReply').disabled=busy||!accessToken;$('complete').disabled=busy||!trial?.reply_state;
+}
+function mountCaptcha(siteKey){
+ if(widgetId!==null||!siteKey)return;
+ if(!window.turnstile){if(!scriptLoaded){scriptLoaded=true;window.ownerTrialCaptchaReady=()=>mountCaptcha(siteKey);const s=document.createElement('script');s.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=ownerTrialCaptchaReady';document.head.appendChild(s)}return}
+ widgetId=window.turnstile.render($('captcha'),{sitekey:siteKey,action:'cargo_customer_intake',callback:t=>{captchaToken=t;render()},'expired-callback':()=>{captchaToken='';render()},'error-callback':()=>{captchaToken='';render()}});
+}
+async function refresh(){
+ trial=await session('status');if(trial.owner_only!==true||trial.environment!=='CARGO_FREE_STAGING'||trial.public_intake_enabled!==false)throw Error('INVALID_STATUS');
+ if(trial.request_id){const result=await call('cargo-customer-review-operator',{action:'list'});savedQuote=result.items?.find(x=>x.id===trial.request_id)?.quote||null;
+  if(savedQuote){$('quoteText').textContent='保存済み：'+savedQuote.amount_yen.toLocaleString('ja-JP')+'円\n'+savedQuote.terms+'\n期限：'+new Date(savedQuote.valid_until).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'});if(!dirty){$('amount').value=savedQuote.amount_yen;$('terms').value=savedQuote.terms}}}
+ if(active()&&!trial.start_claimed){const config=await call('cargo-customer-intake',{action:'status'});if(config.ready===true&&config.owner_test===true)mountCaptcha(config.captcha_site_key)}
+ render();
+}
+async function run(work){if(busy)return;busy=true;render();try{await work()}catch(e){const known={OWNER_ONLY:'検証用の管理者アカウントを確認してください。',INVALID_SESSION:'ログインし直してください。',OWNER_TEST_DENIED:'試験の対象または期限を確認できません。再送せず状態を再確認してください。',PUBLIC_INTAKE_DISABLED:'試験枠は停止しています。',MAIL_NOT_CONFIRMED:'メールの送信結果が不明です。再送せずGmailを確認してください。',CAPTCHA_FAILED:'不正利用防止の確認をやり直してください。',NOT_CONFIGURED:'送信設定の準備を確認できません。設定を変えず担当者へお知らせください。'};message(known[e.reason]||'結果を確認できませんでした。再送せず「状態を再確認」を押してください。');try{if(accessToken)await refresh()}catch{}}finally{busy=false;render()}}
+$('loginForm').onsubmit=e=>{e.preventDefault();run(async()=>{try{const {data,error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error||!data?.session?.access_token)throw Error();accessToken=data.session.access_token;await refresh();message('本人確認ができました。開始操作ではメールを送りません。')}catch{accessToken=null;trial=null;message('ログインできませんでした。これまで使った検証用アカウントをご確認ください。')}finally{$('password').value=''}})};
+$('begin').onclick=()=>run(async()=>{await session('begin');await refresh();message('本人限定の試験枠を開始しました。まだメールは送っていません。')});
+$('reload').onclick=()=>run(async()=>{await refresh();message('保存されている状態を確認しました。メールは送っていません。')});
+$('finish').onclick=$('complete').onclick=()=>run(async()=>{await session('finish');await refresh();message('試験を終了しました。新たな送信・回答を停止しました。')});
+$('logout').onclick=()=>run(async()=>{if(trial?.state==='ACTIVE')await session('finish');await db.auth.signOut({scope:'local'});accessToken=null;trial=null;savedQuote=null;message('ログアウトしました。')});
+$('sendOtp').onclick=()=>run(async()=>{
+ if(!active()||trial.start_claimed||!captchaToken)return;
+ try{const data=await call('cargo-customer-intake',{action:'start',attempt_id:trial.draft_id,email:trial.email,request:trial.fixture,captcha_token:captchaToken});if(data.challenge_id!==trial.draft_id)throw Error();message('認証メールを1通送信受付しました。Gmailでコードを確認して入力してください。')}finally{captchaToken='';if(widgetId!==null)window.turnstile?.reset(widgetId);await refresh()}
+});
+$('verify').onclick=()=>run(async()=>{const code=$('code').value.trim();if(!/^[0-9]{6}$/.test(code)){message('メールに届いた6桁のコードを入力してください。');return}try{await call('cargo-customer-intake',{action:'verify',challenge_id:trial.draft_id,code});await refresh();message('本人のメール認証が完了し、架空案件を保存しました。')}finally{$('code').value=''}});
+$('review').onclick=()=>run(async()=>{await call('cargo-customer-review-operator',{action:'decision',id:trial.request_id,expected_status:'pending_operator_review',next_status:'operator_reviewing'});await refresh();message('架空案件の審査を開始しました。')});
+for(const id of ['amount','terms'])$(id).oninput=()=>{dirty=true;render()};
+$('prepare').onclick=()=>run(async()=>{const amount=Number($('amount').value),terms=$('terms').value.trim();if(!Number.isSafeInteger(amount)||amount<1||amount>10000000||terms.length<30){message('テスト用金額と、30文字以上の条件を入力してください。');return}if(Date.parse(trial.expires_at)<=Date.now()+6*60000){message('残り時間が短いため見積もりを作れません。試験を終了してください。');return}await call('cargo-customer-review-operator',{action:'quote_prepare',id:trial.request_id,amount_yen:amount,terms,valid_until:trial.expires_at});dirty=false;await refresh();message('見積もり下書きを保存しました。まだ送信していません。')});
+$('sendQuote').onclick=()=>run(async()=>{if(!savedQuote||dirty||trial.quote_claimed)return;if(!confirm('本人宛てに見積もりメールを1通送ります。\n'+savedQuote.amount_yen.toLocaleString('ja-JP')+'円\n'+savedQuote.terms+'\n期限：'+new Date(savedQuote.valid_until).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})+'\n再送は行いません。'))return;try{await call('cargo-customer-review-operator',{action:'quote_send',id:trial.request_id,confirmation:'SEND_APPROVED_QUOTE'});message('見積もりメールを1通送信受付しました。Gmailのリンクから回答してください。')}finally{await refresh()}});
+$('checkReply').onclick=()=>run(async()=>{await refresh();message(trial.reply_state?'回答の保存まで確認できました。「確認を終えて試験を終了」を押してください。':'回答はまだ確認できません。Gmailのリンクから回答後、もう一度確認してください。')});
+setInterval(()=>{if(trial?.expires_at)render()},1000);
+render();message('検証用アカウントでログインしてください。');
+})();
+</script></body></html>

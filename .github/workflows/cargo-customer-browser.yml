@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - "staging/cargo-customer-intake.html"
+      - "staging/cargo-owner-mail-test.html"
+      - "staging/cargo-customer-quote-reply.html"
+      - "tests/cargo-owner-mail-test-browser.test.cjs"
       - "cargo-pwa/request-review-rules.js"
       - "tests/cargo-customer-form-browser.test.cjs"
       - ".github/workflows/cargo-customer-browser.yml"
@@ -25,4 +28,6 @@ jobs:
       - name: Install Chromium for simulated offline form test
         run: node "$RUNNER_TEMP/cargo-browser/node_modules/playwright/cli.js" install --with-deps chromium
       - name: Exercise real form with intercepted synthetic responses only
-        run: NODE_PATH="$RUNNER_TEMP/cargo-browser/node_modules" node tests/cargo-customer-form-browser.test.cjs
+        run: |
+          NODE_PATH="$RUNNER_TEMP/cargo-browser/node_modules" node tests/cargo-customer-form-browser.test.cjs
+          NODE_PATH="$RUNNER_TEMP/cargo-browser/node_modules" node tests/cargo-owner-mail-test-browser.test.cjs

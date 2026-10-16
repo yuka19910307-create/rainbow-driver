@@ -212,3 +212,11 @@
 - 実際の検証環境へSELECTのみ実行し、その結果を判定スクリプトへ渡して正常を確認。19:35 JST、異常件数すべて0、内部受付OFF、3ジョブ稼働/予定一致/成功履歴あり。新しいテーブル・権限・関数・cronは作成していない。
 - 通常/異常/古い結果/設定欠落/入力不正の5ローカル試験が成功。隔離PostgreSQLのcron模擬履歴でSQLから分類までの正常・欠落・遅延・失敗・復旧検査をCIへ追加。試験の書込みは隔離DB内でロールバックする。
 - 本番監視、定期起動、通知連携は未導入。監視間隔/通知先/障害担当/本番ジョブ名は別途レビュー。スクリプトは送信・再送・削除・修復を行わない。手順と限界はdocs/cargo-monitoring.review.md。
+
+## 2026-10-16 19:56〜20:00 JST：検証環境の定期監視を稼働
+
+- staging_bounded_cargo_health_monitorを検証環境だけに適用。監視結果をservice専用/RLS有効の1行へ保持する。snapshot/tickはSECURITY INVOKER、anon/authenticatedは参照・実行不可。
+- 監視対象の値だけを読み、日時/異常コード/件数/失敗回数を更新する。メール送信・再送・受付変更・削除は行わない。検査失敗はエラー本文を残さずMONITOR_CHECK_FAILEDとして記録する。
+- job4 cargo-staging-health-monitorを5分間隔で登録。同名ジョブの上書きを拒否。20:00 JSTのscheduled runがsucceeded、監視時刻更新・異常なし・内部受付OFFを読取確認した。
+- 1c3a5fad1e4b47007ee6ac84f4c3f6b50e33a846のsecurity/SQL run38890342397、browser run38890342399、smoke run38890342609が成功。SQL/Node分類一致、権限、失敗回数、復旧、監視処理自体の失敗を隔離DBで検証。
+- 外部からの死活監視・通知、実際の公開経路の不正利用対策、本番導入と事業条件確認は未完了。古い正常記録を正常と判断せず、最終確認時刻の鮮度とジョブ自身の停止も確認する。手順はdocs/cargo-monitoring.review.md。

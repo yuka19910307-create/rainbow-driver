@@ -2,7 +2,8 @@
 
 更新日: 2026-10-15
 
-> 最新状況は [公開準備記録](../../docs/cargo-release-readiness-20261015.md) と [本番反映・復旧手順](../../docs/cargo-production-rollout.review.md) を参照。
+> 最新の開発状況は [相談区分と安全対策の継続記録](../../docs/cargo-consultation-flow-continuation.review.md) を参照。本番DB/API/画面の導入記録は同文書の参照先にあり、以下の「未導入」は作成当時の履歴。今回の開発変更は本番未配備。
+> 従来の状況は [公開準備記録](../../docs/cargo-release-readiness-20261015.md) と [本番反映・復旧手順](../../docs/cargo-production-rollout.review.md) を参照。
 > 以下には作成当時の記録も含まれる。「未実施」「未実装」の古い記述は最新記録と照合する。
 > 現在、検証環境ではTurnstile・所有者メール到着・暗号化・所有者限定OTP通し確認、終了/保留操作、期限後の一式削除、継続相談と見積もり期限の分離を実装・検証済み。
 > 本番顧客用6テーブル/RPCと顧客ページは未導入。一般受付OFF。本番の移行前確認SQLは production-preflight.review.sql（読み取りのみ）。
@@ -13,7 +14,7 @@
 2. Cloudflare Turnstileで不正利用防止確認、メールに6桁OTPを1通送信（**一般受付を許可し、すべての環境変数を設定して初めて動作**）
 3. 10分以内に本人確認、最大5回まで照合
 4. DBの1トランザクションでコードを使い切り、**暗号化した申込を審査待ちキューに1件だけ登録**。料金確定、ドライバー出動、決済、Pushはしない
-5. `cargo-customer-review.html` : 管理者JWT＋`cargo_operator_accounts`照合後に申込一覧を表示し、審査開始・辞退・対応終了を記録。自動見積やメール返信はしない
+5. `cargo-customer-review.html` : 管理者JWT＋`cargo_operator_accounts`照合後に申込一覧を表示し、審査開始・辞退・契約なし終了、手動見積もり下書き・明示操作による見積もり送信、利用希望への対応履歴を扱う。自動受諾・自動見積もりはしない
 
 ## 対象ファイル
 - `integrations/cargo-customer-intake/index.ts` : 公開用API（start/status/verify）、Turnstile、暗号化、メール送信、制限

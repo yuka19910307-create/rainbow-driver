@@ -24,6 +24,7 @@ button:disabled{opacity:.45}a{color:#2b659b}
 </section>
 <section id="requests" aria-live="polite"></section>
 </main>
+<script src="../cargo-pwa/request-review-rules.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 <script>
 (()=>{"use strict";
@@ -49,8 +50,10 @@ async function invoke(body){
  return data;
 }
 function detail(d){
+ const preference=window.CargoRequestReview?.describeDelivery?.(d)||{label:"要確認",requestedPickup:"相談区分・希望日時を担当者が確認してください。"};
  return [
-  ["希望集荷",d.preferredPickupAt?String(d.preferredPickupAt).replace("T"," ")+"（日本時間・希望）":"即時・当日（担当者確認後に決定）"],
+  ["相談区分",preference.label],["希望集荷",preference.requestedPickup],
+  ["配送・予約","この画面では確定しません。相談・見積もり・利用希望の回答だけでは確約しません。"],
   ["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
   ["個数",d.pieces],["重量",String(d.weight)+"kg"],
   ["寸法",String(d.length)+"×"+d.width+"×"+d.height+"cm"],
@@ -81,6 +84,24 @@ function quotePane(item){
  const heading=document.createElement("h3");heading.textContent="手動見積もり・回答";
  container.append(heading);
  container.append(label("料金は案件ごとに入力してください。共通の料金表・距離単価・最低料金は未設定です。税の扱い・追加費用の条件も確認して記入してください。"));
+ // Local reminders only: no reservation, acceptance record or API authorization.
+ const checks=[];
+ let sendQuote=null,quoteDirty=false;
+ const reviewed=()=>checks.length===3&&checks.every(input=>input.checked===true);
+ function updateChecks(){save.disabled=!reviewed();if(sendQuote)sendQuote.disabled=quoteDirty||!reviewed();}
+ const checklist=document.createElement("fieldset");
+ const legend=document.createElement("legend");legend.textContent="見積もり前の確認（案件ごと・この画面内のみ）";checklist.append(legend);
+ for(const [key,message] of [
+  ["schedule","希望日時と自分の稼働予定・既存案件との重複を確認した"],
+  ["route","集荷までの移動・積卸し・待機・帰路を含む対応時間を確認した"],
+  ["vehicle","使用するN-VANの実車の積載条件と荷物・荷役条件を確認した"]
+ ]){
+  const wrap=document.createElement("label"),input=document.createElement("input"),caption=document.createElement("span");
+  input.type="checkbox";input.checked=false;input.dataset.consultationCheck=key;
+  caption.textContent=message;wrap.style.display="block";wrap.append(input,caption);checklist.append(wrap);
+  checks.push(input);input.addEventListener("change",updateChecks);
+ }
+ container.append(label("既存の予定を確認し、案件ごとに受注可否を判断してください。この確認や見積もり保存では車両・時間枠を確保しません。"));
  const existing=item.quote;
  if(existing){
   const prior=document.createElement("p");prior.className="details";
@@ -96,6 +117,7 @@ function quotePane(item){
    :"メール送信済みです。再送はできません。");
   container.append(note);return container;
  }
+ container.append(checklist);
  function field(labelText,type,value){
   const wrap=document.createElement("label");
   wrap.style.display="block";wrap.style.margin="10px 0";
@@ -124,7 +146,7 @@ function quotePane(item){
   dateInput.value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
  }
  const save=button("見積もりを下書き保存",async()=>{
-  if(busy)return;
+  if(busy||!reviewed())return;
   const yen=Number(amount.value),deadline=new Date(dateInput.value),memo=terms.value.trim();
   if(!Number.isSafeInteger(yen)||yen<1||yen>10000000||
     memo.length<30||memo.length>1200||!Number.isFinite(deadline.valueOf())||
@@ -144,11 +166,11 @@ function quotePane(item){
   }catch{ text("auth","見積もりの保存を確認できませんでした。通信・権限を確認してください。") }
   finally{busy=false;$("refresh").disabled=!user}
  });
- container.append(save);
+ save.disabled=true;container.append(save);
+ const invalidateChecks=()=>{checks.forEach(check=>{check.checked=false});updateChecks()};
  if(existing?.delivery_status==="ready_to_send"){
-  let quoteDirty=false;
-  const sendQuote=button("保存済み見積もりをお客様へ1通送信",async()=>{
-   if(busy||quoteDirty)return;
+  sendQuote=button("保存済み見積もりをお客様へ1通送信",async()=>{
+   if(busy||quoteDirty||!reviewed())return;
    if(!confirm("次の保存済み見積もりを送信します。\n金額："+Number(existing.amount_yen).toLocaleString("ja-JP")+"円\n期限："+localDate(existing.valid_until)+"（日本時間）\n条件："+String(existing.terms||"")+"\n\n認証済みメールへ1通送信します。送信後の訂正・再送はできません。実行しますか？"))return;
    busy=true;$("refresh").disabled=true;
    try{
@@ -167,11 +189,13 @@ function quotePane(item){
   const unsaved=label("送信対象は保存済みの金額・条件・期限です。");
   for(const input of [amount,terms,dateInput]){
    input.addEventListener("input",()=>{
-    quoteDirty=true;sendQuote.disabled=true;
+    quoteDirty=true;invalidateChecks();sendQuote.disabled=true;
     unsaved.textContent="変更は未保存です。下書きを保存し直してから送信してください。";
    });
   }
-  container.append(unsaved,sendQuote);
+  sendQuote.disabled=true;container.append(unsaved,sendQuote);
+ }else{
+  for(const input of [amount,terms,dateInput])input.addEventListener("input",invalidateChecks);
  }
  return container;
 }
@@ -194,7 +218,7 @@ function followupPane(item){
   "\n最終記録："+String(item.followup?.updated_at||"なし")+
   "\n前回メモ："+String(item.followup?.operator_note||"なし");
  panel.append(prev);
- const hint=label("お客様への連絡は自動送信されません。電話・メール等で実際に対応した内容だけを記録してください。");
+ const hint=label("利用希望の回答後も、予定と対応可否を改めて確認し、別途ご案内してください。回答やこの履歴の保存では配送・予約・契約は確定しません。お客様への連絡は自動送信されません。電話・メール等で実際に対応した内容だけを記録してください。");
  panel.append(hint);
  if(current==="handled_offline"||current==="closed_no_order"){
   panel.append(label("この案件の対応履歴は終了済みです。記録は変更できません。"));

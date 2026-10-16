@@ -1,0 +1,38 @@
+name: Cargo consultation and disabled notification diagnostics
+
+on:
+  push:
+    branches: [test/cargo-safe-integration-20261013]
+    paths:
+      - "cargo-customer-intake.html"
+      - "cargo-customer-review.html"
+      - "cargo-request-preview.html"
+      - "staging/cargo-customer-intake.html"
+      - "staging/cargo-customer-review.html"
+      - "cargo-pwa/request-review-rules.js"
+      - "scripts/check-cargo-notification-state.cjs"
+      - "tests/cargo-delivery-consultation.test.cjs"
+      - "tests/cargo-customer-quote-edit.test.cjs"
+      - "tests/cargo-notification-state-diagnostic.test.cjs"
+      - ".github/workflows/cargo-consultation-safety.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-changed-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test consultation changes with synthetic browser and services
+        run: node tests/cargo-delivery-consultation.test.cjs
+      - name: Verify saved quote and dirty edit protections affected by the checklist
+        run: node tests/cargo-customer-quote-edit.test.cjs
+      - name: Test new disabled notification diagnostic only
+        run: node tests/cargo-notification-state-diagnostic.test.cjs

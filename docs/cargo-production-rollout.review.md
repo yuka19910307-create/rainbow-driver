@@ -148,3 +148,13 @@
 - 実送信コード→模擬メール→実回答コードの検査は検証用URLで成功。本番用パスが変わらないことも確認。stagingページの本番参照混入・公開キー・fragment除去をCIへ追加。
 - 修正は開発ブランチのみ。稼働中関数・公開HTMLは未配備。両方を対応する版にそろえるまで実メール試験へ進まない。既存stagingはintake_enabled=false/captcha_required=true/contact_verification_required=trueを読取確認。
 - 実メール試験には、一般受付を開放せず対象を限定する手段とメール送信範囲の確定が引き続き必要。今回メール送信・データ変更・受付ONなし。
+
+## 2026-10-16 17:51 JST以降：検証用回答経路の配備と実配信照合
+
+- 検証プロジェクト hvdoqcrnztqmbzgwrovd の cargo-customer-review-operator をv11→v12へ更新。verify_jwt=trueを維持。変更はquoteReplyPathとメール本文の参照先のみ。取得した配備ソースはblob 7b651c40a02d33fca9db9bb9fc3bc0ec75d147ceと完全一致。
+- staging/cargo-customer-quote-reply.html の戻りリンクを、既存の ../cargo-staging-login.html へ変更。開発ブランチでのblob ff6bf20b0399d4e1517e2cf9a9c2fbca8a0e3853を、mainにこの1ファイルだけ追加（commit 99561046d4dfb39f2c5a795826fbe1a51a99e719）。顧客用本番ページ・他業務・CNAME・本番APIは変更していない。
+- GitHub Pages run 38877020249成功。https://app.rainbow-driver.com/staging/cargo-customer-quote-reply.html がHTTP200で応答し、実配信バイトのGit blob SHAもff6bf20b0399d4e1517e2cf9a9c2fbca8a0e3853と一致。検証API参照のみ。
+- 配備後のライブ確認：operatorの未ログインlistはHTTP401 LOGIN_REQUIRED、intake statusはHTTP200でpublic_intake_enabled=false/accepts_orders=false/automatic_dispatch=false/payment_enabled=false、架空トークンでのreply viewはHTTP423 PUBLIC_INTAKE_DISABLED。
+- controlはintake_enabled=false/captcha_required=true/contact_verification_required=trueを再確認。DB設定変更・メール送信なし。
+- 開発修正e795d45657930b3275cf6b3b29fa51264d66824bに対するsecurity/SQL、browser、staging smokeの3CI成功。
+- 残る限定通し試験の条件：現状の一般受付スイッチだけをONにすると対象外の開始/回答も許可し得るため、その操作は行わない。本人のみ・架空案件1件・期限付きの試験制限を先に実装/検証し、送信対象と上限が確認できてから実メール2通の試験へ進む。今回の反映を実メールE2E成功とは扱わない。

@@ -2,7 +2,7 @@
 \set ON_ERROR_STOP on
 begin;
 do $$
-declare o uuid:='5ccbfcd5-bd0f-4a9a-b570-223b3deb2567';j jsonb;d uuid;e text;
+declare o uuid:='5ccbfcd5-bd0f-4a9a-b570-223b3deb2567';j jsonb;d uuid;e text;n integer;
 begin
  delete from public.cargo_staging_owner_test_runs;
  insert into auth.users(id) values(o) on conflict do nothing;
@@ -22,7 +22,9 @@ begin
  j:=public.cargo_staging_owner_test_session(o,'begin');if j->>'state'<>'CLOSED' then raise exception 'RESTARTED_USED_TRIAL';end if;
  update public.cargo_staging_owner_test_runs set enabled=true,created_at=clock_timestamp()-interval '20 minutes',expires_at=clock_timestamp()-interval '1 minute';
  update public.cargo_intake_control set intake_enabled=true where id=1;
- if public.cargo_staging_owner_test_expire()<>1 or (select intake_enabled from public.cargo_intake_control where id=1) then raise exception 'EXPIRY_DID_NOT_STOP';end if;
+ n:=public.cargo_staging_owner_test_expire();
+ if n<>1 then raise exception 'EXPIRY_COUNT %',n;end if;
+ if (select intake_enabled from public.cargo_intake_control where id=1) then raise exception 'EXPIRY_DID_NOT_STOP';end if;
  if public.cargo_staging_owner_test_expire()<>0 then raise exception 'EXPIRY_NOT_IDEMPOTENT';end if;
 end $$;
 rollback;

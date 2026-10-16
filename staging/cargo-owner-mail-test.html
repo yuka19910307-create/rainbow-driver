@@ -57,7 +57,7 @@ async function refresh(){
 }
 async function run(work){if(busy)return;busy=true;render();try{await work()}catch(e){const known={OWNER_ONLY:'検証用の管理者アカウントを確認してください。',INVALID_SESSION:'ログインし直してください。',OWNER_TEST_DENIED:'試験の対象または期限を確認できません。再送せず状態を再確認してください。',PUBLIC_INTAKE_DISABLED:'試験枠は停止しています。',MAIL_NOT_CONFIRMED:'メールの送信結果が不明です。再送せずGmailを確認してください。',CAPTCHA_FAILED:'不正利用防止の確認をやり直してください。',NOT_CONFIGURED:'送信設定の準備を確認できません。設定を変えず担当者へお知らせください。'};message(known[e.reason]||'結果を確認できませんでした。再送せず「状態を再確認」を押してください。');try{if(accessToken)await refresh()}catch{}}finally{busy=false;render()}}
 $('loginForm').onsubmit=e=>{e.preventDefault();run(async()=>{try{const {data,error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error||!data?.session?.access_token)throw Error();accessToken=data.session.access_token;await refresh();message('本人確認ができました。開始操作ではメールを送りません。')}catch{accessToken=null;trial=null;message('ログインできませんでした。これまで使った検証用アカウントをご確認ください。')}finally{$('password').value=''}})};
-$('begin').onclick=()=>run(async()=>{await session('begin');await refresh();message('本人限定の試験枠を開始しました。まだメールは送っていません。')});
+$('begin').onclick=()=>run(async()=>{await session('begin');await refresh();message(active()?'本人限定の試験枠を開始しました。まだメールは送っていません。':'試験枠は終了しています。新しいメールは送っていません。')});
 $('reload').onclick=()=>run(async()=>{await refresh();message('保存されている状態を確認しました。メールは送っていません。')});
 $('finish').onclick=$('complete').onclick=()=>run(async()=>{await session('finish');await refresh();message('試験を終了しました。新たな送信・回答を停止しました。')});
 $('logout').onclick=()=>run(async()=>{if(trial?.state==='ACTIVE')await session('finish');await db.auth.signOut({scope:'local'});accessToken=null;trial=null;savedQuote=null;message('ログアウトしました。')});

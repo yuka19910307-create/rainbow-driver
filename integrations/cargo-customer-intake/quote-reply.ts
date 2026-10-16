@@ -46,6 +46,33 @@ const HEADERS={"Access-Control-Allow-Origin":APP,
  "Content-Type":"application/json; charset=utf-8",
  "Referrer-Policy":"no-referrer"};
 const response=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:HEADERS});
+// Keep each deployment self-contained. Bound bytes before decoding or JSON parsing.
+// UTF-8 needs at most 3 bytes per UTF-16 code unit, preserving the character cap.
+async function boundedBody(req:Request,maxBytes:number){
+ const declared=req.headers.get("content-length");
+ if(declared&&/^\d+$/.test(declared)&&Number(declared)>maxBytes){
+  void req.body?.cancel().catch(()=>{});
+  throw Error("BODY_TOO_LARGE");
+ }
+ if(!req.body)return "";
+ const reader=req.body.getReader(),decoder=new TextDecoder("utf-8",{fatal:true});
+ let total=0,text="",complete=false;
+ try{
+  while(true){
+   const {done,value}=await reader.read();
+   if(done)break;
+   total+=value.byteLength;
+   if(total>maxBytes)throw Error("BODY_TOO_LARGE");
+   text+=decoder.decode(value,{stream:true});
+  }
+  text+=decoder.decode();
+  complete=true;
+  return text;
+ }finally{
+  if(!complete)void reader.cancel().catch(()=>{});
+  reader.releaseLock();
+ }
+}
 const idPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const secretPattern=/^[0-9a-f]{64}$/i;
 const encoder=new TextEncoder();
@@ -70,7 +97,7 @@ Deno.serve(async(req:Request)=>{
  if(origin!==APP)return response({error:"ORIGIN_DENIED"},403);
  let input:Record<string,unknown>;
  try{
-  const body=await req.text();
+  const body=await boundedBody(req,350*3);
   if(body.length>350)return response({error:"BODY_TOO_LARGE"},413);
   input=JSON.parse(body);
   if(!input||typeof input!=="object"||Array.isArray(input))throw Error();
@@ -83,7 +110,10 @@ Deno.serve(async(req:Request)=>{
    ||typeof input.token!=="string"||!secretPattern.test(input.token)
    ||(input.action==="reply"&&!["interested","declined"].includes(String(input.choice))))
    throw Error();
- }catch{return response({error:"INVALID_LINK"},422)}
+ }catch(error){
+  if(error instanceof Error&&error.message==="BODY_TOO_LARGE")return response({error:"BODY_TOO_LARGE"},413);
+  return response({error:"INVALID_LINK"},422);
+ }
  const url=Deno.env.get("SUPABASE_URL")||"";
  const role=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
  const key=Deno.env.get("CARGO_INTAKE_HMAC_KEY")||"";

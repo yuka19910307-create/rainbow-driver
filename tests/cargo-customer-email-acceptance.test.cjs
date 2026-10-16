@@ -9,7 +9,7 @@ let response={ok:true,json:async()=>({id:'public-test-message-id'})};
 const db={from:()=>{const chain={select:()=>chain,eq:()=>chain,maybeSingle:async()=>({data:{intake_enabled:false,captcha_required:true,contact_verification_required:true}})};return chain}};
 const ctx={createClient:()=>db,Deno:{serve:f=>handler=f,env:{get:name=>({SUPABASE_URL:'https://staging.invalid',SUPABASE_SERVICE_ROLE_KEY:'mock-service-only'}[name]||'')}},
  fetch:async()=>{fetchCalls++;if(response instanceof Error)throw response;return response},
- TextEncoder,Uint8Array,Uint32Array,URLSearchParams,AbortController,Response,setTimeout,clearTimeout,atob,crypto:require('node:crypto').webcrypto};
+ TextEncoder,TextDecoder,Uint8Array,Uint32Array,URLSearchParams,AbortController,Response,setTimeout,clearTimeout,atob,crypto:require('node:crypto').webcrypto};
 vm.createContext(ctx);vm.runInContext(code,ctx);
 async function check(result,expected){response=result;fetchCalls=0;const accepted=await vm.runInContext("sendEmail('test@example.invalid','123456','sender@example.invalid','mock-provider-key')",ctx);assert.equal(accepted,expected);assert.equal(fetchCalls,1,'no automatic retries')}
 (async()=>{

@@ -48,6 +48,33 @@ const headers={"Access-Control-Allow-Origin":APP,
  "Access-Control-Allow-Methods":"POST,OPTIONS","Cache-Control":"no-store",
  "Vary":"Origin","Content-Type":"application/json; charset=utf-8"};
 const respond=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers});
+// Keep each deployment self-contained. Bound bytes before decoding or JSON parsing.
+// UTF-8 needs at most 3 bytes per UTF-16 code unit, preserving the character cap.
+async function boundedBody(req:Request,maxBytes:number){
+ const declared=req.headers.get("content-length");
+ if(declared&&/^\d+$/.test(declared)&&Number(declared)>maxBytes){
+  void req.body?.cancel().catch(()=>{});
+  throw Error("BODY_TOO_LARGE");
+ }
+ if(!req.body)return "";
+ const reader=req.body.getReader(),decoder=new TextDecoder("utf-8",{fatal:true});
+ let total=0,text="",complete=false;
+ try{
+  while(true){
+   const {done,value}=await reader.read();
+   if(done)break;
+   total+=value.byteLength;
+   if(total>maxBytes)throw Error("BODY_TOO_LARGE");
+   text+=decoder.decode(value,{stream:true});
+  }
+  text+=decoder.decode();
+  complete=true;
+  return text;
+ }finally{
+  if(!complete)void reader.cancel().catch(()=>{});
+  reader.releaseLock();
+ }
+}
 // Full canonical UUID (no version requirement for externally generated ids).
 const canonical=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function aesSecret(){
@@ -83,7 +110,7 @@ Deno.serve(async(req:Request)=>{
  if(!bearer)return respond({error:"LOGIN_REQUIRED"},401);
  let data:Record<string,unknown>;
  try{
-  const source=await req.text();
+  const source=await boundedBody(req,12000*3);
   if(source.length>12000)return respond({error:"BODY_TOO_LARGE"},413);
   data=JSON.parse(source);
   if(!data||typeof data!=="object"||Array.isArray(data))throw Error();
@@ -123,7 +150,10 @@ Deno.serve(async(req:Request)=>{
      !["contact_attempted","awaiting_reply","handled_offline","closed_no_order"].includes(String(data.next_stage))||
      typeof data.note!=="string"||data.note.trim().length<5||data.note.trim().length>600))
     throw Error();
- }catch{return respond({error:"INVALID_INPUT"},422)}
+ }catch(error){
+  if(error instanceof Error&&error.message==="BODY_TOO_LARGE")return respond({error:"BODY_TOO_LARGE"},413);
+  return respond({error:"INVALID_INPUT"},422);
+ }
  const url=Deno.env.get("SUPABASE_URL"),role=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
  const aes=aesSecret();
  if(!url||!role||!aes)return respond({error:"NOT_CONFIGURED"},503);

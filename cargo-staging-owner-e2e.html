@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src https://hvdoqcrnztqmbzgwrovd.supabase.co https://challenges.cloudflare.com; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>管理者限定の通し確認｜Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1d3855;background:#f1f5fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.7}
+header{background:#183656;color:white;padding:25px 16px}header>div,main{max-width:720px;margin:auto}
+h1{font-size:23px;margin:4px 0}h2{font-size:19px}
+main{padding:16px}section{background:white;padding:20px;border:1px solid #d9e3ee;border-radius:14px;margin-bottom:14px}
+[hidden]{display:none!important}.note{background:#fff0d9;color:#725020;padding:13px;border-radius:9px}
+label{display:block;font-weight:650;font-size:14px;margin:14px 0 4px}
+input:not([type=checkbox]),select,textarea{font:inherit;background:white;color:inherit;border:1px solid #bac9d7;border-radius:9px;padding:12px;width:100%;min-height:46px}
+input[type=checkbox]{width:19px;height:19px;vertical-align:middle}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+button{font:inherit;font-weight:700;background:#24476d;color:white;border:0;border-radius:9px;padding:13px 17px;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}.secondary{background:#e9f0f8;color:#24476d}
+.summary{white-space:pre-wrap;padding:13px;background:#edf3f9;border-radius:9px;overflow-wrap:anywhere}
+.status{white-space:pre-wrap;padding:13px;background:#edf3f9;border-radius:9px}
+small{color:#66798c}a{color:#235c96}
+@media(max-width:480px){.grid{grid-template-columns:1fr}}
+</style></head>
+<body><div style="background:#8b1e24;color:white;padding:12px;text-align:center;font-weight:bold">管理者限定テスト／一般受付OFF／固定の架空案件のみ</div><header><div><small style="color:#c0d5e8">RAINBOW DRIVER / CARGO</small>
+<h1>管理者限定：架空案件の通し確認</h1><p style="margin:0">お申し込み内容の確認 → メール認証 → 担当者の審査</p></div></header>
+<main><section id="ownerLogin"><h2>管理者ログイン</h2><form id="ownerLoginForm"><label for="ownerEmail">メールアドレス</label><input id="ownerEmail" type="email" autocomplete="username" autocapitalize="none" required><label for="ownerPassword">検証用パスワード</label><input id="ownerPassword" type="password" autocomplete="current-password" required><button id="ownerSubmit">ログインしてテストを準備</button></form><p id="ownerLoginMessage" role="status"></p></section><div id="ownerFormBody" hidden>
+<section><p class="note"><strong>管理者本人専用の通し確認です。</strong> 固定の架空案件と管理者Gmailを使います。メールは送信ボタンを押した時に1通だけ送ります。一般受付はOFFのままです。</p>
+<p id="availability" role="status" class="status">受付状況を確認しています…</p>
+<p><a href="./cargo-staging-login.html">検証用画面に戻る</a></p></section>
+<form id="requestForm"><section><h2>1. 集荷・配送</h2>
+<label for="pickup">集荷地 *</label><input id="pickup" minlength="3" maxlength="250" required>
+<label for="delivery">配送先 *</label><input id="delivery" minlength="3" maxlength="250" required>
+<label><input id="today" type="checkbox" required> 即時・当日集荷を希望する（日時指定予約ではありません）</label>
+<label for="readiness">集荷準備</label><select id="readiness"><option value="ready">集荷可能</option><option value="preparing">準備中</option><option value="unknown">要確認</option></select>
+</section>
+<section><h2>2. 荷物</h2>
+<label for="cargo">品名・内容 *</label><input id="cargo" minlength="2" maxlength="500" required>
+<div class="grid">
+<div><label for="pieces">個数 *</label><input id="pieces" type="number" min="1" max="99" step="1" value="1" required></div>
+<div><label for="weight">総重量（kg） *</label><input id="weight" type="number" min="0.01" max="350" step="0.01" required></div>
+<div><label for="length">長さ（cm） *</label><input id="length" type="number" min="0.1" max="500" step="0.1" required></div>
+<div><label for="width">幅（cm） *</label><input id="width" type="number" min="0.1" max="500" step="0.1" required></div>
+<div><label for="height">高さ（cm） *</label><input id="height" type="number" min="0.1" max="500" step="0.1" required></div>
+<div><label for="handling">積み降ろし補助</label><select id="handling"><option value="no">不要</option><option value="yes">希望</option><option value="unknown">要相談</option></select></div>
+</div>
+<label for="note">注意点・補足（任意）</label><textarea id="note" maxlength="500" rows="3"></textarea>
+</section>
+<section><h2>3. お客様の連絡先</h2>
+<label for="clientName">担当者名（任意）</label><input id="clientName" maxlength="80" autocomplete="name">
+<label for="email">認証するメールアドレス *</label><input id="email" type="email" maxlength="254" autocomplete="email" required>
+<label><input id="reviewConfirm" type="checkbox" required> 申込内容・個人情報の取扱いを確認し、メールによる本人確認と担当者からの返信に同意します。</label>
+<p><small>認証後も即時受諾や料金確定にはなりません。この画面は固定の架空データだけを扱います。</small></p>
+<button type="submit" id="reviewButton" disabled>申込内容を確認</button>
+</section></form>
+<section id="reviewPane" hidden>
+<h2>4. 内容確認（まだ送信していません）</h2>
+<div id="summary" class="summary"></div>
+<p><small>表示内容は手動審査が必要です。このテストでは実際の配送受付は発生しません。</small></p>
+<div id="captcha" aria-label="メール送信前の不正利用防止認証"></div>
+<p><button id="sendEmail" type="button" disabled>メール認証コードを送信する</button>
+<button id="edit" type="button" class="secondary">修正する</button></p>
+<p id="sendStatus" class="status" role="status">未送信</p></section>
+<section id="verificationPane" hidden>
+<h2>5. メール認証</h2>
+<p>受信した6桁の数字を10分以内に入力してください。</p>
+<label for="code">確認コード</label><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000">
+<p><button type="button" id="verify">認証して審査待ちに登録する</button></p>
+<p id="verifyStatus" class="status" role="status">未認証</p></section>
+<section id="completedPane" hidden aria-live="polite">
+<h2>6. 受付確認</h2><p class="status" id="completedText"></p>
+<p><small>担当者からの見積もり・受諾確認があるまで配送は確定しません。自動決済・ドライバーへの出動指示は行われません。</small></p></section>
+<section><h2>7. 管理者の審査確認</h2><button id="ownerReload" type="button">保存した架空依頼を読み込む</button><p id="ownerItem" class="status" role="status"></p><button id="ownerReview" type="button" hidden>この架空依頼の審査を開始</button><p>配送・料金・決済は確定しません。</p><button id="ownerLogout" type="button" class="secondary">ログアウト</button></section></div></main>
+<script src="./cargo-staging-owner-review-rules.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js" integrity="sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg" crossorigin="anonymous"></script>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const fieldIds=["pickup","delivery","cargo","pieces","weight","length","width","height","handling","readiness","note","clientName"];
+const allFields=[...fieldIds,"email","today","reviewConfirm"];
+let ownerToken=null,ownerRowId=null;
+let db=null,ready=false,busy=false,sent=false,checked=null,challenge=null,until=0,turnstileToken="",widgetId=null;
+const status=(id,text)=>{$(id).textContent=text};
+function disableSending(){
+ ready=false;turnstileToken="";
+ $("reviewButton").disabled=true;$("sendEmail").disabled=true;
+}
+function snapshot(){
+ const request=Object.fromEntries(fieldIds.map(k=>[k,$(k).value.trim()]));
+ request.today=$("today").checked;request.reviewConfirm=$("reviewConfirm").checked;
+ const decision=window.CargoRequestReview.review({...request,clientContact:""});
+ const email=$("email").value.trim().toLowerCase();
+ if(email.length>254||!(/^[^\s@]{1,64}@[^\s@]{1,190}$/.test(email)))
+  throw Error("メールアドレスを確認してください。");
+ return {request,email,decision};
+}
+function renderSummary(p){
+ const d=p.request;
+ const parts=[
+  ["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
+  ["個数",d.pieces],["重量",d.weight+"kg"],
+  ["寸法",d.length+" × "+d.width+" × "+d.height+" cm"],
+  ["準備",d.readiness],["積み降ろし補助",d.handling],
+  ["補足",d.note||"なし"],["担当者名",d.clientName||"未入力"],
+  ["認証メール",p.email]
+ ];
+ $("summary").textContent=parts.map(([label,value])=>label+"： "+value).join("\n")+
+  "\n\n"+p.decision.reviewReasons.map(v=>"・"+v).join("\n");
+}
+async function invoke(action,payload={}){
+ const r=await fetch('https://hvdoqcrnztqmbzgwrovd.supabase.co/functions/v1/cargo-staging-owner-e2e',{method:'POST',headers:{apikey:'sb_publishable_A-f3WQb7Oh8uMqO4BJPPtg_l4c_JCfQ',Authorization:'Bearer '+ownerToken,'Content-Type':'application/json'},body:JSON.stringify({action,...payload}),cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(25000)});
+ const data=await r.json().catch(()=>({}));
+ if(!r.ok)throw Error(data.error==='TEST_MAIL_ALREADY_ATTEMPTED'?'この通し確認のメールは送信操作済みです。再送せず担当者へお知らせください。':'確認を完了できませんでした（HTTP '+r.status+' / '+String(data.error||data.reason||'不明')+'）。');
+ if(data.mode!=='OWNER_FIXED_E2E'||data.public_intake_enabled!==false||data.customer_request_created!==false||data.payment_created!==false)throw Error('テスト範囲を確認できませんでした。');
+ return data;
+}
+function loadTurnstile(siteKey){
+ if(!/^[0-9A-Za-z_-]{10,100}$/.test(siteKey))return;
+ const script=document.createElement("script");
+ script.src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+ script.async=true;script.onload=()=>{
+  if(!ready||!window.turnstile)return;
+  widgetId=window.turnstile.render("#captcha",{
+   sitekey:siteKey,action:"cargo_customer_intake",
+   callback:token=>{turnstileToken=token;$("sendEmail").disabled=busy||sent||!checked},
+   "expired-callback":()=>{turnstileToken="";$("sendEmail").disabled=true},
+   "error-callback":()=>{turnstileToken="";$("sendEmail").disabled=true}
+  });
+ };
+ script.onerror=()=>status("availability","不正利用防止認証を読み込めません。受付できません。");
+ document.head.appendChild(script);
+}
+async function initialize(){
+ if(!window.supabase||!window.CargoRequestReview){
+  status("availability","受付を利用できません。");return;
+ }
+ try{
+  const result=await invoke("status");
+  if(result?.public_intake_enabled!==false||result?.ready!==true||result?.accepts_orders!==false||
+    result?.payment_enabled!==false||typeof result?.captcha_site_key!=="string"){
+   status("availability","現在、一般受付を停止しています。申込・メール送信はできません。");return;
+  }
+  ready=true;sent=result.mail_attempted===true;
+  $("reviewButton").disabled=false;
+  status("availability",sent?"このテストのメールは送信操作済みです。内容は確認できます。":"申込内容を確認してください。確認後にメール認証へ進みます。");
+  loadTurnstile(result.captcha_site_key);await loadOwnerItem();
+  if(sent&&!result.resume_challenge&&!ownerRowId){status('availability','前回のメール認証は期限切れ、または再開できない状態です。内容は確認できますが、再送と登録は停止しています。担当者が再開方法を確認します。');status('sendStatus','前回の認証は再開できません。メールは再送していません。');}
+  if(result.resume_challenge){challenge=result.resume_challenge.id;until=Date.parse(result.resume_challenge.expires_at);$('verificationPane').hidden=false;status('sendStatus','送信済みです。Gmailに届いたコードを入力してください。再送はしません。');}
+ }catch(e){status("availability",e.message||"接続確認に失敗しました。")}
+}
+allFields.forEach(k=>$(k).addEventListener(k==="today"||k==="reviewConfirm"?"change":"input",()=>{
+ checked=null;turnstileToken="";
+ $("reviewPane").hidden=true;$("sendEmail").disabled=true;
+ if(widgetId!==null&&window.turnstile)window.turnstile.reset(widgetId);
+}));
+$("requestForm").onsubmit=e=>{
+ e.preventDefault();
+ if(!ready||busy)return;
+ try{
+  if(!$("requestForm").reportValidity())return;
+  checked=snapshot();
+  renderSummary(checked);
+  $("reviewPane").hidden=false;
+  $("sendEmail").disabled=sent||!turnstileToken;
+  $("reviewPane").scrollIntoView({behavior:"smooth",block:"start"});
+ }catch(e){status("availability",e?.message||"入力内容を確認してください。")}
+};
+$("edit").onclick=()=>{$("reviewPane").hidden=true;checked=null;turnstileToken="";$("sendEmail").disabled=true;
+ if(widgetId!==null&&window.turnstile)window.turnstile.reset(widgetId);
+ $("requestForm").scrollIntoView({behavior:"smooth",block:"start"})};
+$("sendEmail").onclick=async()=>{
+ if(!ready||busy||sent||!checked||!turnstileToken)return;
+ if(!confirm("確認メールをこのアドレスに1通送信します。よろしいですか？"))return;
+ busy=true;sent=true;$("sendEmail").disabled=true;status("sendStatus","メール認証の準備中…");
+ try{
+  // No real user input is transmitted before explicit consent, CAPTCHA and click.
+  const response=await invoke("start",{
+   attempt_id:crypto.randomUUID(),email:checked.email,request:checked.request,
+   captcha_token:turnstileToken
+  });
+  if(response?.ok!==true||response?.state!=="AWAITING_EMAIL_CODE"||
+    typeof response?.challenge_id!=="string")
+   throw Error("送信を確認できません。");
+  challenge=response.challenge_id;
+  until=Date.now()+Math.min(600,Number(response.expires_in_seconds)||600)*1000;
+  $("verificationPane").hidden=false;
+  status("sendStatus","確認メールの送信を受け付けました。6桁コードを入力してください。");
+ }catch(e){status("sendStatus",e.message+" 重複送信せず担当者へお知らせください。");}
+ finally{busy=false}
+};
+$("verify").onclick=async()=>{
+ if(!ready||busy||!challenge)return;
+ const code=$("code").value.trim();
+ if(!/^[0-9]{6}$/.test(code)){status("verifyStatus","6桁の数字を入力してください。");return}
+ if(Date.now()>=until){challenge=null;status("verifyStatus","認証期限を過ぎました。再送せず、担当者へお知らせください。");return}
+ busy=true;$("verify").disabled=true;$("code").value="";
+ try{
+  const result=await invoke("verify",{challenge_id:challenge,code});
+  if(result?.ok===true&&result?.reason==="PENDING_OPERATOR_REVIEW"){
+   challenge=null;
+   $("completedPane").hidden=false;
+   $("verificationPane").hidden=true;
+   status("completedText","メール認証が完了し、架空依頼がテスト用の審査待ちになりました。\nテスト依頼ID："+String(result.request_id||"（確認中）")+
+     "\n料金・配送はまだ確定していません。");
+   await loadOwnerItem();
+  }else{
+   status("verifyStatus","コードを確認できませんでした。時間内にもう一度ご確認ください。");
+  }
+ }catch{status("verifyStatus","認証結果を確認できません。再送信はせず、通信状態をご確認ください。")}
+ finally{busy=false;$("verify").disabled=false}
+};
+
+const FIXED={pickup:'テスト集荷地・さいたま市',delivery:'テスト配送先・東京都内',cargo:'テスト用・精密機器の箱',pieces:'2',weight:'8.5',length:'40',width:'30',height:'25',handling:'unknown',readiness:'ready',note:'管理者限定の架空案件です。',clientName:'テスト担当者',email:'yuka19910307@gmail.com'};
+for(const [id,value] of Object.entries(FIXED)){$(id).value=value;if($(id).tagName==='SELECT')$(id).disabled=true;else $(id).readOnly=true;}
+if(location.origin!=='https://app.rainbow-driver.com'||!window.supabase){$('ownerSubmit').disabled=true;return}
+db=window.supabase.createClient('https://hvdoqcrnztqmbzgwrovd.supabase.co','sb_publishable_A-f3WQb7Oh8uMqO4BJPPtg_l4c_JCfQ',{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+$('ownerLoginForm').onsubmit=async e=>{e.preventDefault();if(busy)return;busy=true;$('ownerSubmit').disabled=true;try{const {data,error}=await db.auth.signInWithPassword({email:$('ownerEmail').value.trim(),password:$('ownerPassword').value});$('ownerPassword').value='';if(error||!data?.session)throw Error('検証用のログイン情報を確認してください。');ownerToken=data.session.access_token;await initialize();if(!ready)throw Error('準備を完了できませんでした。下の表示を担当者へお知らせください。');$('ownerLogin').hidden=true;$('ownerFormBody').hidden=false;}catch(e){$('ownerLoginMessage').textContent=e.message;ownerToken=null;await db.auth.signOut({scope:'local'}).catch(()=>{});}finally{busy=false;$('ownerSubmit').disabled=false;$('ownerPassword').value='';}};
+async function loadOwnerItem(){const data=await invoke('list');ownerRowId=data.item?.id||null;$('ownerReview').hidden=!data.item||data.item.status!=='pending_operator_review';$('ownerItem').textContent=data.item?'架空依頼ID：'+data.item.id+'\n状態：'+(data.item.status==='operator_reviewing'?'審査中':'審査待ち')+'\n集荷：'+data.item.details.pickup+'\n配送先：'+data.item.details.delivery:'認証して保存された架空依頼はまだありません。';}
+$('ownerReload').onclick=async()=>{if(busy||!ownerToken)return;busy=true;$('ownerReload').disabled=true;try{await loadOwnerItem()}catch(e){$('ownerItem').textContent=e.message}finally{busy=false;$('ownerReload').disabled=false}};
+$('ownerReview').onclick=async()=>{if(busy||!ownerRowId)return;busy=true;$('ownerReview').disabled=true;try{await invoke('start_review',{id:ownerRowId});await loadOwnerItem()}catch(e){$('ownerItem').textContent=e.message}finally{busy=false;$('ownerReview').disabled=false}};
+$('ownerLogout').onclick=async()=>{if(busy)return;ownerToken=null;await db.auth.signOut({scope:'local'}).catch(()=>{});location.reload()};
+})();
+</script></body></html>

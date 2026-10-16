@@ -1,7 +1,7 @@
 {
   "purpose": "Review-only scoped release candidate; does not authorize deployment or intake enablement",
-  "source_commit": "2eecc208481488c3309c6f76c51eaaa48dfa6e34",
-  "main_baseline": "3e7f7db4883020f6bed3c1a2dca593f278ae2d8c",
+  "source_commit": "c4e4a30172889f5b19761a0c31640b270d069b08",
+  "main_baseline": "5b788f9b330796eb6d0933e32202e550a91bfc97",
   "public_intake_enabled": false,
   "files": [
     {
@@ -26,17 +26,17 @@
     },
     {
       "path": "integrations/cargo-customer-intake/index.ts",
-      "git_blob_sha": "fcd98bf317889d7c7f4c49b40a4c0fd29ea825b9",
+      "git_blob_sha": "cf31d17118317567b505b6134f708f7ccf297c4e",
       "kind": "edge_function"
     },
     {
       "path": "integrations/cargo-customer-intake/operator.ts",
-      "git_blob_sha": "acee632b1822bb25812e340934b061b644fbcdec",
+      "git_blob_sha": "832dbc13db7c5a2656afbc048be07887e19aee9e",
       "kind": "edge_function"
     },
     {
       "path": "integrations/cargo-customer-intake/quote-reply.ts",
-      "git_blob_sha": "488afd5d1acfb3a278e4275df56c8bd2debade79",
+      "git_blob_sha": "1e5bb41f3b499b44cb81ef08804f36c886a3a80c",
       "kind": "edge_function"
     },
     {
@@ -71,7 +71,7 @@
   ],
   "blocked_until": [
     "Final customer notice and approved business/fee/cancellation details",
-    "Production migrations and secrets reviewed in target environment",
+    "Production runtime settings, provider restrictions and approved mail limits verified in target environment",
     "Trusted IP abuse controls and failure monitoring reviewed",
     "Scoped public-path end-to-end validation",
     "Explicit production rollout and launch decision"

@@ -1,4 +1,4 @@
-# Cargo release readiness — 2026-10-15
+# Cargo release readiness — 2026-10-15 (updated 2026-10-16)
 
 This record supersedes older progress statements, not security constraints. Public intake remains OFF. No customer mail, dispatch, pricing finalization or payment is authorized by this record.
 
@@ -81,3 +81,10 @@ No production deployment or public intake enablement was performed in this step.
 - Commit 0839e44f9f926763ba5ddaac8bc9ea620f08b98c: security/disposable-SQL 38675377796, staging OFF/auth smoke 38675377797 and browser 38675377809 succeeded.
 - Security advisors report intentional RLS-without-client-policies on the new service-only table; client privileges revoked. Existing leaked-password warning unchanged.
 - This is not complete abuse protection. Trusted source IP handling, per-IP fairness/limits, operator monitoring/alerting and external-service limits remain launch checks. No real customer mail or production change.
+
+## Live owner-scoped customer API flow — 2026-10-16
+
+- The owner completed the real customer APIs in staging using the fixed fictional case: one OTP, encrypted request persistence, operator review, manual quote preparation, one quote email, authenticated reply in a separate browser, and interested response persistence.
+- Read-only status after expiry confirmed CLOSED, delivery_status=sent, reply_state=interested, and intake_enabled=false. The owner supplied screenshots of the actual email-link quote and successful answer. No OTP or link secret was retrieved.
+- Corrected the trial page's Postgres timestamp/API ISO-format mismatch, then passed browser, security/SQL and staging smoke CI. Details and commit/run evidence are in cargo-production-rollout.review.md.
+- Earlier statements that the actual quote/reply test is still pending are historical. Production rollout, public unauthenticated path, future-date live coverage, abuse controls, monitoring and business/privacy launch conditions remain open. Do not repeat this completed owner test or reset its mail slots.

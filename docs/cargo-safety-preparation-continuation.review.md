@@ -41,6 +41,13 @@
 
 `.github/workflows/cargo-safety-preparation.yml` は新規部分のオフライン試験と隔離PostgreSQL比較だけを実行する。既存のメールE2E・終了済み試験枠・本番データ・検証データへ接続しない。完了済み試験の一括再実行や手動リセットは行わない。
 
+### 保存とCIの完了
+
+- 保全実装コミット：`00eec6d7edac3293aa7a0d4d7d4f74e104be0bc3`。再開時に残っていた15ファイルを含み、専用CI・記録・境界試験の補強を追加した。
+- [専用CI run 38941018245](https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38941018245) 成功。オフライン32試験と、隔離DBの新規15検査すべての成功を実行ログで確認した。このHEADで起動したworkflowは新規の専用CIだけで、旧suiteの再実行はなかった。
+- [PR #5](https://github.com/yuka19910307-create/rainbow-driver/pull/5) は開発 `test/cargo-safe-integration-20261013` へ取り込み済み。取り込みコミット `8cfe05c5f6d87f7a5f23704d52e1b6a96a5f3582`。PR #4の説明にも後続PRの参照を追記した。
+- 最後の追記は検証結果の文書だけ。コードの追加変更はなく、成功済み試験を再起動しない。mainは `5b788f9b330796eb6d0933e32202e550a91bfc97` を維持。本番配備・送信・削除・設定変更、運転請負・Square・ドメイン変更は行っていない。
+
 ## 残作業の優先順位
 
 1. 削除の登録前ガードと無効なスケジュール案、履歴の保存・削除運用を整える。判断値を入れずにできる隔離検査を先行する。

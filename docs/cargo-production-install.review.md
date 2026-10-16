@@ -68,3 +68,8 @@ SQL実行時はエラーで確実に停止するトランザクション対応�
   - https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
 - 初回導入SQLの再実行は禁止。今後は既存スキーマの前提で変更をレビューする。空のテーブルを作れたことを、公開顧客経路や本番メールE2E成功と扱わない。
 - 次の工程：本番用API/設定/画面の限定レビュー、メール上限と外部取扱い、削除/監視、本番経路の限定試験と公開条件。不正利用対策・契約/費用/キャンセル条件の確認、一般受付開始の判断は引き続き未完了。
+
+
+## 2026-10-17 00:30〜00:32 JST：後続のAPI限定配備
+
+DB導入後の次工程として運営者の「進めて」を受け、顧客API3本を新規配備した。受付OFF・メール全体枠無効を維持し、HTTP状態/拒否6ケース、配備ソースの一致、顧客データ/送信回数0を確認。詳細は [cargo-production-api-deployment.review.md](cargo-production-api-deployment.review.md)。画面公開・秘密値変更・実メール試験・cron追加・一般受付開始は行っていない。

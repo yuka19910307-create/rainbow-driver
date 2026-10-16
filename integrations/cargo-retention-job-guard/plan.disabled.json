@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "scope": "cargo-retention-job-registration-plan",
+  "enabled": false,
+  "registration_allowed": false,
+  "schedule": null,
+  "history_retention": { "application_days": null, "cron_days": null },
+  "jobs": [
+    { "target": "drafts", "name": "cargo-production-expired-intake-drafts", "batch_limit": 100 },
+    { "target": "closed", "name": "cargo-production-closed-no-order-retention", "batch_limit": 100 }
+  ]
+}

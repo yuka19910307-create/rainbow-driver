@@ -1,0 +1,56 @@
+name: Cargo registration guard and notification state
+
+on:
+  pull_request:
+    paths:
+      - "integrations/cargo-retention-job-guard/**"
+      - "scripts/check-cargo-retention-job-registration.cjs"
+      - "scripts/cargo-monitor-notification-store.cjs"
+      - "tests/cargo-retention-job-registration*.cjs"
+      - "tests/cargo-notification-persistence*.cjs"
+      - ".github/workflows/cargo-registration-notification-state.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  new-guard-and-state-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test new offline guard and temporary local notification store only
+        run: node --test tests/cargo-retention-job-registration.test.cjs tests/cargo-notification-persistence.test.cjs
+
+  disposable-job-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Start isolated PostgreSQL for synthetic job catalog only
+        run: |
+          docker run --detach --rm --name cargo-registration-guard-ci-postgres \
+            --env POSTGRES_PASSWORD=local-test-only postgres:16-alpine
+          for attempt in $(seq 1 30); do
+            if docker exec cargo-registration-guard-ci-postgres pg_isready --host=127.0.0.1 --username=postgres >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+      - name: Verify new read-only inventory against synthetic catalog metadata
+        run: node tests/cargo-retention-job-registration-pg.test.cjs
+      - name: Remove isolated container
+        if: always()
+        run: docker rm --force cargo-registration-guard-ci-postgres || true

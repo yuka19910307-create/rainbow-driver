@@ -2,6 +2,11 @@ import {createClient} from "npm:@supabase/supabase-js@2.112.3";
 // Cargo customer intake OPERATOR queue. Staging-tested; production rollout pending.
 // No public listing, no auto-quote, no driver assignment, no payment, no push.
 const APP="https://app.rainbow-driver.com";
+// Staging mail must return to the staging-backed page, never the production API.
+function quoteReplyPath(projectUrl:string){
+ return projectUrl==="https://hvdoqcrnztqmbzgwrovd.supabase.co"
+  ?"/staging/cargo-customer-quote-reply.html":"/cargo-customer-quote-reply.html";
+}
 const headers={"Access-Control-Allow-Origin":APP,
  "Access-Control-Allow-Headers":"authorization,apikey,content-type,x-client-info",
  "Access-Control-Allow-Methods":"POST,OPTIONS","Cache-Control":"no-store",
@@ -182,7 +187,7 @@ Deno.serve(async(req:Request)=>{
      "ご利用をご希望の場合は下記のページで「利用を希望する」を選んでください。"+
      "ご希望を確認後、担当者から別途ご連絡します。\n\n"+
      "お見積もりへのご回答（有効期限まで）：\n"+
-     APP+"/cargo-customer-quote-reply.html#r="+encodeURIComponent(String(data.id))+
+     APP+quoteReplyPath(url)+"#r="+encodeURIComponent(String(data.id))+
        "&t="+hex+"\n\n"+
      "回答は一度のみ有効です。URLは第三者に共有しないでください。";
     // Check intake mode a second time immediately before contacting the

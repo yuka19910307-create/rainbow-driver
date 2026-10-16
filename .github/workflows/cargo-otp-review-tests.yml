@@ -141,7 +141,9 @@ jobs:
         with:
           node-version: '24'
       - name: Verify read-only monitoring against isolated cron success/failure history
-        run: |\n          node tests/cargo-monitor-pg.test.cjs\n          node tests/cargo-monitor-state-pg.test.cjs
+        run: |
+          node tests/cargo-monitor-pg.test.cjs
+          node tests/cargo-monitor-state-pg.test.cjs
       - name: Remove disposable database
         if: always()
         run: docker rm -f cargo-otp-ci-postgres || true

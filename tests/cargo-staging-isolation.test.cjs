@@ -57,3 +57,14 @@ test('staging operator login uses isolated auth storage and server-side authoriz
  assert.match(review,/href="\.\/cargo-operator-login\.html"/);
  assert.ok(fs.existsSync(path.join(root,'staging/cargo-operator-login.html')));
 });
+
+test('staging quote reply stays on the staging API and strips its secret fragment',()=>{
+ const html=read('staging/cargo-customer-quote-reply.html');
+ assert.match(html,/検証環境/);
+ assert.ok(html.includes(STAGING));assert.ok(!html.includes(PRODUCTION));
+ assert.ok(html.includes('sb_publishable_A-f3WQb7Oh8uMqO4BJPPtg_l4c_JCfQ'));
+ assert.ok(!html.includes('sb_publishable_RG3jeU'));
+ assert.ok(html.includes('history.replaceState(null,"",location.pathname)'));
+ assert.ok(html.includes('SUPABASE+"/functions/v1/cargo-customer-quote-reply"'));
+ assert.ok(html.includes('href="./cargo-customer-intake.html"'));
+});

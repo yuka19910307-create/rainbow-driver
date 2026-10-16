@@ -4,6 +4,8 @@ const fs=require('node:fs'),{spawnSync}=require('node:child_process'),assert=req
 const {assess}=require('../scripts/check-cargo-monitor.cjs');
 const sql=fs.readFileSync('integrations/cargo-customer-intake/staging-monitor.readonly.sql','utf8');
 const setup=`
+-- Normalize earlier synthetic mail-failure fixtures inside this rollback-only test.
+update public.cargo_customer_quote_replies set delivery_status='sent';
 create schema cron;
 create table cron.job(jobid bigint,jobname text,schedule text,active boolean);
 create table cron.job_run_details(jobid bigint,status text,end_time timestamptz);
@@ -16,6 +18,8 @@ update public.cargo_intake_control set intake_enabled=false,captcha_required=tru
 `;
 for(const [name,mutation,expected] of [
  ['healthy','',null],
+ ['unknown quote',"update public.cargo_customer_quote_replies set delivery_status='delivery_unknown';",'QUOTE_DELIVERY_UNKNOWN'],
+ ['stalled quote',"update public.cargo_customer_quote_replies set delivery_status='sending',delivery_attempted_at=now()-interval '11 minutes';",'QUOTE_SEND_STALLED'],
  ['missing job','delete from cron.job where jobid=1;','EXPIRED_INTAKE_DRAFTS_CONFIG'],
  ['stale job',"update cron.job_run_details set end_time=now()-interval '6 minutes' where jobid=3;",'OWNER_MAIL_TRIAL_EXPIRE_STALE'],
  ['latest failure',"insert into cron.job_run_details values (2,'failed',now()-interval '30 seconds');",'CLOSED_NO_ORDER_RETENTION_FAILED'],

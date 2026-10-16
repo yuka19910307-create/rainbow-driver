@@ -39,7 +39,7 @@ a{color:#235c96;overflow-wrap:anywhere}
 </div>
 <p><small>ご回答は一度のみ有効です。内容に不明点がある場合は、回答せず直接担当者にご確認ください。</small></p>
 </section>
-<section class="panel"><p>この画面内の本人確認欄から、検証用アカウントでログインしてください。</p>
+<section class="panel"><p id="ownerLoginHelp">この画面内の本人確認欄から、検証用アカウントでログインしてください。</p>
 <p><small>メールに記載されたリンクは第三者へ共有しないでください。受付停止中や期限切れの場合、この画面からお申し込み・回答はできません。</small></p></section>
 <section class="panel" id="contact" aria-labelledby="contactTitle">
 <h2 id="contactTitle">お見積もりのお問い合わせ</h2>
@@ -101,6 +101,7 @@ async function show(){
   $("terms").textContent=data.terms;
   $("validUntil").textContent=new Date(data.valid_until)
    .toLocaleString("ja-JP",{timeZone:"Asia/Tokyo"});
+  $("ownerLogin").hidden=true;$("ownerLoginHelp").hidden=true;
   $("quote").hidden=false;
   const expired=Date.now()>=Date.parse(data.valid_until);
   if(data.reply_state){

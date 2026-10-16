@@ -3,6 +3,42 @@ import {createClient} from "npm:@supabase/supabase-js@2.112.3";
 // Despite public invocation, only a one-time 256-bit email link grants viewing
 // and a non-binding "interested"/"declined" response. No payment or dispatch.
 const APP="https://app.rainbow-driver.com";
+// BEGIN STAGING OWNER TEST GUARD (keep identical in the three handlers)
+const STAGING_PROJECT="https://hvdoqcrnztqmbzgwrovd.supabase.co";
+const STAGING_OWNER="5ccbfcd5-bd0f-4a9a-b570-223b3deb2567";
+function stagingFixture(){return {
+ pickup:"テスト集荷地・伊奈町",delivery:"テスト配送先・さいたま市",
+ cargo:"テスト用・精密機器の箱",pieces:2,weight:8.5,length:40,width:30,height:25,
+ handling:"unknown",readiness:"ready",note:"管理者限定の架空案件です。",
+ clientName:"テスト担当者",today:true,reviewConfirm:true
+}}
+async function stagingOwnerTest(db:any,projectUrl:string,req:Request,action:string,input:Record<string,unknown>,claim=false){
+ if(projectUrl!==STAGING_PROJECT)return {allowed:true,staging:false};
+ try{
+  const token=(req.headers.get("authorization")||"").match(/^Bearer\s+([^\s]+)$/i)?.[1];
+  if(!token)return {allowed:false,staging:true};
+  const {data:auth,error}=await db.auth.getUser(token);
+  const user=auth?.user;
+  if(error||user?.id!==STAGING_OWNER||!user.email_confirmed_at||typeof user.email!=="string")
+   return {allowed:false,staging:true};
+  if(action==="start"){
+   if(typeof input.email!=="string"||input.email.trim().toLowerCase()!==user.email.toLowerCase())
+    return {allowed:false,staging:true};
+   const incoming=input.request as Record<string,unknown>,fixed=stagingFixture();
+   if(!incoming||Object.keys(incoming).sort().join(",")!==Object.keys(fixed).sort().join(",")||
+      Object.entries(fixed).some(([k,v])=>incoming[k]!==v))return {allowed:false,staging:true};
+  }
+  const target=(action==="start"||action==="mail_check")?input.attempt_id:
+   action==="verify"?input.challenge_id:input.id;
+  const {data:result,error:denied}=await db.rpc("cargo_staging_owner_test_authorize",{
+   p_owner_id:user.id,p_action:action,p_target_id:target??null,p_claim:claim
+  });
+  if(denied||result?.ok!==true)return {allowed:false,staging:true};
+  return {allowed:true,staging:true,draft_id:result.draft_id,email:user.email.toLowerCase(),expires_at:result.expires_at};
+ }catch{return {allowed:false,staging:true}}
+}
+// END STAGING OWNER TEST GUARD
+
 const HEADERS={"Access-Control-Allow-Origin":APP,
  "Access-Control-Allow-Headers":"apikey,authorization,content-type,x-client-info",
  "Access-Control-Allow-Methods":"POST,OPTIONS",
@@ -62,6 +98,8 @@ Deno.serve(async(req:Request)=>{
   if(gateError||gate?.intake_enabled!==true||
      gate?.captcha_required!==true||gate?.contact_verification_required!==true)
    return response({error:"PUBLIC_INTAKE_DISABLED"},423);
+  if(!(await stagingOwnerTest(db,url,req,String(input.action),input)).allowed)
+   return response({error:"OWNER_TEST_DENIED"},403);
   const {data:result,error}=await db.rpc("cargo_customer_quote_reply",{
    p_request_id:input.id,
    p_response_token_hmac:tokenProof,

@@ -21,7 +21,7 @@ a{color:#235c96;overflow-wrap:anywhere}
 </style></head><body>
 <header><div><small style="color:#d6e4f4">RAINBOW DRIVER / CARGO</small>
 <h1>軽貨物・お見積もりへのご回答</h1></div></header>
-<main><p class="notice"><strong>検証環境専用</strong>：架空案件の回答確認です。配送・料金・決済は確定しません。</p>
+<main><section class="panel" id="ownerLogin"><h2>検証用アカウントの本人確認</h2><p>見積もりリンクを開いたご本人だけが回答できる検証画面です。</p><label for="ownerEmail">検証用メールアドレス</label><input id="ownerEmail" type="email" autocomplete="username" style="display:block;max-width:100%;font:inherit"><label for="ownerPassword">検証用パスワード</label><input id="ownerPassword" type="password" autocomplete="current-password" style="display:block;max-width:100%;font:inherit"><button type="button" id="ownerSignIn">検証用アカウントでログイン</button><p id="ownerLoginState" role="status"></p></section><p class="notice"><strong>検証環境専用</strong>：架空案件の回答確認です。配送・料金・決済は確定しません。</p>
 <section class="panel">
 <p class="notice">この画面は見積もりの内容確認と、ご希望の回答専用です。
 <strong>「利用を希望する」を押しても配送契約・予約・配車・決済は確定しません。</strong>
@@ -39,7 +39,7 @@ a{color:#235c96;overflow-wrap:anywhere}
 </div>
 <p><small>ご回答は一度のみ有効です。内容に不明点がある場合は、回答せず直接担当者にご確認ください。</small></p>
 </section>
-<section class="panel"><p><a href="../cargo-staging-login.html">検証用ログインへ</a></p>
+<section class="panel"><p>この画面内の本人確認欄から、検証用アカウントでログインしてください。</p>
 <p><small>メールに記載されたリンクは第三者へ共有しないでください。受付停止中や期限切れの場合、この画面からお申し込み・回答はできません。</small></p></section>
 <section class="panel" id="contact" aria-labelledby="contactTitle">
 <h2 id="contactTitle">お見積もりのお問い合わせ</h2>
@@ -49,7 +49,7 @@ a{color:#235c96;overflow-wrap:anywhere}
 <p><small>見積もりメールの受付IDをお知らせください。認証コードや見積もり回答用リンクを送る必要はありません。</small></p>
 </section>
 </main>
-<script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js" integrity="sha384-qafw21c/iciq0VXsi9FzkfoQv5I/V0iqE4lSNcKXPnW9/UTJLnv5CcN4FHxVLnKg" crossorigin="anonymous"></script><script>
 (()=>{
 "use strict";
 const $=id=>document.getElementById(id);
@@ -60,7 +60,7 @@ const tokenPattern=/^[0-9a-f]{64}$/i;
 // Remove opaque token from browser location before any request or UI rendering.
 const fragment=location.hash.slice(1);
 history.replaceState(null,"",location.pathname);
-let requestId=null,secret=null,busy=false,loaded=false;
+let requestId=null,secret=null,busy=false,loaded=false,ownerAccessToken="";
 try{
  const params=new URLSearchParams(fragment);
  if([...params.keys()].sort().join(",")==="r,t"){
@@ -76,9 +76,12 @@ function close(){
  $("interested").disabled=true;$("declined").disabled=true;
 }
 async function invoke(action,more={}){
+ let accessToken=ownerAccessToken;
+ try{if(!accessToken)accessToken=JSON.parse(localStorage.getItem("rd-cargo-staging-operator-auth-v1")||"null")?.access_token||""}catch{}
+ if(!accessToken){set("この画面の本人確認欄で検証用アカウントにログインしてください。");throw Error("OWNER_LOGIN_REQUIRED");}
  const response=await fetch(SUPABASE+"/functions/v1/cargo-customer-quote-reply",{
   method:"POST",cache:"no-store",referrerPolicy:"no-referrer",
-  headers:{"Content-Type":"application/json","apikey":KEY},
+  headers:{"Content-Type":"application/json","apikey":KEY,"Authorization":"Bearer "+accessToken},
   body:JSON.stringify({action,id:requestId,token:secret,...more})
  });
  if(!response.ok)throw Error("QUOTE_UNAVAILABLE");
@@ -134,6 +137,18 @@ async function answer(choice){
   set("回答の成否を確認できません。二重回答を避けるため、メールの再操作はせず担当者へご確認ください。");
  }finally{busy=false}
 }
+$("ownerSignIn").onclick=async()=>{
+ $("ownerSignIn").disabled=true;$("ownerLoginState").textContent="本人確認中…";
+ try{
+  if(!window.supabase)throw Error();
+  const auth=window.supabase.createClient(SUPABASE,KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+  const {data,error}=await auth.auth.signInWithPassword({email:$("ownerEmail").value.trim(),password:$("ownerPassword").value});
+  if(error||!data?.session?.access_token)throw Error();
+  ownerAccessToken=data.session.access_token;$("ownerLoginState").textContent="ログインしました。見積もりを確認中です。";
+  await show();
+ }catch{$("ownerLoginState").textContent="ログインできませんでした。検証用アカウントをご確認ください。"}
+ finally{$("ownerPassword").value="";$("ownerSignIn").disabled=false}
+};
 $("interested").onclick=()=>answer("interested");
 $("declined").onclick=()=>answer("declined");
 show();

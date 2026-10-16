@@ -2,6 +2,42 @@ import {createClient} from "npm:@supabase/supabase-js@2.112.3";
 // Cargo customer intake OPERATOR queue. Staging-tested; production rollout pending.
 // No public listing, no auto-quote, no driver assignment, no payment, no push.
 const APP="https://app.rainbow-driver.com";
+// BEGIN STAGING OWNER TEST GUARD (keep identical in the three handlers)
+const STAGING_PROJECT="https://hvdoqcrnztqmbzgwrovd.supabase.co";
+const STAGING_OWNER="5ccbfcd5-bd0f-4a9a-b570-223b3deb2567";
+function stagingFixture(){return {
+ pickup:"テスト集荷地・伊奈町",delivery:"テスト配送先・さいたま市",
+ cargo:"テスト用・精密機器の箱",pieces:2,weight:8.5,length:40,width:30,height:25,
+ handling:"unknown",readiness:"ready",note:"管理者限定の架空案件です。",
+ clientName:"テスト担当者",today:true,reviewConfirm:true
+}}
+async function stagingOwnerTest(db:any,projectUrl:string,req:Request,action:string,input:Record<string,unknown>,claim=false){
+ if(projectUrl!==STAGING_PROJECT)return {allowed:true,staging:false};
+ try{
+  const token=(req.headers.get("authorization")||"").match(/^Bearer\s+([^\s]+)$/i)?.[1];
+  if(!token)return {allowed:false,staging:true};
+  const {data:auth,error}=await db.auth.getUser(token);
+  const user=auth?.user;
+  if(error||user?.id!==STAGING_OWNER||!user.email_confirmed_at||typeof user.email!=="string")
+   return {allowed:false,staging:true};
+  if(action==="start"){
+   if(typeof input.email!=="string"||input.email.trim().toLowerCase()!==user.email.toLowerCase())
+    return {allowed:false,staging:true};
+   const incoming=input.request as Record<string,unknown>,fixed=stagingFixture();
+   if(!incoming||Object.keys(incoming).sort().join(",")!==Object.keys(fixed).sort().join(",")||
+      Object.entries(fixed).some(([k,v])=>incoming[k]!==v))return {allowed:false,staging:true};
+  }
+  const target=(action==="start"||action==="mail_check")?input.attempt_id:
+   action==="verify"?input.challenge_id:input.id;
+  const {data:result,error:denied}=await db.rpc("cargo_staging_owner_test_authorize",{
+   p_owner_id:user.id,p_action:action,p_target_id:target??null,p_claim:claim
+  });
+  if(denied||result?.ok!==true)return {allowed:false,staging:true};
+  return {allowed:true,staging:true,draft_id:result.draft_id,email:user.email.toLowerCase(),expires_at:result.expires_at};
+ }catch{return {allowed:false,staging:true}}
+}
+// END STAGING OWNER TEST GUARD
+
 // Staging mail must return to the staging-backed page, never the production API.
 function quoteReplyPath(projectUrl:string){
  return projectUrl==="https://hvdoqcrnztqmbzgwrovd.supabase.co"
@@ -155,6 +191,8 @@ Deno.serve(async(req:Request)=>{
    const signed=new Uint8Array(await crypto.subtle.sign("HMAC",secretKey,
     new TextEncoder().encode("CARGO_CUSTOMER_QUOTE_REPLY_V1|"+data.id+"|"+hex)));
    const fingerprint="\\x"+Array.from(signed,b=>b.toString(16).padStart(2,"0")).join("");
+   if(!(await stagingOwnerTest(db,url,req,"quote_send",data,true)).allowed)
+    return respond({error:"OWNER_TEST_DENIED"},403);
    const {data:claimed,error:claimError}=await db.rpc("cargo_customer_quote_claim_send",{
     p_request_id:data.id,p_operator_id:auth.user.id,
     p_response_token_hmac:fingerprint
@@ -199,6 +237,8 @@ Deno.serve(async(req:Request)=>{
        sendGate?.captcha_required!==true||
        sendGate?.contact_verification_required!==true)
      throw Error("PUBLIC_INTAKE_DISABLED");
+    if(!(await stagingOwnerTest(db,url,req,"quote_mail_check",data)).allowed)
+     throw Error("OWNER_TEST_DENIED");
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
     try{
      const sent=await fetch("https://api.resend.com/emails",{

@@ -66,5 +66,7 @@ test('staging quote reply stays on the staging API and strips its secret fragmen
  assert.ok(!html.includes('sb_publishable_RG3jeU'));
  assert.ok(html.includes('history.replaceState(null,"",location.pathname)'));
  assert.ok(html.includes('SUPABASE+"/functions/v1/cargo-customer-quote-reply"'));
- assert.ok(html.includes('href="../cargo-staging-login.html"'));
+ assert.ok(html.includes('id="ownerSignIn"'));
+ assert.ok(html.includes('"Authorization":"Bearer "+accessToken'));
+ assert.ok(html.includes('persistSession:false'));
 });

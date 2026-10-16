@@ -1,6 +1,6 @@
 {
   "purpose": "Review-only scoped release candidate; does not authorize deployment or intake enablement",
-  "source_commit": "e159d145a3f5339fb1af5dde2b9173405b12ae28",
+  "source_commit": "2eecc208481488c3309c6f76c51eaaa48dfa6e34",
   "main_baseline": "3e7f7db4883020f6bed3c1a2dca593f278ae2d8c",
   "public_intake_enabled": false,
   "files": [
@@ -26,17 +26,17 @@
     },
     {
       "path": "integrations/cargo-customer-intake/index.ts",
-      "git_blob_sha": "09521c13d7819a2efba370f032bc6ec70111d3ab",
+      "git_blob_sha": "fcd98bf317889d7c7f4c49b40a4c0fd29ea825b9",
       "kind": "edge_function"
     },
     {
       "path": "integrations/cargo-customer-intake/operator.ts",
-      "git_blob_sha": "7b651c40a02d33fca9db9bb9fc3bc0ec75d147ce",
+      "git_blob_sha": "acee632b1822bb25812e340934b061b644fbcdec",
       "kind": "edge_function"
     },
     {
       "path": "integrations/cargo-customer-intake/quote-reply.ts",
-      "git_blob_sha": "17a051fa3c06b9e1f907165ded3ba4a649114059",
+      "git_blob_sha": "488afd5d1acfb3a278e4275df56c8bd2debade79",
       "kind": "edge_function"
     },
     {

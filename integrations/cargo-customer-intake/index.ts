@@ -48,6 +48,33 @@ const headers={
  "Content-Type":"application/json; charset=utf-8"
 };
 const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers});
+// Keep each deployment self-contained. Bound bytes before decoding or JSON parsing.
+// UTF-8 needs at most 3 bytes per UTF-16 code unit, preserving the character cap.
+async function boundedBody(req:Request,maxBytes:number){
+ const declared=req.headers.get("content-length");
+ if(declared&&/^\d+$/.test(declared)&&Number(declared)>maxBytes){
+  void req.body?.cancel().catch(()=>{});
+  throw Error("BODY_TOO_LARGE");
+ }
+ if(!req.body)return "";
+ const reader=req.body.getReader(),decoder=new TextDecoder("utf-8",{fatal:true});
+ let total=0,text="",complete=false;
+ try{
+  while(true){
+   const {done,value}=await reader.read();
+   if(done)break;
+   total+=value.byteLength;
+   if(total>maxBytes)throw Error("BODY_TOO_LARGE");
+   text+=decoder.decode(value,{stream:true});
+  }
+  text+=decoder.decode();
+  complete=true;
+  return text;
+ }finally{
+  if(!complete)void reader.cancel().catch(()=>{});
+  reader.releaseLock();
+ }
+}
 const encoder=new TextEncoder();
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const emailPattern=/^[^\s@]{1,64}@[^\s@]{1,190}$/;
@@ -180,12 +207,15 @@ Deno.serve(async(req:Request)=>{
  if(req.method!=="POST")return reply({error:"METHOD_NOT_ALLOWED"},405);
  let body:Record<string,unknown>;
  try{
-  const text=await req.text();
+  const text=await boundedBody(req,12000*3);
   if(text.length>12000)return reply({error:"BODY_TOO_LARGE"},413);
   body=JSON.parse(text);
   if(!body||typeof body!=="object"||Array.isArray(body)||
      !["status","start","verify"].includes(String(body.action)))throw Error();
- }catch{return reply({error:"INVALID_INPUT"},400)}
+ }catch(error){
+  if(error instanceof Error&&error.message==="BODY_TOO_LARGE")return reply({error:"BODY_TOO_LARGE"},413);
+  return reply({error:"INVALID_INPUT"},400);
+ }
  const conf=runtime();
  if(!conf.url||!conf.role)return reply({error:"NOT_CONFIGURED"},503);
  try{

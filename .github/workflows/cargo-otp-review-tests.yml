@@ -16,10 +16,14 @@ on:
       - "tests/cargo-staging-owner-test*"
       - "tests/cargo-staging-live-smoke.mjs"
       - "integrations/cargo-customer-intake/**"
+      - "integrations/cargo-production-readiness/**"
       - "integrations/cargo-staging-owner-mail-test/**"
       - "tests/cargo-staging-owner-mail-session.test.cjs"
       - "tests/cargo-request-review.test.cjs"
       - "tests/cargo-customer-email-acceptance.test.cjs"
+      - "tests/cargo-customer-body-limit.test.cjs"
+      - "tests/cargo-production-readiness.test.cjs"
+      - "tests/cargo-production-monitor*.cjs"
       - "tests/cargo-customer-pipeline.test.cjs"
       - "tests/cargo-customer-quote-edit.test.cjs"
       - "tests/cargo-customer-quote-flow.test.cjs"
@@ -32,6 +36,7 @@ on:
       - "scripts/build-cargo-production-install.cjs"
       - "tests/cargo-production-install*.cjs"
       - "scripts/check-cargo-monitor.cjs"
+      - "scripts/check-cargo-production-monitor.cjs"
       - "tests/cargo-monitor*.cjs"
       - ".github/workflows/cargo-otp-review-tests.yml"
   workflow_dispatch:
@@ -55,7 +60,7 @@ jobs:
       - name: Verify pinned production candidate (read-only; no deployment)
         run: node scripts/check-cargo-production-candidate.cjs
       - name: Run offline contract tests (no secrets or network requests)
-        run: node --test tests/cargo-production-install.test.cjs tests/cargo-monitor.test.cjs tests/cargo-staging-owner-mail-session.test.cjs tests/cargo-staging-owner-test.test.cjs tests/cargo-customer-quote-flow.test.cjs tests/cargo-customer-quote-edit.test.cjs tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs tests/cargo-customer-email-acceptance.test.cjs tests/cargo-customer-pipeline.test.cjs tests/cargo-customer-retention-operator.test.cjs
+        run: node --test tests/cargo-production-install.test.cjs tests/cargo-monitor.test.cjs tests/cargo-production-monitor.test.cjs tests/cargo-production-readiness.test.cjs tests/cargo-customer-body-limit.test.cjs tests/cargo-staging-owner-mail-session.test.cjs tests/cargo-staging-owner-test.test.cjs tests/cargo-customer-quote-flow.test.cjs tests/cargo-customer-quote-edit.test.cjs tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs tests/cargo-customer-email-acceptance.test.cjs tests/cargo-customer-pipeline.test.cjs tests/cargo-customer-retention-operator.test.cjs
 
   staging-live-smoke:
     runs-on: ubuntu-latest
@@ -146,6 +151,7 @@ jobs:
         run: |
           node tests/cargo-monitor-pg.test.cjs
           node tests/cargo-monitor-state-pg.test.cjs
+          node tests/cargo-production-monitor-pg.test.cjs
       - name: Verify atomic production install in new disposable databases only
         run: node tests/cargo-production-install-pg.test.cjs
       - name: Remove disposable database

@@ -1,6 +1,6 @@
 # 軽貨物受付の運用確認（検証環境）
 
-更新：2026-10-16。検査を実行した時点の確認用。常時監視・通知連携は未導入。
+更新：2026-10-16。検証環境では5分ごとに自動検査し、最新状態を記録する。外部通知・本番監視は未導入。
 
 ## できること
 
@@ -48,3 +48,27 @@ SQLを実行できる権限が必要。匿名/通常ログイン利用者へテ�
 - head `b435b1816396e12fcde0e1b324ececf29cbbf43f`：security/SQL run `38888866878`、browser run `38888866882`、staging OFF smoke run `38888866889` はすべて成功。
 - ローカル分類試験5件と、隔離PostgreSQLでの正常・送信不明・送信停滞・ジョブ欠落・遅延・失敗・復旧の7ケースを確認。過去の別テストが残した送信不明の架空行は、監視テストのトランザクション内で基準状態にそろえ、全変更をロールバックする。
 - 検証環境のSQL読取以外に実データを変更せず、メール送信・本番反映・新規ジョブ作成は行っていない。
+
+## 2026-10-16：5分ごとの内部監視
+
+- 検証環境に `cargo_staging_monitor_state` とsnapshot/tick関数を追加。RLS有効、anon/authenticatedのテーブル参照・関数実行権限は撤回。関数はSECURITY INVOKER。履歴の無制限な追記はせず、最新結果・最終成功/失敗時刻・連続/累計失敗回数だけを1行に保持する。
+- `staging-monitor-state.review.sql` のsnapshot部分は読取専用SQLと一致させ、SQL判定とNode判定の一致を隔離DBで検査する。監視失敗時はSQLエラー本文を保存せず `MONITOR_CHECK_FAILED` を記録し、直前の成功時刻を維持する。
+- 監視処理は行ロック後に読み取って更新する。並行した古い結果による上書きを防ぐ。新しいメール・受付・削除・再送・修復処理は呼ばない。
+- 監視ジョブは `cargo-staging-health-monitor`（job4）、`*/5 * * * *`、`select public.cargo_staging_monitor_tick();`。登録スクリプトは同名ジョブが存在したら拒否し、既存処理を上書きしない。
+- 19:56 JSTの手動実行結果は正常、各異常件数0。ジョブ稼働・予定/コマンド一致、一般クライアントのSELECT/EXECUTE不可、受付OFFを確認した。
+- `1c3a5fad1e4b47007ee6ac84f4c3f6b50e33a846` のsecurity/SQL run38890342397、browser run38890342399、staging smoke run38890342609は成功。通常/送信不明/停滞/ジョブ欠落/遅延/失敗/保護無効/受付状態、失敗回数と復旧、検査自体の失敗を隔離PostgreSQLで確認。
+- advisorの追加INFOはservice専用テーブルのRLS/no-policyという閉鎖設計。クライアント権限を開けて解消しない。参照 https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy 。既存の漏洩パスワード保護WARNは今回変更していない https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection 。
+
+### 記録の鮮度確認と監視自身の停止
+
+権限のあるSQL画面で次を読む。行がない場合、`ok=false`、または`record_fresh=false`なら未確認/異常として扱う。古い正常記録を現在の正常と読み替えない。
+
+```sql
+select checked_at,ok,issues,last_ok_at,last_failure_at,
+ consecutive_failures,total_failures,
+ checked_at > statement_timestamp()-interval '10 minutes'
+ and checked_at <= statement_timestamp()+interval '1 minute' as record_fresh
+from public.cargo_staging_monitor_state where id=1;
+```
+
+ジョブ自身が停止した場合は記録も更新されない。DB障害・プロジェクト停止時も同様のため、DBの外側からの死活確認と通知は引き続き必要。メールやLINEへの障害通知は未接続であり、監視結果だけを根拠に自動送信しない。監視用の読み取り権限を一般公開しない。

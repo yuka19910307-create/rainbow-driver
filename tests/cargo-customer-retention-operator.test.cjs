@@ -18,7 +18,7 @@ async function call(body,auth='Bearer synthetic',origin='https://app.rainbow-dri
  const r=await handler(new Request('https://synthetic.invalid',{method:'POST',headers:{origin,authorization:auth},body:JSON.stringify(body)}));return{status:r.status,data:await r.json()};
 }
 async function ui(file){
- class El{constructor(tag){this.tagName=tag;this.children=[];this.style={};this.textContent='';this.disabled=false}append(...nodes){this.children.push(...nodes)}replaceChildren(...nodes){this.children=nodes} }
+ class El{constructor(tag){this.tagName=tag;this.children=[];this.style={};this.dataset={};this.listeners={};this.textContent='';this.disabled=false}addEventListener(kind,fn){this.listeners[kind]=fn}append(...nodes){this.children.push(...nodes)}replaceChildren(...nodes){this.children=nodes} }
  const nodes=Object.fromEntries(['auth','refresh','retentionView','requests'].map(k=>[k,new El('div')]));
  let closed=false,hold=false,confirmed=false,bodies=[],denied=false;
  const record=()=>({id,status:closed?'closed':'operator_reviewing',details:{},created_at:'2026-10-15T00:00:00Z',retention_hold:closed?hold:true,closed_no_order_at:closed?'2026-10-15T02:00:00Z':null,delete_after:'2026-11-14T02:00:00Z'});

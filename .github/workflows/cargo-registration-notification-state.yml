@@ -16,6 +16,13 @@ permissions:
 
 jobs:
   new-guard-and-state-tests:
+    # PR #3 must not replay old suites/live probes on every dev push.
+    # Scoped development checks run in cargo-consultation-safety.yml instead.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.number != 3 ||
+      github.head_ref != 'test/cargo-safe-integration-20261013' ||
+      github.base_ref != 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -29,6 +36,13 @@ jobs:
         run: node --test tests/cargo-retention-job-registration.test.cjs tests/cargo-notification-persistence.test.cjs
 
   disposable-job-inventory:
+    # PR #3 must not replay old suites/live probes on every dev push.
+    # Scoped development checks run in cargo-consultation-safety.yml instead.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.number != 3 ||
+      github.head_ref != 'test/cargo-safe-integration-20261013' ||
+      github.base_ref != 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

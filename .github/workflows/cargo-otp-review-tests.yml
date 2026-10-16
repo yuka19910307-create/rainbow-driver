@@ -46,6 +46,13 @@ permissions:
 
 jobs:
   offline-security-contract:
+    # PR #3 must not replay old suites/live probes on every dev push.
+    # Scoped development checks run in cargo-consultation-safety.yml instead.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.number != 3 ||
+      github.head_ref != 'test/cargo-safe-integration-20261013' ||
+      github.base_ref != 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -63,6 +70,13 @@ jobs:
         run: node --test tests/cargo-production-install.test.cjs tests/cargo-monitor.test.cjs tests/cargo-production-monitor.test.cjs tests/cargo-production-readiness.test.cjs tests/cargo-customer-body-limit.test.cjs tests/cargo-staging-owner-mail-session.test.cjs tests/cargo-staging-owner-test.test.cjs tests/cargo-customer-quote-flow.test.cjs tests/cargo-customer-quote-edit.test.cjs tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs tests/cargo-customer-email-acceptance.test.cjs tests/cargo-customer-pipeline.test.cjs tests/cargo-customer-retention-operator.test.cjs
 
   staging-live-smoke:
+    # PR #3 must not replay old suites/live probes on every dev push.
+    # Scoped development checks run in cargo-consultation-safety.yml instead.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.number != 3 ||
+      github.head_ref != 'test/cargo-safe-integration-20261013' ||
+      github.base_ref != 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
@@ -78,6 +92,13 @@ jobs:
         run: node tests/cargo-staging-live-smoke.mjs
 
   disposable-postgres-integration:
+    # PR #3 must not replay old suites/live probes on every dev push.
+    # Scoped development checks run in cargo-consultation-safety.yml instead.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.number != 3 ||
+      github.head_ref != 'test/cargo-safe-integration-20261013' ||
+      github.base_ref != 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:

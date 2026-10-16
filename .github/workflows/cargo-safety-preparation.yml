@@ -20,6 +20,13 @@ permissions:
 
 jobs:
   offline-preparation:
+    # PR #3 must not replay old suites/live probes on every dev push.
+    # Scoped development checks run in cargo-consultation-safety.yml instead.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.number != 3 ||
+      github.head_ref != 'test/cargo-safe-integration-20261013' ||
+      github.base_ref != 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -33,6 +40,13 @@ jobs:
         run: node --test tests/cargo-retention-preview.test.cjs tests/cargo-notification-preparation.test.cjs tests/cargo-operator-ip-policy.test.cjs tests/cargo-production-trial-preflight.test.cjs
 
   disposable-retention-comparison:
+    # PR #3 must not replay old suites/live probes on every dev push.
+    # Scoped development checks run in cargo-consultation-safety.yml instead.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.number != 3 ||
+      github.head_ref != 'test/cargo-safe-integration-20261013' ||
+      github.base_ref != 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

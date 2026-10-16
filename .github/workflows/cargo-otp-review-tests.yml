@@ -19,6 +19,7 @@ on:
       - "tests/cargo-customer-email-acceptance.test.cjs"
       - "tests/cargo-customer-pipeline.test.cjs"
       - "tests/cargo-customer-quote-edit.test.cjs"
+      - "tests/cargo-customer-quote-flow.test.cjs"
       - "tests/cargo-customer-retention-operator.test.cjs"
       - "tests/cargo-draft-otp-*.test.cjs"
       - "tests/cargo-otp-pg-*.sql"
@@ -47,7 +48,7 @@ jobs:
       - name: Verify pinned production candidate (read-only; no deployment)
         run: node scripts/check-cargo-production-candidate.cjs
       - name: Run offline contract tests (no secrets or network requests)
-        run: node --test tests/cargo-customer-quote-edit.test.cjs tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs tests/cargo-customer-email-acceptance.test.cjs tests/cargo-customer-pipeline.test.cjs tests/cargo-customer-retention-operator.test.cjs
+        run: node --test tests/cargo-customer-quote-flow.test.cjs tests/cargo-customer-quote-edit.test.cjs tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs tests/cargo-customer-email-acceptance.test.cjs tests/cargo-customer-pipeline.test.cjs tests/cargo-customer-retention-operator.test.cjs
 
   staging-live-smoke:
     runs-on: ubuntu-latest

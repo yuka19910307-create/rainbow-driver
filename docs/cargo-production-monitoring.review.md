@@ -66,3 +66,7 @@
 - 本番では新しいSELECTと、独立レビューでの修正後のSELECTを確認した。完了済みの検証メール試験、既存の監視試験、認証から利用希望までの一連試験を再実行していない。
 
 参照：Supabase Cron Quickstart https://supabase.com/docs/guides/cron/quickstart （2026-10-16取得。同名scheduleの上書きとジョブ履歴の非自動削除を確認）。Changelog https://supabase.com/changelog.md も確認し、この変更では新しいSupabase機能・接続方式・拡張の追加を行っていない。
+
+### 2026-10-16 16:05 UTC以降：隔離DB試験の実行完了
+
+上記のローカル未実行とは別に、[CI run 38929146489](https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38929146489) が成功した。`disposable-postgres-integration` の実行ログで、監視の新規23ケースすべてのPASSを確認。関数名/引数型のすり替え、列だけの権限追加、削除除外、失敗と復旧も実際の隔離PostgreSQLで検査できた。本番/検証DBに架空データを投入する試験ではなく、外部通知の完成を意味しない。検証済みコードを開発ブランチへ取り込み、本番配備はしていない。

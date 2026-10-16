@@ -46,10 +46,17 @@ DB初回導入（7テーブル・11関数）、本番API3本、本番画面4フ�
 - 診断用の新規6試験成功（実Request/Stream・認証/設定の模擬応答、外部送信なし）。
 - 監視分類器の新規7試験成功。独立レビューの指摘を修正後も成功。
 - 顧客API3本の変更に必要な既存回帰6ファイルを一度実行し成功：email-acceptance、pipeline、quote-flow、retention-operator、draft-otp-customer-operator、staging-owner-test。いずれも通信を模擬した試験で、終了済みの本人メール試験は起動しない。
-- 隔離PostgreSQL用に監視の新規23ケースを追加。ローカル環境にPostgreSQLコンテナ/イメージがないため、その実行はCIで確認する。構文確認だけを成功したDB試験と扱わない。
+- 隔離PostgreSQL用に監視の新規23ケースを追加。ローカル環境にPostgreSQLコンテナ/イメージがないためローカルでは未実行。その後、CI `38929146489` の実行ログで全23ケースの成功を確認した。構文確認だけを成功したDB試験と扱っていない。
 - 独立レビューで、診断の本文一括読取、同数の別関数による欠落の見逃し、列だけの権限追加の見逃しを修正。修正版の再レビューは追加指摘なし。
 
 CIには新規試験を組み込み、認証・配信・DBの新しい実サービス試験は追加していない。
+
+### CI完了と開発ブランチへの保存
+
+- [PR #4](https://github.com/yuka19910307-create/rainbow-driver/pull/4) を開発 `test/cargo-safe-integration-20261013` に取り込んだ。取り込みコミット `005b2b43685c5c24329147b3aa83185640341078`。mainへの取り込みではない。
+- 検査対象HEAD `74488d45719495795a317c6f2cf390125b27092c`、[security/isolated PostgreSQL run 38929146489](https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38929146489) は成功。offline-security-contract、disposable-postgres-integration、staging-live-smoke が成功し、実行ログで新規23ケースのPASSも確認した。
+- [staging OFF smoke run 38929146433](https://github.com/yuka19910307-create/rainbow-driver/actions/runs/38929146433) も成功。これは既存PR検査の停止/未認証確認で、本人メールE2Eの再実施ではない。今回、コード変更を検査する既存CIを一度実行し、手動の再起動は行っていない。
+- 後続の追記は検証結果の文書だけ。実装の変更がないため、成功済みの試験を再実行しない。新しいAPI・SQL・サイトの本番/検証配備、実メール、秘密設定、受付/枠変更は引き続き未実施。
 
 ## 次の優先順位と残件
 

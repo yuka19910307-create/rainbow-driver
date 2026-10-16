@@ -220,3 +220,14 @@
 - job4 cargo-staging-health-monitorを5分間隔で登録。同名ジョブの上書きを拒否。20:00 JSTのscheduled runがsucceeded、監視時刻更新・異常なし・内部受付OFFを読取確認した。
 - 1c3a5fad1e4b47007ee6ac84f4c3f6b50e33a846のsecurity/SQL run38890342397、browser run38890342399、smoke run38890342609が成功。SQL/Node分類一致、権限、失敗回数、復旧、監視処理自体の失敗を隔離DBで検証。
 - 外部からの死活監視・通知、実際の公開経路の不正利用対策、本番導入と事業条件確認は未完了。古い正常記録を正常と判断せず、最終確認時刻の鮮度とジョブ自身の停止も確認する。手順はdocs/cargo-monitoring.review.md。
+
+## 2026-10-17：本番初回導入用SQLの検証完了
+
+- 対象の生成済みSQL blob：`14219afecf1f2dd392c3d8fb5e321c9fbf64db74`（ソースhead `6b5adae58c05855bfb3c232935959f39af0b7346`）。本番未実行。
+- CI：security/SQL `38892282167`、browser `38892282118`、staging smoke `38892282252`がすべて成功。
+- 隔離DBで6ケース成功：保護された受付OFFでの初回導入、受付ON拒否、保護設定無効時の拒否、既存テーブルの保護、既存顧客関数の保護、途中エラーによる全体ロールバック。初回導入後の再実行も拒否する。既存operator行が保持されることも確認した。
+- 2026-10-17の本番読取：protected_off=true、operator_present=true、service_roleのcontrol SELECT/UPDATEとoperator SELECT=true、顧客用7テーブル0件、顧客関数0件。初回導入ガードの前提に一致する。
+- 次に確認する実行範囲：本番プロジェクト `kvoaorzdewwirqryeizq` へこのSQLだけを1トランザクションで適用し、空の顧客用保存先と関連処理を追加。内部受付はOFF、メール全体枠は無効のまま、既存コアの行・運転請負・決済・ドメインを変更しない。顧客API/画面/秘密値/cronの配備や受付開始は含めない。
+- 本番へ初めてデータベース変更を加える工程のため、この具体的な反映範囲を運営者へ提示して確認する。承認後も直前の状態再取得、SQLハッシュ照合、適用後のRLS/権限/OFF/枠無効/空テーブル確認を行う。今回の準備を一般受付開始の承認に読み替えない。
+
+詳細はdocs/cargo-production-install.review.md。読取と準備のみで本番変更は行っていない。

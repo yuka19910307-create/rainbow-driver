@@ -1,0 +1,60 @@
+name: Cargo stage 1 order foundation (isolated only)
+
+on:
+  push:
+    branches: [test/cargo-safe-integration-20261013]
+    paths:
+      - "integrations/cargo-customer-orders/**"
+      - "tests/cargo-customer-orders-edge.test.cjs"
+      - "tests/cargo-customer-orders-pg.test.cjs"
+      - ".github/workflows/cargo-orders-stage1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-order-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test new operator API with mocks and synthetic encryption only
+        run: node --test tests/cargo-customer-orders-edge.test.cjs
+
+  disposable-order-postgres:
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [16, 17]
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Start disposable database with no network, ports or host mounts
+        run: |
+          docker --host=unix:///var/run/docker.sock run --detach --rm --network none \
+            --name cargo-orders-stage1-ci-postgres \
+            --env POSTGRES_PASSWORD=local-test-only postgres:${{ matrix.postgres }}-alpine
+          for attempt in $(seq 1 30); do
+            if docker --host=unix:///var/run/docker.sock exec cargo-orders-stage1-ci-postgres \
+              pg_isready --host=127.0.0.1 --username=postgres >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+      - name: Test only new order, concurrent-operation and retention protection cases
+        run: node --test tests/cargo-customer-orders-pg.test.cjs
+      - name: Remove disposable database and automatically removed temporary storage
+        if: always()
+        run: docker --host=unix:///var/run/docker.sock rm --force cargo-orders-stage1-ci-postgres || true

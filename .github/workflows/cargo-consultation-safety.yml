@@ -16,7 +16,7 @@ on:
       - "tests/cargo-customer-retention-operator.test.cjs"
       - "tests/cargo-customer-form-browser.test.cjs"
       - "tests/cargo-notification-state-diagnostic.test.cjs"
-      - ".github/workflows/cargo-*.yml"
+      # Workflow-only updates must not replay these completed UI/notification suites.
 
 permissions:
   contents: read

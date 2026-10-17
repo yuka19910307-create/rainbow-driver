@@ -1,0 +1,61 @@
+name: Cargo decision concurrency and disabled retention preparation
+
+on:
+  push:
+    branches: [test/cargo-safe-integration-20261013]
+    paths:
+      - "integrations/cargo-customer-intake/operator.ts"
+      - "integrations/cargo-customer-intake/decision-concurrency.review.sql"
+      - "scripts/check-cargo-retention-execution-preparation.cjs"
+      - "tests/cargo-decision-operator.test.cjs"
+      - "tests/cargo-decision-concurrency-pg.test.cjs"
+      - "tests/cargo-retention-execution-preparation.test.cjs"
+      - ".github/workflows/cargo-decision-retention-safety.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  changed-offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test new operator decision mapping with synthetic services only
+        run: node tests/cargo-decision-operator.test.cjs
+      - name: Test new disabled retention evidence bundle only
+        run: node tests/cargo-retention-execution-preparation.test.cjs
+
+  disposable-concurrent-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Start disposable local database without network, ports or host mounts
+        run: |
+          docker --host=unix:///var/run/docker.sock run --detach --rm --network none \
+            --name cargo-decision-concurrency-ci-postgres \
+            --env POSTGRES_PASSWORD=local-test-only postgres:16-alpine
+          for attempt in $(seq 1 30); do
+            if docker --host=unix:///var/run/docker.sock exec cargo-decision-concurrency-ci-postgres \
+              pg_isready --host=127.0.0.1 --username=postgres >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+      - name: Test new row-lock conflicts with synthetic consultations only
+        run: node tests/cargo-decision-concurrency-pg.test.cjs
+      - name: Remove disposable database and its automatically removed temporary storage
+        if: always()
+        run: docker --host=unix:///var/run/docker.sock rm --force cargo-decision-concurrency-ci-postgres || true

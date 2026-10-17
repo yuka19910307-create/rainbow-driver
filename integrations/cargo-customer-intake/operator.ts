@@ -299,12 +299,16 @@ Deno.serve(async(req:Request)=>{
     payment_created:false,driver_assigned:false},providerAccepted?200:503);
   }
   if(data.action==="decision"){
-   // Optimistic state comparison: no prices, no notifications, no dispatch.
-   const {data:updated,error:changeError}=await db.from("cargo_customer_intake_requests")
-    .update({status:data.next_status})
-    .eq("id",data.id).eq("status",data.expected_status).select("id,status").maybeSingle();
-   if(changeError)return respond({error:"SAVE_FAILED"},503);
-   if(!updated)return respond({error:"STATUS_CHANGED"},409);
+   // Lock the request before its quote, sharing the send/closure lock boundary.
+   // Missing RPC / uncertain result never falls back to the old direct UPDATE.
+   const {data:updated,error:changeError}=await db.rpc("cargo_customer_request_decide",{
+    p_request_id:data.id,p_operator_id:auth.user.id,
+    p_expected_status:data.expected_status,p_next_status:data.next_status
+   });
+   if(changeError||!updated)return respond({error:"DECISION_UNAVAILABLE"},503);
+   if(updated.ok!==true)return respond({error:"DECISION_CONFLICT"},409);
+   if(updated.id!==data.id||updated.status!==data.next_status)
+    return respond({error:"DECISION_RESULT_UNCERTAIN"},503);
    return respond({ok:true,id:updated.id,status:updated.status,
     payment_created:false,driver_assigned:false,customer_notified:false});
   }

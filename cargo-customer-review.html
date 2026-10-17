@@ -1,7 +1,7 @@
 <!doctype html><html lang="ja"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>軽貨物｜顧客申込の審査待ち管理（管理者専用）</title>
+<title>軽貨物｜配送相談・受注・配送管理（管理者専用）</title>
 <style>
 :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#20364d;background:#f0f5fa}
 *{box-sizing:border-box}body{margin:0;line-height:1.6}
@@ -12,24 +12,57 @@ small{color:#62768a}button{background:#25456a;color:white;border:0;border-radius
 button:disabled{opacity:.45}a{color:#2b659b}
 .msg{background:#e9f1f8;padding:12px;border-radius:9px;white-space:pre-wrap}
 .details{white-space:pre-wrap;overflow-wrap:anywhere;background:#f0f4f9;padding:12px;border-radius:9px}
-</style></head><body>
+</style><link rel="stylesheet" href="./cargo-pwa/order-management.css"></head><body>
 <header><div><small style="color:#c5d7ea">RAINBOW DRIVER / CARGO / OPERATOR</small>
-<h1>軽貨物・お客様からの申込審査</h1><p>管理者専用／自動受諾・自動見積もりは行いません</p></div></header>
+<h1>軽貨物・配送相談と受注・配送管理</h1><p>管理者専用／自動受諾・自動見積もりは行いません</p></div></header>
 <main>
 <section class="card"><p><a href="./cargo-operator-login.html">管理者ログイン</a> ／ <a href="./cargo-request-preview.html">申込プレビュー</a></p>
 <p id="auth" class="msg" role="status">管理者のログイン状態を確認しています…</p>
-<p><button type="button" id="refresh" disabled>申込一覧を更新</button>
+<p><button type="button" id="refresh" disabled>相談・受注一覧を更新</button>
 <button type="button" id="retentionView" disabled>終了・保存保留の記録を表示</button></p>
 <p><small>お客様の個人情報は業務目的でのみ扱ってください。画面の内容を共有端末に残さないでください。自動通知・決済・運行依頼はありません。</small></p>
 </section>
 <section id="requests" aria-live="polite"></section>
 </main>
 <script src="./cargo-pwa/request-review-rules.js"></script>
+<script src="./cargo-pwa/order-management.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 <script>
 (()=>{"use strict";
 const $=id=>document.getElementById(id);
 let db=null,user=null,busy=false,showRetention=false;
+let orderPanes=[],listGeneration=0,authGeneration=0,lockedOrderControls=[];
+function disposeOrderPanes(){
+ for(const pane of orderPanes)pane.dispose();
+ orderPanes=[];
+}
+function acquireOrder(){
+ if(busy||!user)return false;
+ busy=true;
+ lockedOrderControls=Array.from(document.querySelectorAll("button,input,textarea,select"))
+  .filter(control=>!control.closest(".cargo-orders")).map(control=>[control,control.disabled]);
+ for(const [control] of lockedOrderControls)control.disabled=true;
+ return true;
+}
+function releaseOrder(){
+ for(const [control,disabled] of lockedOrderControls)control.disabled=!user||disabled;
+ lockedOrderControls=[];busy=false;
+ $("refresh").disabled=!user;$("retentionView").disabled=!user;
+}
+function orderAuthFailure(){
+ user=null;++listGeneration;++authGeneration;disposeOrderPanes();$("requests").replaceChildren();
+ $("refresh").disabled=true;$("retentionView").disabled=true;
+ text("auth","管理者の権限またはログインを確認できないため、表示を消去しました。ログインし直してください。");
+}
+async function invokeOrder(body){
+ // A timeout never means a write failed: the module keeps its operation ID and
+ // requires history reconciliation. This does not retry or cancel the DB work.
+ let timer;
+ try{return await Promise.race([
+  db.functions.invoke("cargo-customer-orders",{body}),
+  new Promise(resolve=>{timer=setTimeout(()=>resolve({error:{context:{status:0}}}),15000)})
+ ])}finally{clearTimeout(timer)}
+}
 function label(text){const e=document.createElement("p");e.textContent=text;return e}
 function button(text,action){
  const el=document.createElement("button");el.type="button";el.textContent=text;el.onclick=action;return el;
@@ -53,7 +86,7 @@ function detail(d){
  const preference=window.CargoRequestReview?.describeDelivery?.(d)||{label:"要確認",requestedPickup:"相談区分・希望日時を担当者が確認してください。"};
  return [
   ["相談区分",preference.label],["希望集荷",preference.requestedPickup],
-  ["配送・予約","この画面では確定しません。相談・見積もり・利用希望の回答だけでは確約しません。"],
+  ["配送・予約","相談・見積もり・利用希望の回答だけでは確約しません。正式受注は管理者の別操作で記録します。"],
   ["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
   ["個数",d.pieces],["重量",String(d.weight)+"kg"],
   ["寸法",String(d.length)+"×"+d.width+"×"+d.height+"cm"],
@@ -105,7 +138,7 @@ function quotePane(item){
  const existing=item.quote;
  if(existing){
   const prior=document.createElement("p");prior.className="details";
-  prior.textContent="下書き金額："+Number(existing.amount_yen).toLocaleString("ja-JP")+"円\n"+
+  prior.textContent="保存済み見積もり金額："+Number(existing.amount_yen).toLocaleString("ja-JP")+"円\n"+
    "期限："+String(existing.valid_until||"")+"\n"+
    "条件："+String(existing.terms||"")+"\n"+
    "送信状態："+(({ready_to_send:"下書き・未送信",sending:"送信処理中",sent:"送信受付済み",delivery_unknown:"送信結果不明（再送不可）"})[existing.delivery_status]||"要確認");
@@ -280,7 +313,8 @@ async function retentionChange(item,action,hold){
     FOLLOWUP_NOT_CLOSED_NO_ORDER:"対応履歴を「受注に至らず終了した」にしてから操作してください。",
     DELIVERY_RECONCILIATION_REQUIRED:"見積もりメールの送信結果を確認してから操作してください。",
     CLOSURE_REQUIRED:"先に契約なしでの対応終了を記録してください。",
-    ALREADY_CLOSED:"すでに終了しています。一覧を更新して確認してください。"
+    ALREADY_CLOSED:"すでに終了しています。一覧を更新して確認してください。",
+    ORDER_RETENTION_PROTECTED:"受注済み記録は契約なし終了・保存保留解除の対象にできません。受注管理の状態を確認してください。"
    };
    throw Error(reasons[result?.reason]||"保存できませんでした。一覧を更新して確認してください。");
   }
@@ -313,11 +347,12 @@ function retentionPane(item){
 }
 
 function render(items){
+ disposeOrderPanes();
  const root=$("requests");root.replaceChildren();
  if(items.length===0){const e=document.createElement("section");e.className="card";
-  e.append(label(showRetention?"終了・辞退の記録はありません。":"審査待ち・審査中の申込はありません。"));root.append(e);return}
+  e.append(label(showRetention?"終了・辞退の記録はありません。":"表示対象の相談・受注記録はありません。"));root.append(e);return}
  for(const item of items){
-  const card=document.createElement("section");card.className="card";
+  const card=document.createElement("section");card.className="card";card.dataset.requestId=item.id;
   const title=document.createElement("h2");title.textContent=
    (item.status==="pending_operator_review"?"未審査":
     item.status==="operator_reviewing"?"確認中":
@@ -340,28 +375,47 @@ function render(items){
    card.append(button("辞退として記録",()=>change(item,"declined")));
   }else if(item.status==="operator_reviewing"){
    card.append(quotePane(item));
-  }else if(item.status==="quoted"&&item.quote?.response_state==="interested"){
-   const pane=followupPane(item);
-   if(pane)card.append(pane);
   }
-  card.append(retentionPane(item));
+  if(item.status==="quoted"){
+   // Reuse the saved quote display; sent quotes have no send/edit controls.
+   if(item.quote)card.append(quotePane(item));
+   const legacy=document.createElement("div");legacy.dataset.orderLegacy=item.id;legacy.hidden=true;
+   const followup=followupPane(item);if(followup)legacy.append(followup);
+   legacy.append(retentionPane(item));
+   if(item.quote?.delivery_status==="sent"&&window.CargoOrderManagement){
+    const pane=window.CargoOrderManagement.create({item,userId:user.id,
+     storageScope:"cargo-orders-v1",invoke:invokeOrder,acquire:acquireOrder,release:releaseOrder,
+     onAuthFailure:orderAuthFailure,
+     onOrderChange:snapshot=>{legacy.hidden=!snapshot||!!snapshot.order||snapshot.pending_operation===true}
+    });
+    orderPanes.push(pane);card.append(pane.element);
+   }else{
+    card.append(label("受注状態を確認できないため、契約なし終了・保存保留の操作を停止しています。機能の導入状況と権限を確認してください。"));
+   }
+   card.append(legacy);
+  }else card.append(retentionPane(item));
   root.append(card);
  }
 }
 async function load(allowWhileBusy=false){
  if(!user||(busy&&!allowWhileBusy))return;
- $("refresh").disabled=true;
- text("auth","暗号化された審査待ち申込を取得しています…");
+ const generation=++listGeneration,ownsBusy=!busy;
+ busy=true;$("refresh").disabled=true;$("retentionView").disabled=true;
+ text("auth","配送相談・受注記録を取得しています…");
  try{
   const data=await invoke({action:showRetention?"list_retention":"list"});
   if(data?.ok!==true||!Array.isArray(data.items))throw Error();
+  if(!user||generation!==listGeneration)return;
   render(data.items);
-  text("auth","管理者確認済み。表示は最大20件。お客様への自動通知・受注確定はありません。");
+  await Promise.all(orderPanes.map(pane=>pane.load()));
+  if(!user||generation!==listGeneration)return;
+  text("auth","管理者確認済み。表示は最大20件。正式受注・配送状態は案件ごとの明示操作で記録します。自動通知はありません。");
  }catch{
-  $("requests").replaceChildren();
+  if(generation!==listGeneration)return;
+  disposeOrderPanes();$("requests").replaceChildren();
   text("auth","審査待ちを取得できません。機能の導入状況・権限・通信を確認してください。");
  }
- finally{$("refresh").disabled=!user;$("retentionView").disabled=!user}
+ finally{if(ownsBusy)busy=false;$("refresh").disabled=!user||busy;$("retentionView").disabled=!user||busy}
 }
 async function init(){
  if(!window.supabase){text("auth","認証ライブラリがありません。");return}
@@ -370,8 +424,13 @@ async function init(){
   "sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms",
   {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}}
  );
+ if(typeof db.auth.onAuthStateChange==="function")db.auth.onAuthStateChange((event,session)=>{
+  if(event==="SIGNED_OUT"||(event==="SIGNED_IN"&&!user)||(user&&session?.user?.id&&session.user.id!==user.id))orderAuthFailure();
+ });
+ const generation=authGeneration;
  try{
   const {data,error}=await db.auth.getUser();
+  if(generation!==authGeneration)return;
   if(error||!data?.user)throw Error();
   // The protected API checks operator membership; the browser has no direct table access.
   user=data.user;$("refresh").disabled=false;
@@ -382,7 +441,7 @@ $("refresh").onclick=()=>load();
 $("retentionView").onclick=()=>{
  if(busy)return;
  showRetention=!showRetention;
- $("retentionView").textContent=showRetention?"審査中の申込に戻る":"終了・保存保留の記録を表示";
+ $("retentionView").textContent=showRetention?"相談・受注一覧に戻る":"終了・保存保留の記録を表示";
  load();
 };init();
 })();

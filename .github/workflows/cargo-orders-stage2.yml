@@ -1,0 +1,58 @@
+name: Cargo order management UI (isolated only)
+
+on:
+  push:
+    branches: [test/cargo-safe-integration-20261013]
+    paths:
+      - "cargo-customer-review.html"
+      - "staging/cargo-customer-review.html"
+      - "cargo-pwa/order-management.js"
+      - "cargo-pwa/order-management.css"
+      - "tests/cargo-customer-orders-browser.test.cjs"
+      - "tests/cargo-customer-quote-edit.test.cjs"
+      - "tests/cargo-customer-retention-operator.test.cjs"
+      - "tests/cargo-delivery-consultation.test.cjs"
+      - ".github/workflows/cargo-orders-stage2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  affected-operator-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify affected manual quote and operator retention controls only
+        run: |
+          node --test tests/cargo-customer-quote-edit.test.cjs
+          node tests/cargo-customer-retention-operator.test.cjs
+          node --test --test-name-pattern='cargo-customer-review[.]html:' tests/cargo-delivery-consultation.test.cjs
+
+  intercepted-order-browser:
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned browser dependency in temporary storage only
+        run: npm install --prefix "$RUNNER_TEMP/cargo-orders-browser" --no-save --ignore-scripts playwright@1.51.1
+      - name: Install selected isolated browser
+        run: node "$RUNNER_TEMP/cargo-orders-browser/node_modules/playwright/cli.js" install --with-deps ${{ matrix.browser }}
+      - name: Test both management pages with synthetic Auth and APIs and no external requests
+        env:
+          NODE_PATH: ${{ runner.temp }}/cargo-orders-browser/node_modules
+        run: node tests/cargo-customer-orders-browser.test.cjs --browser=${{ matrix.browser }}

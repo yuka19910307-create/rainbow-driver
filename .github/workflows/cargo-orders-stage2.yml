@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   affected-operator-regressions:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +39,9 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, webkit]
-    runs-on: ubuntu-latest
+    # The verified Playwright/WebKit build supports this OS. Do not inherit
+    # ubuntu-latest's announced Ubuntu 26 migration on 2026-10-19.
+    runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4

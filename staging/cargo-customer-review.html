@@ -1,0 +1,448 @@
+<!doctype html><html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>【検証環境】軽貨物｜配送相談・受注・配送管理（管理者専用）</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#20364d;background:#f0f5fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.6}
+header{background:#1c3552;color:white;padding:25px 17px}
+header>div,main{max-width:800px;margin:auto}h1{font-size:24px;margin:4px 0}
+main{padding:16px}.card{padding:19px;border:1px solid #d8e3ef;border-radius:13px;background:white;margin-bottom:13px}
+small{color:#62768a}button{background:#25456a;color:white;border:0;border-radius:8px;font:inherit;font-weight:700;padding:11px 15px;margin:5px 8px 5px 0}
+button:disabled{opacity:.45}a{color:#2b659b}
+.msg{background:#e9f1f8;padding:12px;border-radius:9px;white-space:pre-wrap}
+.details{white-space:pre-wrap;overflow-wrap:anywhere;background:#f0f4f9;padding:12px;border-radius:9px}
+</style><link rel="stylesheet" href="../cargo-pwa/order-management.css"></head><body><div style="background:#8b1e24;color:white;padding:12px;text-align:center;font-weight:bold">検証環境：本番ではありません／一般受付OFF・メール送信禁止</div>
+<header><div><small style="color:#c5d7ea">RAINBOW DRIVER / CARGO / OPERATOR</small>
+<h1>軽貨物・配送相談と受注・配送管理</h1><p>管理者専用／自動受諾・自動見積もりは行いません</p></div></header>
+<main>
+<section class="card"><p><a href="./cargo-operator-login.html">管理者ログイン</a> ／ <a href="./cargo-request-preview.html">申込プレビュー</a></p>
+<p id="auth" class="msg" role="status">管理者のログイン状態を確認しています…</p>
+<p><button type="button" id="refresh" disabled>相談・受注一覧を更新</button>
+<button type="button" id="retentionView" disabled>終了・保存保留の記録を表示</button></p>
+<p><small>お客様の個人情報は業務目的でのみ扱ってください。画面の内容を共有端末に残さないでください。自動通知・決済・運行依頼はありません。</small></p>
+</section>
+<section id="requests" aria-live="polite"></section>
+</main>
+<script src="../cargo-pwa/request-review-rules.js"></script>
+<script src="../cargo-pwa/order-management.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{"use strict";
+const $=id=>document.getElementById(id);
+let db=null,user=null,busy=false,showRetention=false;
+let orderPanes=[],listGeneration=0,authGeneration=0,lockedOrderControls=[];
+function disposeOrderPanes(){
+ for(const pane of orderPanes)pane.dispose();
+ orderPanes=[];
+}
+function acquireOrder(){
+ if(busy||!user)return false;
+ busy=true;
+ lockedOrderControls=Array.from(document.querySelectorAll("button,input,textarea,select"))
+  .filter(control=>!control.closest(".cargo-orders")).map(control=>[control,control.disabled]);
+ for(const [control] of lockedOrderControls)control.disabled=true;
+ return true;
+}
+function releaseOrder(){
+ for(const [control,disabled] of lockedOrderControls)control.disabled=!user||disabled;
+ lockedOrderControls=[];busy=false;
+ $("refresh").disabled=!user;$("retentionView").disabled=!user;
+}
+function orderAuthFailure(){
+ user=null;++listGeneration;++authGeneration;disposeOrderPanes();$("requests").replaceChildren();
+ $("refresh").disabled=true;$("retentionView").disabled=true;
+ text("auth","管理者の権限またはログインを確認できないため、表示を消去しました。ログインし直してください。");
+}
+async function invokeOrder(body){
+ // A timeout never means a write failed: the module keeps its operation ID and
+ // requires history reconciliation. This does not retry or cancel the DB work.
+ let timer;
+ try{return await Promise.race([
+  db.functions.invoke("cargo-customer-orders",{body}),
+  new Promise(resolve=>{timer=setTimeout(()=>resolve({error:{context:{status:0}}}),15000)})
+ ])}finally{clearTimeout(timer)}
+}
+function label(text){const e=document.createElement("p");e.textContent=text;return e}
+function button(text,action){
+ const el=document.createElement("button");el.type="button";el.textContent=text;el.onclick=action;return el;
+}
+function text(id,message){$(id).textContent=message}
+async function invoke(body){
+ const {data,error}=await db.functions.invoke("cargo-customer-review-operator",{body});
+ if(error){
+  try{
+   const rejected=await error.context?.clone().json();
+   const reason=rejected?.reason||rejected?.error;
+   if(["MAIL_BUDGET_EXHAUSTED","MAIL_BUDGET_UNAVAILABLE"].includes(reason))
+    return {ok:false,reason};
+  }catch{/* Preserve the existing generic handling for other failures. */}
+  throw Error("サーバーへ接続できません。");
+ }
+ if(!data)throw Error("サーバーへ接続できません。");
+ return data;
+}
+function detail(d){
+ const preference=window.CargoRequestReview?.describeDelivery?.(d)||{label:"要確認",requestedPickup:"相談区分・希望日時を担当者が確認してください。"};
+ return [
+  ["相談区分",preference.label],["希望集荷",preference.requestedPickup],
+  ["配送・予約","相談・見積もり・利用希望の回答だけでは確約しません。正式受注は管理者の別操作で記録します。"],
+  ["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
+  ["個数",d.pieces],["重量",String(d.weight)+"kg"],
+  ["寸法",String(d.length)+"×"+d.width+"×"+d.height+"cm"],
+  ["集荷準備",({ready:"集荷可能",preparing:"準備中",unknown:"要確認"})[d.readiness]||"要確認"],
+  ["積み降ろし補助",({no:"不要",yes:"希望",unknown:"要相談"})[d.handling]||"要確認"],
+  ["補足",d.note||"なし"],["担当者",d.clientName||"未入力"],
+  ["認証済みメール",d.email]
+ ].map(([k,v])=>k+"： "+String(v??"—")).join("\n");
+}
+async function change(item,next){
+ if(busy)return;
+ const message=next==="operator_reviewing"?"この申込を確認中にしますか？":
+  next==="declined"?"この申込を辞退扱いにしますか？":
+  "この申込を完了扱いで閉じますか？お客様への通知は行われません。";
+ if(!confirm(message))return;
+ busy=true;$("refresh").disabled=true;
+ try{
+  const r=await invoke({action:"decision",id:item.id,
+   expected_status:item.status,next_status:next});
+  if(!r?.ok)throw Error("保存できませんでした。");
+  text("auth","変更を保存しました。お客様へのメール通知・決済は行っていません。");
+  await load(true);
+ }catch{ text("auth","申込状態を保存できませんでした。更新後に状態を確認してください。") }
+ finally{busy=false;$("refresh").disabled=!user}
+}
+function quotePane(item){
+ const container=document.createElement("div");container.className="card";
+ const heading=document.createElement("h3");heading.textContent="手動見積もり・回答";
+ container.append(heading);
+ container.append(label("料金は案件ごとに入力してください。共通の料金表・距離単価・最低料金は未設定です。税の扱い・追加費用の条件も確認して記入してください。"));
+ // Local reminders only: no reservation, acceptance record or API authorization.
+ const checks=[];
+ let sendQuote=null,quoteDirty=false;
+ const reviewed=()=>checks.length===3&&checks.every(input=>input.checked===true);
+ function updateChecks(){save.disabled=!reviewed();if(sendQuote)sendQuote.disabled=quoteDirty||!reviewed();}
+ const checklist=document.createElement("fieldset");
+ const legend=document.createElement("legend");legend.textContent="見積もり前の確認（案件ごと・この画面内のみ）";checklist.append(legend);
+ for(const [key,message] of [
+  ["schedule","希望日時と自分の稼働予定・既存案件との重複を確認した"],
+  ["route","集荷までの移動・積卸し・待機・帰路を含む対応時間を確認した"],
+  ["vehicle","使用するN-VANの実車の積載条件と荷物・荷役条件を確認した"]
+ ]){
+  const wrap=document.createElement("label"),input=document.createElement("input"),caption=document.createElement("span");
+  input.type="checkbox";input.checked=false;input.dataset.consultationCheck=key;
+  caption.textContent=message;wrap.style.display="block";wrap.append(input,caption);checklist.append(wrap);
+  checks.push(input);input.addEventListener("change",updateChecks);
+ }
+ container.append(label("既存の予定を確認し、案件ごとに受注可否を判断してください。この確認や見積もり保存では車両・時間枠を確保しません。"));
+ const existing=item.quote;
+ if(existing){
+  const prior=document.createElement("p");prior.className="details";
+  prior.textContent="保存済み見積もり金額："+Number(existing.amount_yen).toLocaleString("ja-JP")+"円\n"+
+   "期限："+String(existing.valid_until||"")+"\n"+
+   "条件："+String(existing.terms||"")+"\n"+
+   "送信状態："+(({ready_to_send:"下書き・未送信",sending:"送信処理中",sent:"送信受付済み",delivery_unknown:"送信結果不明（再送不可）"})[existing.delivery_status]||"要確認");
+  container.append(prior);
+ }
+ if(existing&&existing.delivery_status!=="ready_to_send"){
+  const note=label(existing.delivery_status==="sending"||existing.delivery_status==="delivery_unknown"
+   ?"送信結果が不明のため自動・手動再送はできません。メール事業者の管理画面で確認してください。"
+   :"メール送信済みです。再送はできません。");
+  container.append(note);return container;
+ }
+ container.append(checklist);
+ function field(labelText,type,value){
+  const wrap=document.createElement("label");
+  wrap.style.display="block";wrap.style.margin="10px 0";
+  wrap.textContent=labelText;
+  const input=document.createElement(type==="textarea"?"textarea":"input");
+  if(type!=="textarea")input.type=type;
+  input.style.display="block";input.style.width="100%";input.style.padding="10px";
+  input.style.border="1px solid #b3c4d5";input.style.borderRadius="8px";
+  input.value=value||"";wrap.append(input);container.append(wrap);return input;
+ }
+ const amount=field("見積もり金額（税込・税抜などは条件欄で明示）／円","number",
+  existing?String(existing.amount_yen):"");
+ amount.min="1";amount.max="10000000";amount.step="1";
+ const terms=field("見積もり条件・消費税・高速料金・待機・荷役・キャンセル・適用条件（30〜1200文字）",
+  "textarea",existing?.terms||"");terms.maxLength=1200;terms.rows=5;
+ const expiryDefault=()=>{
+  const d=new Date(Date.now()+2*86400000);
+  const local=new Date(d.getTime()-d.getTimezoneOffset()*60000);
+  return local.toISOString().slice(0,16)
+ };
+ const dateInput=field("見積もり有効期限","datetime-local",
+  existing?.valid_until?new Date(existing.valid_until).toISOString().slice(0,16):expiryDefault());
+ // Existing server timestamps are UTC; use a user-local value on new drafts.
+ if(existing?.valid_until){
+  const d=new Date(existing.valid_until);
+  dateInput.value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ }
+ const save=button("見積もりを下書き保存",async()=>{
+  if(busy||!reviewed())return;
+  const yen=Number(amount.value),deadline=new Date(dateInput.value),memo=terms.value.trim();
+  if(!Number.isSafeInteger(yen)||yen<1||yen>10000000||
+    memo.length<30||memo.length>1200||!Number.isFinite(deadline.valueOf())||
+    deadline.getTime()<=Date.now()+5*60000||
+    deadline.getTime()>Date.now()+14*86400000){
+   text("auth","金額・条件30文字以上・有効期限（5分後〜14日以内）を確認してください。");
+   return;
+  }
+  if(!confirm("この内容を見積もり下書きとして保存しますか？まだメールは送りません。"))return;
+  busy=true;$("refresh").disabled=true;
+  try{
+   const result=await invoke({action:"quote_prepare",id:item.id,
+    amount_yen:yen,terms:memo,valid_until:deadline.toISOString()});
+   if(result?.ok!==true)throw Error("QUOTE_NOT_SAVED");
+   await load(true);
+   text("auth","見積もり下書きを保存しました。メールはまだ送信されていません。");
+  }catch{ text("auth","見積もりの保存を確認できませんでした。通信・権限を確認してください。") }
+  finally{busy=false;$("refresh").disabled=!user}
+ });
+ save.disabled=true;container.append(save);
+ const invalidateChecks=()=>{checks.forEach(check=>{check.checked=false});updateChecks()};
+ if(existing?.delivery_status==="ready_to_send"){
+  sendQuote=button("保存済み見積もりをお客様へ1通送信",async()=>{
+   if(busy||quoteDirty||!reviewed())return;
+   if(!confirm("次の保存済み見積もりを送信します。\n金額："+Number(existing.amount_yen).toLocaleString("ja-JP")+"円\n期限："+localDate(existing.valid_until)+"（日本時間）\n条件："+String(existing.terms||"")+"\n\n認証済みメールへ1通送信します。送信後の訂正・再送はできません。実行しますか？"))return;
+   busy=true;$("refresh").disabled=true;
+   try{
+    const result=await invoke({action:"quote_send",id:item.id,confirmation:"SEND_APPROVED_QUOTE"});
+    if(result?.ok===true&&result?.reason==="QUOTE_PROVIDER_ACCEPTED"){
+     text("auth","メール送信事業者が見積もりを受け付けました。配送・決済は確定していません。");
+    }else if(["MAIL_BUDGET_EXHAUSTED","MAIL_BUDGET_UNAVAILABLE"].includes(result?.reason)){
+     text("auth","送信上限または送信枠の確認で停止しました。見積もりメールは送信していません。送信枠を確認してください。");
+    }else text("auth","メールの送信結果を確認できません。再送せず、メール事業者側を確認してください。");
+   }catch{text("auth","送信結果は不明です。二重送信を避けるため、再送せずメール事業者側を確認してください。")}
+   finally{
+    busy=false;$("refresh").disabled=!user;
+    await load();
+   }
+  });
+  const unsaved=label("送信対象は保存済みの金額・条件・期限です。");
+  for(const input of [amount,terms,dateInput]){
+   input.addEventListener("input",()=>{
+    quoteDirty=true;invalidateChecks();sendQuote.disabled=true;
+    unsaved.textContent="変更は未保存です。下書きを保存し直してから送信してください。";
+   });
+  }
+  sendQuote.disabled=true;container.append(unsaved,sendQuote);
+ }else{
+  for(const input of [amount,terms,dateInput])input.addEventListener("input",invalidateChecks);
+ }
+ return container;
+}
+
+function followupPane(item){
+ const quote=item.quote;
+ if(item.status!=="quoted"||quote?.response_state!=="interested")return null;
+ const current=item.followup?.stage||null;
+ const stages={
+  contact_attempted:"お客様へ連絡した",
+  awaiting_reply:"お客様からの返答待ち",
+  handled_offline:"個別対応を終了した（業務記録のみ）",
+  closed_no_order:"受注に至らず終了した"
+ };
+ const panel=document.createElement("section");panel.className="card";
+ const title=document.createElement("h3");title.textContent="利用希望への対応履歴（管理者専用）";
+ panel.append(title);
+ const prev=document.createElement("p");prev.className="details";
+ prev.textContent="対応状態："+(current?stages[current]||current:"未着手")+
+  "\n最終記録："+String(item.followup?.updated_at||"なし")+
+  "\n前回メモ："+String(item.followup?.operator_note||"なし");
+ panel.append(prev);
+ const hint=label("利用希望の回答後も、予定と対応可否を改めて確認し、別途ご案内してください。回答やこの履歴の保存では配送・予約・契約は確定しません。お客様への連絡は自動送信されません。電話・メール等で実際に対応した内容だけを記録してください。");
+ panel.append(hint);
+ if(current==="handled_offline"||current==="closed_no_order"){
+  panel.append(label("この案件の対応履歴は終了済みです。記録は変更できません。"));
+  return panel;
+ }
+ const note=document.createElement("textarea");
+ note.rows=3;note.maxLength=600;note.placeholder="対応内容（5〜600文字）。個人情報を必要以上に記録しないでください。";
+ note.style.width="100%";note.style.padding="10px";note.style.borderRadius="8px";
+ note.style.border="1px solid #a8bfd5";
+ const wrapper=document.createElement("label");wrapper.textContent="対応メモ";
+ wrapper.style.display="block";wrapper.append(note);panel.append(wrapper);
+ const allowed=current===null?["contact_attempted","closed_no_order"]:
+  current==="contact_attempted"?["awaiting_reply","handled_offline","closed_no_order"]:
+  ["contact_attempted","handled_offline","closed_no_order"];
+ for(const stage of allowed){
+  panel.append(button(stages[stage],async()=>{
+   if(busy)return;
+   const memo=note.value.trim();
+   if(memo.length<5||memo.length>600){
+    text("auth","対応メモは5〜600文字で記入してください。");
+    return;
+   }
+   if(!confirm("対応状況を業務記録として保存します。顧客への通知・配車・決済は行いません。よろしいですか？"))return;
+   busy=true;$("refresh").disabled=true;
+   try{
+    const saved=await invoke({action:"followup",id:item.id,
+     expected_stage:current,next_stage:stage,note:memo});
+    if(saved?.ok!==true||saved?.booking_confirmed!==false||
+      saved?.payment_created!==false||saved?.dispatch_created!==false)throw Error();
+    await load(true);
+    text("auth","対応履歴を保存しました。顧客への通知・予約・決済は発生していません。");
+   }catch{
+    text("auth","対応履歴を保存できませんでした。重複記録せず、一覧を更新して確認してください。");
+   }finally{busy=false;$("refresh").disabled=!user}
+  }));
+ }
+ return panel;
+}
+
+function localDate(value){
+ const date=new Date(value);
+ return Number.isFinite(date.valueOf())?date.toLocaleString("ja-JP",{timeZone:"Asia/Tokyo"}):"確認できません";
+}
+async function retentionChange(item,action,hold){
+ if(busy)return;
+ const closing=action==="close_no_order";
+ const message=closing
+  ?"契約・受注がなく、相談対応は終了していますか？契約・会計・紛争対応などで保存が必要な記録がないことを確認してください。終了から30日後に申込・見積もり・対応履歴が削除対象になります。"
+  :hold?"保存保留にしますか？保留中は自動削除されません。"
+  :"保存が必要な理由がなくなったことを確認してください。保留を解除すると、解除した日から改めて30日後に削除対象になります。";
+ if(!confirm(message))return;
+ busy=true;$("refresh").disabled=true;$("retentionView").disabled=true;
+ try{
+  const body=closing?{action,id:item.id,confirmation:"CLOSE_WITHOUT_ORDER_OR_RETENTION_NEED"}:
+   {action,id:item.id,hold,confirmation:hold?"KEEP_REQUIRED_RECORD":"RELEASE_WITHOUT_RETENTION_NEED"};
+  const result=await invoke(body);
+  if(result?.ok!==true){
+   const reasons={
+    FOLLOWUP_NOT_CLOSED_NO_ORDER:"対応履歴を「受注に至らず終了した」にしてから操作してください。",
+    DELIVERY_RECONCILIATION_REQUIRED:"見積もりメールの送信結果を確認してから操作してください。",
+    CLOSURE_REQUIRED:"先に契約なしでの対応終了を記録してください。",
+    ALREADY_CLOSED:"すでに終了しています。一覧を更新して確認してください。",
+    ORDER_RETENTION_PROTECTED:"受注済み記録は契約なし終了・保存保留解除の対象にできません。受注管理の状態を確認してください。"
+   };
+   throw Error(reasons[result?.reason]||"保存できませんでした。一覧を更新して確認してください。");
+  }
+  await load(true);
+  text("auth",closing?"契約なしでの対応終了を記録しました。削除予定："+localDate(result.delete_after):
+   hold?"保存保留にしました。自動削除の対象から外れます。":
+   "保留を解除しました。解除日から30日後に削除対象になります。");
+ }catch(error){text("auth",error?.message||"保存結果を確認できません。一覧を更新してください。")}
+ finally{busy=false;$("refresh").disabled=!user;$("retentionView").disabled=!user}
+}
+function retentionPane(item){
+ const panel=document.createElement("section");panel.className="card";
+ const title=document.createElement("h3");title.textContent="対応終了・記録の保存";panel.append(title);
+ if(item.closed_no_order_at){
+  panel.append(label("30日間の保存期間の起算日（終了・保留解除）："+localDate(item.closed_no_order_at)));
+  panel.append(label(item.retention_hold===true?"保存保留中（自動削除しません）":
+   "削除予定："+localDate(item.delete_after)+"以降の定期処理"));
+  panel.append(button(item.retention_hold===true?"保存保留を解除する（30日後に削除）":"保存を保留する",
+   ()=>retentionChange(item,"retention_hold",item.retention_hold!==true)));
+ }else{
+  panel.append(label("相談中・保存が必要な記録は削除対象になりません。契約なしで対応が終了した場合のみ、下の操作で30日の保存期間を開始します。"));
+  const unresolved=item.followup&&item.followup.stage!=="closed_no_order";
+  const uncertain=["sending","delivery_unknown"].includes(item.quote?.delivery_status);
+  if(unresolved)panel.append(label("対応履歴が継続中または別途対応済みのため、終了登録はできません。"));
+  else if(uncertain)panel.append(label("見積もりメールの送信結果を確認するまで、終了登録はできません。"));
+  else panel.append(button("契約なしで対応終了（30日後に削除）",
+   ()=>retentionChange(item,"close_no_order")));
+ }
+ return panel;
+}
+
+function render(items){
+ disposeOrderPanes();
+ const root=$("requests");root.replaceChildren();
+ if(items.length===0){const e=document.createElement("section");e.className="card";
+  e.append(label(showRetention?"終了・辞退の記録はありません。":"表示対象の相談・受注記録はありません。"));root.append(e);return}
+ for(const item of items){
+  const card=document.createElement("section");card.className="card";card.dataset.requestId=item.id;
+  const title=document.createElement("h2");title.textContent=
+   (item.status==="pending_operator_review"?"未審査":
+    item.status==="operator_reviewing"?"確認中":
+    item.status==="closed"?"対応終了":item.status==="declined"?"辞退":"見積もり送信済み")+
+   " ／ "+String(item.created_at||"");
+  card.append(title);
+  const content=document.createElement("p");content.className="details";
+  content.textContent=detail(item.details||{});card.append(content);
+  card.append(label("受付ID："+String(item.id||"")));
+  if(item.quote?.response_state){
+   card.append(label(item.quote.response_state==="interested"
+    ?"お客様の回答：利用を希望（正式受諾ではありません。管理者の別途確認が必要）"
+    :"お客様の回答：今回は見送り"));
+   card.append(label("回答日時："+String(item.quote.responded_at||"")));
+  }else if(item.status==="quoted"){
+   card.append(label("見積もり送信済み。お客様からの回答待ちです。"));
+  }
+  if(item.status==="pending_operator_review"){
+   card.append(button("審査を開始",()=>change(item,"operator_reviewing")));
+   card.append(button("辞退として記録",()=>change(item,"declined")));
+  }else if(item.status==="operator_reviewing"){
+   card.append(quotePane(item));
+  }
+  if(item.status==="quoted"){
+   // Reuse the saved quote display; sent quotes have no send/edit controls.
+   if(item.quote)card.append(quotePane(item));
+   const legacy=document.createElement("div");legacy.dataset.orderLegacy=item.id;legacy.hidden=true;
+   const followup=followupPane(item);if(followup)legacy.append(followup);
+   legacy.append(retentionPane(item));
+   if(item.quote?.delivery_status==="sent"&&window.CargoOrderManagement){
+    const pane=window.CargoOrderManagement.create({item,userId:user.id,
+     storageScope:"cargo-staging-orders-v1",invoke:invokeOrder,acquire:acquireOrder,release:releaseOrder,
+     onAuthFailure:orderAuthFailure,
+     onOrderChange:snapshot=>{legacy.hidden=!snapshot||!!snapshot.order||snapshot.pending_operation===true}
+    });
+    orderPanes.push(pane);card.append(pane.element);
+   }else{
+    card.append(label("受注状態を確認できないため、契約なし終了・保存保留の操作を停止しています。機能の導入状況と権限を確認してください。"));
+   }
+   card.append(legacy);
+  }else card.append(retentionPane(item));
+  root.append(card);
+ }
+}
+async function load(allowWhileBusy=false){
+ if(!user||(busy&&!allowWhileBusy))return;
+ const generation=++listGeneration,ownsBusy=!busy;
+ busy=true;$("refresh").disabled=true;$("retentionView").disabled=true;
+ text("auth","配送相談・受注記録を取得しています…");
+ try{
+  const data=await invoke({action:showRetention?"list_retention":"list"});
+  if(data?.ok!==true||!Array.isArray(data.items))throw Error();
+  if(!user||generation!==listGeneration)return;
+  render(data.items);
+  await Promise.all(orderPanes.map(pane=>pane.load()));
+  if(!user||generation!==listGeneration)return;
+  text("auth","管理者確認済み。表示は最大20件。正式受注・配送状態は案件ごとの明示操作で記録します。自動通知はありません。");
+ }catch{
+  if(generation!==listGeneration)return;
+  disposeOrderPanes();$("requests").replaceChildren();
+  text("auth","審査待ちを取得できません。機能の導入状況・権限・通信を確認してください。");
+ }
+ finally{if(ownsBusy)busy=false;$("refresh").disabled=!user||busy;$("retentionView").disabled=!user||busy}
+}
+async function init(){
+ if(!window.supabase){text("auth","認証ライブラリがありません。");return}
+ db=window.supabase.createClient(
+  "https://hvdoqcrnztqmbzgwrovd.supabase.co",
+  "sb_publishable_A-f3WQb7Oh8uMqO4BJPPtg_l4c_JCfQ",
+  {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-staging-operator-auth-v1"}}
+ );
+ if(typeof db.auth.onAuthStateChange==="function")db.auth.onAuthStateChange((event,session)=>{
+  if(event==="SIGNED_OUT"||(event==="SIGNED_IN"&&!user)||(user&&session?.user?.id&&session.user.id!==user.id))orderAuthFailure();
+ });
+ const generation=authGeneration;
+ try{
+  const {data,error}=await db.auth.getUser();
+  if(generation!==authGeneration)return;
+  if(error||!data?.user)throw Error();
+  // The protected API checks operator membership; the browser has no direct table access.
+  user=data.user;$("refresh").disabled=false;
+  await load();
+ }catch{text("auth","軽貨物管理者としてログインしてください。");}
+}
+$("refresh").onclick=()=>load();
+$("retentionView").onclick=()=>{
+ if(busy)return;
+ showRetention=!showRetention;
+ $("retentionView").textContent=showRetention?"相談・受注一覧に戻る":"終了・保存保留の記録を表示";
+ load();
+};init();
+})();
+</script></body></html>

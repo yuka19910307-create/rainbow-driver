@@ -1,0 +1,88 @@
+{
+  "purpose": "Review-only scoped release candidate; does not authorize deployment or intake enablement",
+  "source_commit": "c4e4a30172889f5b19761a0c31640b270d069b08",
+  "main_baseline": "5b788f9b330796eb6d0933e32202e550a91bfc97",
+  "public_intake_enabled": false,
+  "files": [
+    {
+      "path": "cargo-customer-intake.html",
+      "git_blob_sha": "2fee31e2d072e3aba846c27c4d55cd974130b4a7",
+      "kind": "site"
+    },
+    {
+      "path": "cargo-customer-review.html",
+      "git_blob_sha": "fc31f3608c2755b4a8e905a61b1bfbccad4a3cd7",
+      "kind": "site"
+    },
+    {
+      "path": "cargo-customer-quote-reply.html",
+      "git_blob_sha": "d238355a00103bc506876580caf61281e5a415fe",
+      "kind": "site"
+    },
+    {
+      "path": "cargo-pwa/request-review-rules.js",
+      "git_blob_sha": "a0d7fe3bf5f4a8fdb7dee62a55d19b5517c33da2",
+      "kind": "site"
+    },
+    {
+      "path": "integrations/cargo-customer-intake/index.ts",
+      "git_blob_sha": "cf31d17118317567b505b6134f708f7ccf297c4e",
+      "kind": "edge_function"
+    },
+    {
+      "path": "integrations/cargo-customer-intake/operator.ts",
+      "git_blob_sha": "832dbc13db7c5a2656afbc048be07887e19aee9e",
+      "kind": "edge_function"
+    },
+    {
+      "path": "integrations/cargo-customer-intake/quote-reply.ts",
+      "git_blob_sha": "1e5bb41f3b499b44cb81ef08804f36c886a3a80c",
+      "kind": "edge_function"
+    },
+    {
+      "path": "integrations/cargo-customer-intake/schema.review.sql",
+      "git_blob_sha": "eec368e9fe2521289cad5835b2e1604a759b1def",
+      "kind": "database_review_only"
+    },
+    {
+      "path": "integrations/cargo-customer-intake/quotes.review.sql",
+      "git_blob_sha": "344941b896922e5738d1dae0125836a49c96af1a",
+      "kind": "database_review_only"
+    },
+    {
+      "path": "integrations/cargo-customer-intake/mail-budget.review.sql",
+      "git_blob_sha": "6a4972f6ae98a8b58fd5a2c0da2cd4af72eb9333",
+      "kind": "database_review_only"
+    },
+    {
+      "path": "integrations/cargo-customer-intake/followup.review.sql",
+      "git_blob_sha": "b8d3b4fcc4cb0bd689a3a87d1d7535d78c2faac3",
+      "kind": "database_review_only"
+    },
+    {
+      "path": "integrations/cargo-customer-intake/closed-no-order-retention.review.sql",
+      "git_blob_sha": "64e694a33066a3b0cb6f6c4e60bd128c7f9d3783",
+      "kind": "database_review_only"
+    }
+  ],
+  "existing_site_dependencies": [
+    "cargo-operator-login.html",
+    "cargo-request-preview.html"
+  ],
+  "blocked_until": [
+    "Final customer notice and approved business/fee/cancellation details",
+    "Production runtime settings, provider restrictions and approved mail limits verified in target environment",
+    "Trusted IP abuse controls and failure monitoring reviewed",
+    "Scoped public-path end-to-end validation",
+    "Explicit production rollout and launch decision"
+  ],
+  "exclusions": [
+    "staging/",
+    "owner-only test fixtures",
+    "staging-bootstrap.sql",
+    "driving service",
+    "Square",
+    "CNAME",
+    "whole branch merge"
+  ]
+}

@@ -1,0 +1,180 @@
+name: Cargo OTP review-only security tests
+
+on:
+  pull_request:
+    paths:
+      - "design/cargo-operator-draft-otp-binding.review.sql"
+      - "integrations/cargo-draft-otp-binding/index.ts"
+      - "cargo-request-otp-integration-preview.html"
+      - "cargo-request-preview.html"
+      - "cargo-pwa/request-review-rules.js"
+      - "cargo-customer-intake.html"
+      - "cargo-customer-quote-reply.html"
+      - "cargo-customer-review.html"
+      - "staging/**"
+      - "tests/cargo-staging-isolation.test.cjs"
+      - "tests/cargo-staging-owner-test*"
+      - "tests/cargo-staging-live-smoke.mjs"
+      - "integrations/cargo-customer-intake/**"
+      - "integrations/cargo-production-readiness/**"
+      - "integrations/cargo-staging-owner-mail-test/**"
+      - "tests/cargo-staging-owner-mail-session.test.cjs"
+      - "tests/cargo-request-review.test.cjs"
+      - "tests/cargo-customer-email-acceptance.test.cjs"
+      - "tests/cargo-customer-body-limit.test.cjs"
+      - "tests/cargo-production-readiness.test.cjs"
+      - "tests/cargo-production-monitor*.cjs"
+      - "tests/cargo-customer-pipeline.test.cjs"
+      - "tests/cargo-customer-quote-edit.test.cjs"
+      - "tests/cargo-customer-quote-flow.test.cjs"
+      - "tests/cargo-customer-retention-operator.test.cjs"
+      - "tests/cargo-draft-otp-*.test.cjs"
+      - "tests/cargo-otp-pg-*.sql"
+      - "tests/cargo-otp-pg-concurrency.py"
+      - "docs/cargo-production-candidate.review.json"
+      - "scripts/check-cargo-production-candidate.cjs"
+      - "scripts/build-cargo-production-install.cjs"
+      - "tests/cargo-production-install*.cjs"
+      - "scripts/check-cargo-monitor.cjs"
+      - "scripts/check-cargo-production-monitor.cjs"
+      - "tests/cargo-monitor*.cjs"
+      - ".github/workflows/cargo-otp-review-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-security-contract:
+    # PR #3 must not replay old suites/live probes on every dev push.
+    # Scoped development checks run in cargo-consultation-safety.yml instead.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.number != 3 ||
+      github.head_ref != 'test/cargo-safe-integration-20261013' ||
+      github.base_ref != 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out review branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node for TypeScript handler tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify pinned production candidate (read-only; no deployment)
+        run: node scripts/check-cargo-production-candidate.cjs
+      - name: Run offline contract tests (no secrets or network requests)
+        run: node --test tests/cargo-production-install.test.cjs tests/cargo-monitor.test.cjs tests/cargo-production-monitor.test.cjs tests/cargo-production-readiness.test.cjs tests/cargo-customer-body-limit.test.cjs tests/cargo-staging-owner-mail-session.test.cjs tests/cargo-staging-owner-test.test.cjs tests/cargo-customer-quote-flow.test.cjs tests/cargo-customer-quote-edit.test.cjs tests/cargo-draft-otp-*.test.cjs tests/cargo-request-review.test.cjs tests/cargo-staging-isolation.test.cjs tests/cargo-customer-email-acceptance.test.cjs tests/cargo-customer-pipeline.test.cjs tests/cargo-customer-retention-operator.test.cjs
+
+  staging-live-smoke:
+    # PR #3 must not replay old suites/live probes on every dev push.
+    # Scoped development checks run in cargo-consultation-safety.yml instead.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.number != 3 ||
+      github.head_ref != 'test/cargo-safe-integration-20261013' ||
+      github.base_ref != 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check live staging API is disabled and operator requires login
+        env:
+          CARGO_STAGING_PUBLISHABLE_KEY: sb_publishable_A-f3WQb7Oh8uMqO4BJPPtg_l4c_JCfQ
+        run: node tests/cargo-staging-live-smoke.mjs
+
+  disposable-postgres-integration:
+    # PR #3 must not replay old suites/live probes on every dev push.
+    # Scoped development checks run in cargo-consultation-safety.yml instead.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.number != 3 ||
+      github.head_ref != 'test/cargo-safe-integration-20261013' ||
+      github.base_ref != 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out review branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Start disposable PostgreSQL 16 (no Supabase connection)
+        run: |
+          docker run -d --rm --name cargo-otp-ci-postgres \
+            -e POSTGRES_PASSWORD=local-test-only \
+            postgres:16-alpine
+          for i in $(seq 1 30); do
+            if docker exec cargo-otp-ci-postgres psql -X -U postgres -Atqc "select 1" 2>/dev/null | grep -qx 1; then
+              # The official image temporarily starts PostgreSQL during init,
+              # then restarts it. Do not mistake that temporary server for ready.
+              sleep 3
+              if docker exec cargo-otp-ci-postgres psql -X -U postgres -Atqc "select 1" 2>/dev/null | grep -qx 1; then
+                exit 0
+              fi
+            fi
+            sleep 1
+          done
+          docker logs cargo-otp-ci-postgres
+          exit 1
+      - name: Create isolated schema and synthetic fixtures
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < tests/cargo-otp-pg-fixtures.sql
+      - name: Apply review-only SQL to disposable PostgreSQL
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < design/cargo-operator-draft-otp-binding.review.sql
+      - name: Verify RLS, permissions, OTP expiry, reuse and intake gate
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < tests/cargo-otp-pg-assert.sql
+      - name: Verify simultaneous claims and expiry under row locks
+        run: python3 tests/cargo-otp-pg-concurrency.py
+      - name: Verify bounded cleanup without deleting OTP challenges
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < tests/cargo-otp-pg-cleanup.sql
+      - name: Apply customer intake staging schema (isolated database ONLY)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/schema.review.sql
+      - name: Verify OFF gate and atomic customer email verification
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/schema-smoke.review.sql
+      - name: Apply manual quote and customer reply schema (disposable only)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/quotes.review.sql
+      - name: Apply shared customer mail budget (disposable only)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/mail-budget.review.sql
+      - name: Verify mail budget hour/day caps and fail-closed behavior
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/mail-budget.test.sql
+      - name: Verify operator approval, public intake OFF and one-time email attempt
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/quotes-smoke.review.sql
+      - name: Apply quote follow-up ledger (disposable database only)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/followup.review.sql
+      - name: Check customer-interest follow-up without booking or payment
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/followup-smoke.review.sql
+      - name: Apply approved closed-consultation retention (disposable only)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/closed-no-order-retention.review.sql
+      - name: Check closure, retention holds and dependent-record cleanup
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/closed-no-order-retention.test.sql
+      - name: Create inactive staging owner-test restrictions (disposable only)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/staging-owner-test.review.sql
+      - name: Verify owner, request, expiry, permissions and one-attempt guards
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/staging-owner-test.assert.sql
+      - name: Verify concurrent owner-test claims grant one attempt each
+        run: python3 tests/cargo-staging-owner-test-concurrency.py
+      - name: Apply owner-test start and stop controls (disposable only)
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/staging-owner-test-session.review.sql
+      - name: Verify one-time start, stop and automatic expiry
+        run: docker exec -i cargo-otp-ci-postgres psql -X -U postgres -v ON_ERROR_STOP=1 < integrations/cargo-customer-intake/staging-owner-test-session.assert.sql
+      - name: Set up Node for read-only monitor fixture checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify read-only monitoring against isolated cron success/failure history
+        run: |
+          node tests/cargo-monitor-pg.test.cjs
+          node tests/cargo-monitor-state-pg.test.cjs
+          node tests/cargo-production-monitor-pg.test.cjs
+      - name: Verify atomic production install in new disposable databases only
+        run: node tests/cargo-production-install-pg.test.cjs
+      - name: Remove disposable database
+        if: always()
+        run: docker rm -f cargo-otp-ci-postgres || true

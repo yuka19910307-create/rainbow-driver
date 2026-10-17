@@ -30,8 +30,9 @@ small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 <form id="requestForm"><section><h2>1. 集荷・配送</h2>
 <label for="pickup">集荷地 *</label><input id="pickup" minlength="3" maxlength="250" required>
 <label for="delivery">配送先 *</label><input id="delivery" minlength="3" maxlength="250" required>
-<label><input id="today" type="checkbox" checked> 即時・当日の集荷を希望する</label>
-<div id="preferredPickupPane" hidden><label for="preferredPickupAt">希望集荷日時（日本時間） *</label><input id="preferredPickupAt" type="datetime-local"><p><small>ご希望の日時です。担当者の確認後に決定します。</small></p></div>
+<label><input id="today" type="checkbox" checked aria-describedby="deliveryKindHint"> スポット配送の相談（即時・当日）</label>
+<p id="deliveryKindHint"><small>事前予約配送を相談する場合はチェックを外し、希望集荷日時を入力してください。どちらも案件ごとに対応可否を確認します。</small></p>
+<div id="preferredPickupPane" hidden><label for="preferredPickupAt">事前予約配送の相談：希望集荷日時（日本時間） *</label><input id="preferredPickupAt" type="datetime-local"><p><small>希望日時の受付は予約確定や車両・時間枠の確保ではありません。担当者が予定・経路・荷物を確認してご案内します。</small></p></div>
 <label for="readiness">集荷準備</label><select id="readiness"><option value="ready">集荷可能</option><option value="preparing">準備中</option><option value="unknown">要確認</option></select>
 </section>
 <section><h2>2. 荷物</h2>
@@ -52,7 +53,7 @@ small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 <div id="informationUse" class="status">
 <strong>送信前にご確認ください</strong>
 <p>入力したお名前・メールアドレス・集荷地・配送先・荷物の情報は、メール認証、配送可否の確認、見積もり・返信、対応記録の管理、不正利用の防止に利用します。</p>
-<p>申込・メール認証だけでは、配送の受諾・料金・契約は確定しません。担当者が内容を確認し、ご案内します。自動決済やドライバーへの出動指示は行いません。</p>
+<p>相談・希望日時の受付・メール認証・利用希望の回答だけでは、配送の受諾・予約・料金・契約は確定しません。担当者が内容を確認し、ご案内します。自動決済やドライバーへの出動指示は行いません。</p>
 <p>お問い合わせは<a href="#contact">メール・LINEの窓口</a>へお願いします。</p>
 </div>
 <label><input aria-describedby="informationUse" id="reviewConfirm" type="checkbox" required> 申込内容・個人情報の取扱いを確認し、メールによる本人確認と担当者からの返信に同意します。</label>
@@ -75,7 +76,7 @@ small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 <p id="verifyStatus" class="status" role="status">未認証</p></section>
 <section id="completedPane" hidden aria-live="polite">
 <h2>6. 受付確認</h2><p class="status" id="completedText"></p>
-<p><small>担当者からの見積もり・受諾確認があるまで配送は確定しません。自動決済・ドライバーへの出動指示は行われません。</small></p></section>
+<p><small>見積もりの提示だけでは配送は確定しません。利用希望の回答後も、担当者が対応可否を確認し、別途ご案内します。自動決済・ドライバーへの出動指示は行われません。</small></p></section>
 <section id="contact" aria-labelledby="contactTitle">
 <h2 id="contactTitle">お問い合わせ</h2>
 <p>申込内容のご相談や、入力情報の取扱いに関するお問い合わせはこちらへお願いします。</p>
@@ -110,8 +111,9 @@ function snapshot(){
 }
 function renderSummary(p){
  const d=p.request;
+ const preference=p.decision.deliveryPreference||{label:"要確認",requestedPickup:"相談区分・希望日時を担当者が確認してください。"};
  const parts=[
-  ["希望集荷",d.today?"即時・当日（担当者確認後に決定）":d.preferredPickupAt.replace("T"," ")+"（日本時間・希望）"],["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
+  ["相談区分",preference.label],["希望集荷",preference.requestedPickup],["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
   ["個数",d.pieces],["重量",d.weight+"kg"],
   ["寸法",d.length+" × "+d.width+" × "+d.height+" cm"],
   ["集荷準備",({ready:"集荷可能",preparing:"準備中",unknown:"要確認"})[d.readiness]||"要確認"],

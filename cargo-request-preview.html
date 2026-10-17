@@ -27,7 +27,7 @@ button:disabled{opacity:.5;cursor:default}.secondary{background:#e8eef5;color:#2
 <body><header><div><div class="eyebrow">RAINBOW DRIVER / CARGO / PREVIEW</div><h1>軽貨物・即時配送依頼</h1><p style="margin:0;font-size:13px;color:#dce9f3">お客様向け画面の公開前プレビュー</p></div></header>
 <main>
 <section><p class="note"><strong>現在は受付していません。</strong> この画面は開発中のプレビューです。「内容を確認」を押してもお客様からの依頼は送信されません。連絡・決済・運行依頼も発生しません。試す際は架空の情報をご利用ください。</p>
-<p>対象は<strong>今から対応を希望する即時・当日集荷</strong>です。日時を指定したご予約はアプリでは受け付けず、別途ご相談となります。</p></section>
+<p>対象は<strong>今から対応を希望する即時・当日集荷</strong>です。この旧プレビューはスポット配送の架空確認用です。スポット配送・事前予約配送の相談区分は、下の「お客様用申込・メール認証画面」で確認できます（一般受付停止中）。希望日時の受付は配送・予約の確約ではありません。</p></section>
 <form id="requestForm"><section><p class="hint">実際の個人情報を入力せずに試す場合は、下のボタンを使用してください。</p><button type="button" class="secondary" id="fillDemo">架空のサンプル値を入力する</button></section>
 <section><h2>1. 集荷とお届け先</h2>
 <label for="pickup">集荷地（住所や施設名） <span aria-hidden="true">*</span></label>
@@ -57,26 +57,46 @@ button:disabled{opacity:.5;cursor:default}.secondary{background:#e8eef5;color:#2
 <div class="summary" id="summary"></div>
 <div class="actions"><button class="secondary" id="edit" type="button">入力内容を修正</button></div>
 <div id="operatorTest" hidden>
-<h3>管理者限定・架空データ登録テスト</h3><p class="hint">管理者でログイン中の場合のみ利用可能。集荷地・配送先・荷物名がすべて「テスト」で始まる架空案件だけをテストDBへ登録します。連絡先はDBに保存しません。</p>
+<h3>管理者限定・架空データの試験</h3>
+<p class="hint">以下のGmail認証テストは、用意された架空サンプルと完全に一致した場合にのみ案内します。入力した連絡先や配送内容を別画面に渡しません。遷移だけではGmailは送信されません。</p>
+<p id="otpHandoffNotice" class="hint">架空サンプルを入力し、内容を確認すると認証テストへの導線が表示されます。</p>
+<p><a id="otpHandoff" href="./cargo-request-otp-integration-preview.html" hidden>固定架空申込のGmail認証テストへ進む（管理者専用）</a></p>
+<h3>架空データ登録テスト</h3><p class="hint">管理者でログイン中の場合のみ利用可能。集荷地・配送先・荷物名がすべて「テスト」で始まる架空案件だけをテストDBへ登録します。連絡先はDBに保存しません。</p>
 <button type="button" id="submitTest">架空案件としてテスト登録</button>
 <p id="testStatus" role="status"></p>
 <p><a href="./cargo-dispatch-test.html">ドライバー側のテスト案件一覧を開く</a></p>
 </div></section>
 <section><p id="status" role="status">入力内容の確認まで試すことができます。正式な依頼送信はまだ提供していません。</p>
+<p><a href="./cargo-customer-intake.html">お客様用申込・メール認証画面（現在は受付準備中）</a></p>
 <p><a href="./cargo-operator-login.html">軽貨物ドライバー管理画面（管理者専用）</a></p></section>
 </main>
+<script src="./cargo-pwa/fictional-flow.js"></script>
+<script src="./cargo-pwa/request-review-rules.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id),fields=['pickup','delivery','cargo','pieces','weight','length','width','height','handling','note','clientName','clientContact','readiness'];
 let operator=null,client=null,verified=null,requestKey=crypto.randomUUID(),testSaved=false;
+function updateOtpHandoff(){
+ const matching=!!operator&&!!verified&&!$('reviewPane').hidden
+  &&window.CargoFictionalFlow?.matches?.({
+   ...verified,today:$('today').checked,reviewConfirm:$('reviewConfirm').checked
+  })===true;
+ $('otpHandoff').hidden=!matching;
+ $('otpHandoffNotice').textContent=matching
+  ?'固定架空サンプルだけが認証テストへ進めます。遷移時に入力内容は送信・引き継ぎされません。'
+  :'認証テストへの導線は、管理者ログインと固定架空サンプルの完全一致が必要です。';
+}
 const samples=[['pickup','集荷地'],['delivery','配送先'],['cargo','荷物内容'],['pieces','個数'],['weight','総重量（kg）'],['length','長さ（cm）'],['width','幅（cm）'],['height','高さ（cm）'],['handling','積み降ろし補助'],['readiness','集荷準備'],['note','補足'],['clientName','ご担当者'],['clientContact','連絡先']];
 const handlingNames={no:'不要',yes:'希望する',unknown:'要相談'},readinessNames={ready:'集荷可能',preparing:'準備中',unknown:'要確認'};
 function snapshot(){
  const raw=Object.fromEntries(fields.map(k=>[k,$(k).value.trim()]));
  if(!$('today').checked||!$('reviewConfirm').checked)throw Error('確認事項への同意が必要です。');
- const p=Number(raw.pieces),weight=Number(raw.weight),l=Number(raw.length),w=Number(raw.width),h=Number(raw.height);
- if(!Number.isInteger(p)||p<1||p>99||![weight,l,w,h].every(v=>Number.isFinite(v)&&v>0))throw Error('個数・重量・寸法を確認してください。');
+ // Validate every visible field with the same offline rules used in CI.
+ // Never send this snapshot to the backend or enable public submission.
+ if(!window.CargoRequestReview)throw Error('入力検証モジュールを読み込めません。');
+ const decision=window.CargoRequestReview.review({...raw,today:$('today').checked,reviewConfirm:$('reviewConfirm').checked});
+ if(decision.canSubmit!==false||decision.publicIntakeEnabled!==false)throw Error('一般受付は停止中です。');
  return raw;
 }
 function draw(data){
@@ -94,28 +114,31 @@ async function canTest(){
   const {data:{user},error}=await client.auth.getUser();
   if(error||!user)return;
   const {data,error:e}=await client.from('cargo_operator_accounts').select('user_id').eq('user_id',user.id).maybeSingle();
-  if(!e&&data){operator=user;$('operatorTest').hidden=false}
+  if(!e&&data){operator=user;$('operatorTest').hidden=false;updateOtpHandoff()}
  }catch(e){/* The public preview remains read-only if auth fails. */}
 }
 $('fillDemo').onclick=()=>{
- const v={pickup:'テスト集荷地・さいたま市',delivery:'テスト配送先・東京都内',cargo:'テスト用・精密機器の箱',pieces:'2',weight:'8.5',length:'40',width:'30',height:'25',handling:'yes',readiness:'ready',note:'テスト専用の架空案件。積み降ろし補助を相談。',clientName:'テスト担当者',clientContact:''};
- for(const [k,value] of Object.entries(v))$(k).value=value;
- $('today').checked=true;$('reviewConfirm').checked=true;
- verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true;
+ if(!window.CargoFictionalFlow){$('status').textContent='架空データの検証モジュールが利用できません。';return}
+ const v=window.CargoFictionalFlow.sample();
+ for(const k of fields)$(k).value=v[k];
+ $('today').checked=v.today;$('reviewConfirm').checked=v.reviewConfirm;
+ verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true;updateOtpHandoff();
  $('status').textContent='架空のサンプル値をセットしました。内容を確認して「入力内容を確認する」を押してください。';
+ updateOtpHandoff();
 };
 $('requestForm').onsubmit=e=>{
  e.preventDefault();
  try{
   if(!$('requestForm').reportValidity())return;
-  verified=snapshot();draw(verified);$('reviewPane').hidden=false;
-  $('status').textContent='下書き内容を画面に表示しました。まだ送信されていません。';
+  verified=snapshot();draw(verified);$('reviewPane').hidden=false;updateOtpHandoff();
+  const decision=window.CargoRequestReview.review({...verified,today:$('today').checked,reviewConfirm:$('reviewConfirm').checked});
+  $('status').textContent='下書き確認（未送信）\n'+decision.reviewReasons.map(x=>'・'+x).join('\n')+'\n一般受付OFF。見積もり・受注・決済は確定していません。';
   $('reviewPane').scrollIntoView({behavior:'smooth',block:'start'});
  }catch(err){$('status').textContent=err.message||'入力を確認してください。'}
 };
-$('edit').onclick=()=>{$('reviewPane').hidden=true;$('requestForm').scrollIntoView({behavior:'smooth',block:'start'})};
-fields.forEach(id=>$(id).addEventListener('input',()=>{verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true}));
-for(const id of ['today','reviewConfirm'])$(id).addEventListener('change',()=>{verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true});
+$('edit').onclick=()=>{$('reviewPane').hidden=true;updateOtpHandoff();$('requestForm').scrollIntoView({behavior:'smooth',block:'start'})};
+fields.forEach(id=>$(id).addEventListener('input',()=>{verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true;updateOtpHandoff()}));
+for(const id of ['today','reviewConfirm'])$(id).addEventListener('change',()=>{verified=null;requestKey=crypto.randomUUID();testSaved=false;$('submitTest').disabled=false;$('reviewPane').hidden=true;updateOtpHandoff()});
 $('submitTest').onclick=async()=>{
  const status=$('testStatus'),button=$('submitTest');
  if(!operator||!client||!verified){status.textContent='管理者としてログインし、内容を再確認してください。';return}

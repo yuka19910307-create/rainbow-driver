@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>軽貨物・申込からGmail認証までの試験画面｜Rainbow Driver</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#203552;background:#f0f4fa}
+*{box-sizing:border-box}body{margin:0;line-height:1.7}
+header{background:#213958;color:#fff;padding:22px 18px}
+header>div,main{max-width:680px;margin:auto}main{padding:16px}
+section{background:#fff;border:1px solid #d5e0ed;border-radius:14px;padding:20px;margin-bottom:14px}
+h1{font-size:22px}h2{font-size:19px}
+button{background:#2e4d72;color:#fff;border:0;border-radius:9px;padding:14px 18px;font-size:16px;font-weight:700;width:100%}
+button:disabled{opacity:.4}input{font:inherit;font-size:22px;letter-spacing:3px;border:1px solid #bac8d9;border-radius:9px;padding:12px;width:100%;max-width:220px}
+label{display:block;font-weight:700;margin:10px 0}
+p{margin:10px 0}a{color:#245d8d}
+.note{padding:13px;background:#fff2dc;border-radius:10px}
+.result{padding:12px;background:#eef3f9;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere}
+.ok{color:#17653f}.warn{color:#a33130}small{color:#64748b}
+</style></head>
+<body><header><div><small style="color:#cfdef0">RAINBOW DRIVER / CARGO / PRELAUNCH</small><h1>架空申込 → Gmail本人確認</h1></div></header>
+<main>
+<section>
+<h2>管理者専用・実送信を伴うテスト</h2>
+<p class="note">一般受付OFFを維持します。固定した架空の配送情報を検証した後、管理者本人が明示的に許可した場合だけ所有者Gmailへ1通送信します。顧客メール・正式受注・Push通知・運賃確定・決済は行いません。</p>
+<p><a href="./cargo-request-preview.html">架空配送申込プレビューに戻る</a> ／ <a href="./cargo-operator-login.html">管理者ログイン</a> ／ <a href="./cargo-integration-safety-test.html">メール送信なしの安全テスト</a></p>
+<p><small>この画面は申込プレビューから値を受け取りません。URLやブラウザ保存領域に連絡先・配送情報・認証コードを引き継がず、同じ固定架空データを画面内で用意します。</small></p>
+<p id="auth" class="result" role="status">管理者認証を確認しています…</p>
+</section>
+<section>
+<h2>1. 架空の配送依頼を検証</h2>
+<p>集荷地：テスト集荷地・さいたま市<br>配送先：テスト配送先・東京都内<br>荷物：テスト用・精密機器の箱<br>個数：2個 ／ 重量：8.5kg</p>
+<button type="button" id="check" disabled>架空申込と受付停止を確認</button>
+<p id="checkResult" class="result" role="status">未確認</p>
+</section>
+<section>
+<h2>2. 自分のGmailへコードを送信</h2>
+<p>上の安全確認に成功した場合のみ有効になります。送信先はGoogle Apps Script所有者に固定されています。送信上限は1時間3回です。</p>
+<button type="button" id="send" disabled>確認メールを1通だけ送信</button>
+<p id="sendResult" class="result" role="status">未送信</p>
+</section>
+<section>
+<h2>3. 6桁コードで確認</h2>
+<label for="code">Gmailに届いた6桁のコード</label>
+<input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" type="text">
+<p><button type="button" id="verify" disabled>6桁コードを検証</button></p>
+<p id="verifyResult" class="result" role="status">未検証</p>
+</section>
+<section>
+<h2>4. 受付停止を再確認</h2>
+<p id="finalResult" class="result" role="status">本人確認後に自動確認します。</p>
+<p><small>これは固定架空申込を対象とした管理者専用試験です。顧客の実際の申込情報と認証結果を紐づける本番機能ではありません。サーバー側の新API・テーブルはレビュー中で、まだデプロイしていません。</small></p>
+</section>
+</main>
+<script src="./cargo-pwa/fictional-flow.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const set=(id,msg,ok)=>{const e=$(id);e.textContent=msg;e.className="result"+(ok===true?" ok":ok===false?" warn":"")};
+if(!window.supabase||!window.CargoFictionalFlow){set("auth","安全な認証テストに必要なモジュールを読み込めません。",false);return}
+const db=window.supabase.createClient(
+ "https://kvoaorzdewwirqryeizq.supabase.co",
+ "sb_publishable_RG3jeU_P22ZPMce6kREkeg_ukVyAlms",
+ {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:"rd-cargo-operator-auth-v1"}}
+);
+let authorized=false,checked=false,busy=false,challengeId=null,draftId=null,verified=false,expiresAt=0,sendAttempted=false;
+const fixture=window.CargoFictionalFlow.otpSample();
+const update=()=>{
+ $("check").disabled=!authorized||busy;
+ $("send").disabled=!authorized||!checked||busy||sendAttempted||verified;
+ $("verify").disabled=!authorized||!challengeId||!draftId||busy||verified;
+};
+async function call(fn,body){
+ const {data,error}=await db.functions.invoke(fn,{body});
+ let result=data;
+ if(error?.context&&typeof error.context.json==="function"){
+  try{result=await error.context.json()}catch(_){}
+ }
+ return {data:result,error};
+}
+async function guard(){
+ const r=await call("cargo-intake-readiness",{action:"diagnose"});
+ const d=r.data;
+ return !r.error&&d?.mode==="PRELAUNCH_OPERATOR_DIAGNOSTIC"
+  &&d?.public_intake_enabled===false&&d?.database_switch_enabled===false
+  &&d?.customer_submission_supported===false
+  &&d?.captcha_required===true&&d?.contact_verification_required===true;
+}
+async function auth(){
+ try{
+  const {data,error}=await db.auth.getUser();
+  if(error||!data?.user)throw Error("LOGIN_REQUIRED");
+  const {data:member,error:e}=await db.from("cargo_operator_accounts").select("user_id").eq("user_id",data.user.id).maybeSingle();
+  if(e||!member)throw Error("OPERATOR_ONLY");
+  authorized=true;set("auth","軽貨物管理者のログインと権限を確認しました。",true);
+ }catch(_){set("auth","管理者ログインが必要です。上のリンクからログインしてください。",false)}
+ update();
+}
+$("check").onclick=async()=>{
+ if(!authorized||busy)return;
+ busy=true;checked=false;update();set("checkResult","確認中…");
+ try{
+  if(!(await guard()))throw Error("受付OFF・必須設定を確認できません。");
+  const v=await call("cargo-intake-readiness",{action:"validate_sample",sample:fixture});
+  if(v.error||v.data?.valid!==true||v.data?.stores_data!==false||v.data?.sends_push!==false||v.data?.accepts_customers!==false)
+   throw Error("架空配送情報の検証に失敗しました。");
+  const s=await call("cargo-gmail-otp-test",{action:"status"});
+  if(s.error||s.data?.mode!=="OPERATOR_OWN_GMAIL_PRELAUNCH"||s.data?.bridge_configured!==true
+    ||s.data?.verification_hmac_configured!==true||s.data?.delivery_scope!=="SCRIPT_OWNER_GMAIL_ONLY"
+    ||s.data?.public_intake_enabled!==false)throw Error("Gmail認証の設定を確認できません。");
+  const bindReady=await call("cargo-draft-otp-binding",{action:"status"});
+  if(bindReady.error||bindReady.data?.ok!==true||bindReady.data?.ready!==true
+    ||bindReady.data?.mode!=="OPERATOR_SYNTHETIC_DRAFT_ONLY"
+    ||bindReady.data?.public_intake_enabled!==false)
+    throw Error("申込別認証APIがまだ準備できていません。Gmail送信は行いません。");
+  checked=true;set("checkResult","架空配送情報・Gmail設定・申込別認証APIを確認しました。一般受付OFFです。実際の配送依頼は作成していません。",true);
+ }catch(e){set("checkResult","安全確認を停止しました："+(e?.message||"通信エラー"),false)}
+ finally{busy=false;update()}
+};
+$("send").onclick=async()=>{
+ if(!authorized||!checked||busy||sendAttempted||verified)return;
+ if(!confirm("Google Apps Script所有者のGmailへ6桁コードを1通送信します。続けますか？"))return;
+ busy=true;checked=false;sendAttempted=true;challengeId=null;draftId=null;expiresAt=0;$("code").value="";
+ update();set("sendResult","送信しています…");
+ try{
+  if(!(await guard()))throw Error("一般受付OFFを確認できず、送信を中止しました。");
+  const ready=await call("cargo-draft-otp-binding",{action:"status"});
+  if(ready.error||ready.data?.ok!==true||ready.data?.ready!==true
+    ||ready.data?.public_intake_enabled!==false)
+    throw Error("申込別認証APIを再確認できません。Gmail送信は中止しました。");
+  const r=await call("cargo-gmail-otp-test",{action:"send_test"});
+  if(r.error||r.data?.ok!==true||r.data?.mode!=="OPERATOR_OWN_GMAIL_TEST"
+    ||typeof r.data?.challenge_id!=="string"||r.data?.public_intake_enabled!==false)
+    throw Error("送信受付を確認できません。重複送信せず受信トレイを確認してください。");
+  const binding=await call("cargo-draft-otp-binding",{action:"bind",challenge_id:r.data.challenge_id});
+  if(binding.error||binding.data?.ok!==true||binding.data?.mode!=="OPERATOR_SYNTHETIC_DRAFT_ONLY"
+    ||typeof binding.data?.draft_id!=="string"||binding.data?.challenge_id!==r.data.challenge_id
+    ||binding.data?.public_intake_enabled!==false)throw Error("メールは送信された可能性がありますが、架空申込との紐づけを確認できません。コード認証は進めません。");
+  challengeId=r.data.challenge_id;
+  draftId=binding.data.draft_id;
+  expiresAt=Date.now()+Math.min(600,Number(r.data.expires_in_seconds)||600)*1000;
+  set("sendResult","送信受付・架空申込への紐づけ成功。所有者Gmailに届いたコードを10分以内に入力してください。",true);
+ }catch(e){set("sendResult",e?.message||"送信の結果を確認できません。",false)}
+ finally{busy=false;update()}
+};
+$("verify").onclick=async()=>{
+ if(!authorized||busy||!challengeId||!draftId||verified)return;
+ const code=$("code").value.trim();
+ if(!/^[0-9]{6}$/.test(code)){set("verifyResult","6桁の数字を入力してください。",false);return}
+ if(Date.now()>=expiresAt){challengeId=null;$("code").value="";set("verifyResult","10分を超えました。認証コードは利用できません。",false);update();return}
+ busy=true;update();set("verifyResult","照合中…");
+ $("code").value="";
+ try{
+  const r=await call("cargo-gmail-otp-test",{action:"verify",challenge_id:challengeId,code});
+  if(r.error||r.data?.verified!==true||r.data?.reason!=="VERIFIED") {
+   set("verifyResult","コードを確認できませんでした："+(r.data?.reason||r.data?.error||"認証エラー"),false);
+   if(["ALREADY_USED","EXPIRED","LOCKED","OLDER_CODE_SUPERSEDED"].includes(r.data?.reason)||r.data?.reason==="OLDER_CODE_SUPERSEDED")challengeId=null;
+   return;
+  }
+  set("verifyResult","6桁コード認証に成功。架空申込との一度限りの紐づけを確認しています…");
+  const claimed=await call("cargo-draft-otp-binding",{action:"claim",challenge_id:challengeId,draft_id:draftId});
+  if(claimed.error||claimed.data?.ok!==true||claimed.data?.reason!=="CLAIMED"
+    ||claimed.data?.public_intake_enabled!==false){
+   challengeId=null;draftId=null;
+   set("verifyResult","コード認証は成功しましたが、架空申込との紐づけ確定に失敗しました。再送信せず、管理者に確認してください。",false);
+   return;
+  }
+  verified=true;challengeId=null;draftId=null;
+  set("verifyResult","管理者本人の6桁コード認証と、架空申込への一度限りの紐づけに成功しました。",true);
+  const safe=await guard();
+  set("finalResult",safe
+   ?"完了：架空申込の入力検証 → 所有者Gmail送信 → 6桁認証 → 申込別の一度限りの紐づけ → 一般受付OFFの維持を確認しました。実受注・決済はありません。"
+   :"認証は成功しましたが、受付OFFの最終確認ができません。完了とは判定しません。",safe);
+ }catch(_){set("verifyResult","通信エラーで検証を完了できませんでした。",false)}
+ finally{busy=false;update()}
+};
+auth();
+})();
+</script>
+</body></html>

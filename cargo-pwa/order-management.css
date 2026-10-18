@@ -1,0 +1,19 @@
+.cargo-orders{margin:18px 0;padding:16px;border:2px solid #a6bad0;border-radius:12px;background:#fbfdff;color:#20364d;min-width:0;overflow-wrap:anywhere}
+.cargo-orders *{box-sizing:border-box;min-width:0}
+.cargo-orders h3{margin-top:0}.cargo-orders h4{font-size:1.08rem;margin:12px 0}.cargo-orders h5{font-size:1rem;margin:6px 0}
+.cargo-orders p{white-space:pre-wrap;overflow-wrap:anywhere}
+.cargo-orders .cargo-orders-message{padding:12px;background:#e7f0fa;border-radius:8px}
+.cargo-orders [data-order-tone="error"],.cargo-orders .cargo-orders-warning{background:#fff0d9;color:#71420d;border-left:4px solid #9b600d;padding:12px}
+.cargo-orders .cargo-orders-summary,.cargo-orders .cargo-orders-form{padding:13px;margin:14px 0;border:1px solid #bdccdc;border-radius:9px}
+.cargo-orders .cargo-orders-field{display:block;margin:12px 0;font-weight:600}
+.cargo-orders .cargo-orders-field input,.cargo-orders textarea,.cargo-orders select{display:block;width:100%;max-width:100%;min-height:44px;padding:10px;margin-top:5px;border:1px solid #91a7bf;border-radius:7px;background:#fff;color:#20364d;font:inherit;font-weight:400}
+.cargo-orders textarea{resize:vertical;line-height:1.5}.cargo-orders input[type="datetime-local"]{width:100%;font-size:16px}
+.cargo-orders .cargo-orders-check{display:flex;align-items:flex-start;gap:10px;margin:12px 0;padding:10px 0;min-height:44px}
+.cargo-orders .cargo-orders-check input{width:23px;height:23px;flex:none;margin:2px 0}
+.cargo-orders button{min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere;cursor:pointer;font:inherit;font-weight:700;background:#25456a;color:white;border:0;border-radius:8px;padding:11px 14px;margin:5px 8px 5px 0}
+.cargo-orders button:disabled{opacity:.5;cursor:default}.cargo-orders input:disabled,.cargo-orders textarea:disabled,.cargo-orders select:disabled{background:#eef2f6}
+.cargo-orders .cargo-orders-actions{display:flex;flex-wrap:wrap;gap:6px}.cargo-orders .cargo-orders-actions button{margin-right:0}
+.cargo-orders .cargo-orders-record{padding:12px;margin:10px 0;border:1px solid #d4dfe9;border-radius:8px;background:white}
+.cargo-orders dl{margin:0}.cargo-orders dt{font-weight:700;margin-top:9px}.cargo-orders dd{margin:3px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.cargo-orders :focus-visible{outline:3px solid #b86b00;outline-offset:3px}
+@media(max-width:480px){.cargo-orders{padding:10px}.cargo-orders .cargo-orders-form,.cargo-orders .cargo-orders-summary,.cargo-orders .cargo-orders-record{padding:10px}.cargo-orders button{width:100%;margin-right:0}.cargo-orders .cargo-orders-actions{display:block}}

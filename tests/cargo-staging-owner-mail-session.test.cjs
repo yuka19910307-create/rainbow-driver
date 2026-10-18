@@ -1,0 +1,17 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),test=require('node:test');
+const {stripTypeScriptTypes}=require('node:module');
+const src=fs.readFileSync('integrations/cargo-staging-owner-mail-test/index.ts','utf8').replace(/^import .*;\n/,'');
+const OWNER='5ccbfcd5-bd0f-4a9a-b570-223b3deb2567';
+function setup(){let handler,calls=0;const env={SUPABASE_URL:'https://hvdoqcrnztqmbzgwrovd.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'synthetic',CARGO_INTAKE_HMAC_KEY:Buffer.alloc(32,1).toString('base64'),CARGO_CONTACT_AES_256_GCM_KEY:Buffer.alloc(32,2).toString('base64'),CARGO_CUSTOMER_TURNSTILE_SITE_KEY:'synthetic',CARGO_CUSTOMER_TURNSTILE_SECRET:'synthetic',CARGO_CUSTOMER_RESEND_API_KEY:'synthetic',CARGO_CUSTOMER_FROM_EMAIL:'sender@example.invalid',CARGO_CUSTOMER_EMAIL_PROVIDER:'resend'};
+const user={id:OWNER,email:'synthetic@example.invalid',email_confirmed_at:'2026-01-01'};
+const db={auth:{getUser:async()=>({data:{user}})},rpc:async(name,args)=>{calls++;assert.equal(name,'cargo_staging_owner_test_session');assert.equal(args.p_owner_id,OWNER);return{data:{ok:true,state:args.p_action==='begin'?'ACTIVE':'NOT_STARTED'}}}};
+const ctx={createClient:()=>db,Deno:{env:{get:k=>env[k]},serve:f=>handler=f},Request,Response,atob,fetch:()=>{throw Error('No external calls permitted')}};vm.createContext(ctx);vm.runInContext(stripTypeScriptTypes(src),ctx);
+return{ctx,env,user,get calls(){return calls},async call(body,token=true,origin='https://app.rainbow-driver.com'){const r=await handler(new Request('https://synthetic.invalid',{method:'POST',headers:{origin,...(token?{Authorization:'Bearer synthetic'}:{})},body:JSON.stringify(body)}));return{status:r.status,body:await r.json()}}};}
+test('trial management requires stage, exact owner and explicit begin confirmation; never sends mail',async()=>{const s=setup();assert.equal((await s.call({action:'status'},false)).status,401);assert.equal((await s.call({action:'begin'})).status,422);assert.equal((await s.call({action:'begin',confirmation:'BEGIN_OWNER_ONLY_MAIL_TRIAL',email:'other@example.invalid'})).status,422);assert.equal(s.calls,0);
+s.user.id='other';assert.equal((await s.call({action:'status'})).status,403);s.user.id=OWNER;
+let r=await s.call({action:'status'});assert.equal(r.status,200);assert.equal(r.body.email_sent,false);assert.equal(r.body.public_intake_enabled,false);
+r=await s.call({action:'begin',confirmation:'BEGIN_OWNER_ONLY_MAIL_TRIAL'});assert.equal(r.status,200);assert.equal(r.body.state,'ACTIVE');assert.equal(r.body.email_sent,false);assert.equal(r.body.owner_only,true);
+s.env.CARGO_CUSTOMER_RESEND_API_KEY='';const calls=s.calls;assert.equal((await s.call({action:'begin',confirmation:'BEGIN_OWNER_ONLY_MAIL_TRIAL'})).status,503);assert.equal(s.calls,calls);
+s.env.SUPABASE_URL='https://kvoaorzdewwirqryeizq.supabase.co';assert.equal((await s.call({action:'status'})).status,403);assert.equal(s.calls,calls);
+});
+test('screen fixture equals the guarded server fixture',()=>{const s=setup();const a=vm.runInContext('JSON.stringify(fixture)',s.ctx);const intake=fs.readFileSync('integrations/cargo-customer-intake/index.ts','utf8');const code=intake.slice(intake.indexOf('function stagingFixture()'),intake.indexOf('async function stagingOwnerTest'));const ctx={};vm.createContext(ctx);vm.runInContext(code,ctx);assert.deepEqual(JSON.parse(a),JSON.parse(vm.runInContext('JSON.stringify(stagingFixture())',ctx)));});

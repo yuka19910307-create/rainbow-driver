@@ -24,14 +24,15 @@ small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 <body><header><div><small style="color:#c0d5e8">RAINBOW DRIVER / CARGO</small>
 <h1>軽貨物配送のご相談</h1><p style="margin:0">お申し込み内容の確認 → メール認証 → 担当者の審査</p></div></header>
 <main>
-<section><p class="note"><strong>一般受付準備中。</strong> 受付開始まではメール送信・依頼登録ができません。運賃は担当者が荷姿・距離・対応可否を確認後にご案内します。画面確認中は実際の個人情報を入力しないでください。</p>
+<section><p class="note"><strong>アプリの一般受付フォームは現在準備中です。</strong> このフォームからの相談登録・認証メール送信はできません。配送のご相談・お見積もりは、掲載のLINE・メールからお問い合わせください。画面確認中は実際の個人情報を入力しないでください。</p>
 <p id="availability" role="status" class="status">受付状況を確認しています…</p>
 <p><a href="./cargo-request-preview.html">保存・送信しない申込プレビューに戻る</a></p></section>
 <form id="requestForm"><section><h2>1. 集荷・配送</h2>
 <label for="pickup">集荷地 *</label><input id="pickup" minlength="3" maxlength="250" required>
 <label for="delivery">配送先 *</label><input id="delivery" minlength="3" maxlength="250" required>
-<label><input id="today" type="checkbox" checked> 即時・当日の集荷を希望する</label>
-<div id="preferredPickupPane" hidden><label for="preferredPickupAt">希望集荷日時（日本時間） *</label><input id="preferredPickupAt" type="datetime-local"><p><small>ご希望の日時です。担当者の確認後に決定します。</small></p></div>
+<label><input id="today" type="checkbox" checked aria-describedby="deliveryKindHint"> スポット配送の相談（即時・当日）</label>
+<p id="deliveryKindHint"><small>事前予約配送を相談する場合はチェックを外し、希望集荷日時を入力してください。どちらも案件ごとに対応可否を確認します。</small></p>
+<div id="preferredPickupPane" hidden><label for="preferredPickupAt">事前予約配送の相談：希望集荷日時（日本時間） *</label><input id="preferredPickupAt" type="datetime-local"><p><small>希望日時の受付は予約確定や車両・時間枠の確保ではありません。担当者が予定・経路・荷物を確認してご案内します。</small></p></div>
 <label for="readiness">集荷準備</label><select id="readiness"><option value="ready">集荷可能</option><option value="preparing">準備中</option><option value="unknown">要確認</option></select>
 </section>
 <section><h2>2. 荷物</h2>
@@ -52,7 +53,7 @@ small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 <div id="informationUse" class="status">
 <strong>送信前にご確認ください</strong>
 <p>入力したお名前・メールアドレス・集荷地・配送先・荷物の情報は、メール認証、配送可否の確認、見積もり・返信、対応記録の管理、不正利用の防止に利用します。</p>
-<p>申込・メール認証だけでは、配送の受諾・料金・契約は確定しません。担当者が内容を確認し、ご案内します。自動決済やドライバーへの出動指示は行いません。</p>
+<p>ご相談・お見積もり・「利用希望」の回答だけでは、正式受注や配送日時の確約にはなりません。運営者が案件ごとに対応可否と条件を確認・判断し、正式受注について個別にご案内します。自動決済やドライバーへの出動指示は行いません。</p>
 <p>お問い合わせは<a href="#contact">メール・LINEの窓口</a>へお願いします。</p>
 </div>
 <label><input aria-describedby="informationUse" id="reviewConfirm" type="checkbox" required> 申込内容・個人情報の取扱いを確認し、メールによる本人確認と担当者からの返信に同意します。</label>
@@ -75,13 +76,13 @@ small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 <p id="verifyStatus" class="status" role="status">未認証</p></section>
 <section id="completedPane" hidden aria-live="polite">
 <h2>6. 受付確認</h2><p class="status" id="completedText"></p>
-<p><small>担当者からの見積もり・受諾確認があるまで配送は確定しません。自動決済・ドライバーへの出動指示は行われません。</small></p></section>
+<p><small>見積もりの提示や「利用希望」の回答だけでは、正式受注や配送日時の確約にはなりません。運営者が対応可否と条件を確認・判断し、正式受注について個別にご案内します。自動決済・ドライバーへの出動指示は行われません。</small></p></section>
 <section id="contact" aria-labelledby="contactTitle">
 <h2 id="contactTitle">お問い合わせ</h2>
 <p>申込内容のご相談や、入力情報の取扱いに関するお問い合わせはこちらへお願いします。</p>
 <p>メール：<a href="mailto:rainbow.driver.saitama@gmail.com">rainbow.driver.saitama@gmail.com</a></p>
 <p><a href="https://lin.ee/8YNhfM5" target="_blank" rel="noopener noreferrer">LINEで相談する（別の画面で開きます）</a></p>
-<p><small>お問い合わせだけでは配送・料金は確定しません。</small></p>
+<p><small>お問い合わせだけでは正式受注になりません。運営者の個別判断と正式なご案内が必要です。</small></p>
 </section>
 </main>
 <script src="./cargo-pwa/request-review-rules.js"></script>
@@ -110,8 +111,9 @@ function snapshot(){
 }
 function renderSummary(p){
  const d=p.request;
+ const preference=p.decision.deliveryPreference||{label:"要確認",requestedPickup:"相談区分・希望日時を担当者が確認してください。"};
  const parts=[
-  ["希望集荷",d.today?"即時・当日（担当者確認後に決定）":d.preferredPickupAt.replace("T"," ")+"（日本時間・希望）"],["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
+  ["相談区分",preference.label],["希望集荷",preference.requestedPickup],["集荷地",d.pickup],["配送先",d.delivery],["荷物",d.cargo],
   ["個数",d.pieces],["重量",d.weight+"kg"],
   ["寸法",d.length+" × "+d.width+" × "+d.height+" cm"],
   ["集荷準備",({ready:"集荷可能",preparing:"準備中",unknown:"要確認"})[d.readiness]||"要確認"],
@@ -149,12 +151,12 @@ function loadTurnstile(siteKey){
    "error-callback":()=>{turnstileToken="";$("sendEmail").disabled=true}
   });
  };
- script.onerror=()=>status("availability","不正利用防止認証を読み込めません。受付できません。");
+ script.onerror=()=>status("availability","不正利用防止の確認を読み込めません。安全のため、このフォームからは送信できません。");
  document.head.appendChild(script);
 }
 async function initialize(){
  if(!window.supabase||!window.CargoRequestReview){
-  status("availability","受付を利用できません。");return;
+  status("availability","必要な画面機能を読み込めません。安全のため、このフォームからは送信できません。");return;
  }
  db=window.supabase.createClient(
   "https://kvoaorzdewwirqryeizq.supabase.co",
@@ -164,13 +166,13 @@ async function initialize(){
   const result=await invoke("status");
   if(result?.public_intake_enabled!==true||result?.ready!==true||result?.accepts_orders!==false||
     result?.payment_enabled!==false||typeof result?.captcha_site_key!=="string"){
-   status("availability","現在、一般受付を停止しています。申込・メール送信はできません。");return;
+   status("availability","アプリの一般受付フォームは現在準備中です。このフォームからの相談登録・認証メール送信はできません。");return;
   }
   ready=true;
   $("reviewButton").disabled=false;
   status("availability","申込内容を入力してください。確認後にメール認証へ進みます。");
   loadTurnstile(result.captcha_site_key);
- }catch{status("availability","一般受付は準備中です。現在、送信はできません。")}
+ }catch{status("availability","フォームの受付状況を確認できません。安全のため、このフォームからは送信できません。")}
 }
 $("today").addEventListener("change",()=>{
  $("preferredPickupPane").hidden=$("today").checked;

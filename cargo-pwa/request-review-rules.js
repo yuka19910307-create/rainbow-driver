@@ -23,6 +23,24 @@
       throw Error(label+'の数値が範囲外です。');
     return n;
   }
+  function pickupStamp(value){
+    if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))return null;
+    var stamp=Date.parse(value+':00+09:00');
+    return Number.isFinite(stamp)&&new Date(stamp+9*3600000).toISOString().slice(0,16)===value?stamp:null;
+  }
+  // Describe stored requests too: a past preferred date remains a request, never a booking.
+  function describeDelivery(raw){
+    var kind='needs_confirmation',label='要確認',requestedPickup='相談区分・希望日時を担当者が確認してください。';
+    if(raw&&typeof raw==='object'&&!Array.isArray(raw)){
+      var preferred=raw.preferredPickupAt??'';
+      if(raw.today===true&&preferred===''){
+        kind='spot';label='スポット配送の相談';requestedPickup='即時・当日を希望（対応未確定）';
+      }else if(raw.today===false&&pickupStamp(preferred)!==null){
+        kind='scheduled';label='事前予約配送の相談';requestedPickup=preferred.replace('T',' ')+'（日本時間・希望／予約未確定）';
+      }
+    }
+    return Object.freeze({kind:kind,label:label,requestedPickup:requestedPickup,bookingConfirmed:false});
+  }
   function review(raw){
     if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('申込内容がありません。');
     var pickup=string(raw.pickup,MAX.pickup,'集荷地',3);
@@ -38,13 +56,12 @@
     var height=number(raw.height,'高さ',0.1,500,false);
 
     if(typeof raw.today!=='boolean')throw Error('集荷希望を選択してください。');
-    var preferred=raw.preferredPickupAt||'';
+    var preferred=raw.preferredPickupAt??'';
     if(raw.today){
       if(preferred!=='')throw Error('当日希望と日時指定を同時に選択できません。');
     }else{
-      if(typeof preferred!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(preferred))throw Error('希望集荷日時を入力してください。');
-      var stamp=Date.parse(preferred+':00+09:00');
-      if(!Number.isFinite(stamp)||new Date(stamp+9*3600000).toISOString().slice(0,16)!==preferred||stamp<=Date.now())throw Error('希望集荷日時は日本時間の未来の日時を指定してください。');
+      var stamp=pickupStamp(preferred);
+      if(stamp===null||stamp<=Date.now())throw Error('希望集荷日時は日本時間の未来の日時を指定してください。');
     }
 
     if(raw.reviewConfirm!==true)throw Error('未送信であることの確認が必要です。');
@@ -60,6 +77,7 @@
     if(raw.handling==='unknown')reasons.push('積み降ろし条件の確認が必要です。');
     // Physical constraints are not capacity approval, even within input bounds.
     reasons.push('車両の積載可否・経路・対応可否・料金は担当者による確認が必要です。');
+    reasons.push('相談・希望日時の受付や利用希望の回答だけでは、配送・予約・契約は確定しません。');
     return Object.freeze({
       status:'manual_review_only',
       canSubmit:false,
@@ -67,10 +85,11 @@
       priceFinalized:false,
       publicIntakeEnabled:false,
       requiresOperatorReview:true,
+      deliveryPreference:describeDelivery(raw),
       reviewReasons:Object.freeze(reasons),
       checked:{pickup:pickup,delivery:delivery,cargo:cargo,
         pieces:pieces,weightKg:weight,lengthCm:length,widthCm:width,heightCm:height}
     });
   }
-  return Object.freeze({review:review});
+  return Object.freeze({review:review,describeDelivery:describeDelivery});
 });

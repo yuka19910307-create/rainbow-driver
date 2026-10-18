@@ -24,7 +24,7 @@ small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 <body><div style="background:#8b1e24;color:white;padding:12px;text-align:center;font-weight:bold">検証環境：本番ではありません／一般受付OFF・メール送信禁止</div><header><div><small style="color:#c0d5e8">RAINBOW DRIVER / CARGO</small>
 <h1>軽貨物配送のご相談</h1><p style="margin:0">お申し込み内容の確認 → メール認証 → 担当者の審査</p></div></header>
 <main>
-<section><p class="note"><strong>一般受付準備中。</strong> 受付開始まではメール送信・依頼登録ができません。運賃は担当者が荷姿・距離・対応可否を確認後にご案内します。画面確認中は実際の個人情報を入力しないでください。</p>
+<section><p class="note"><strong>アプリの一般受付フォームは現在準備中です。</strong> このフォームからの相談登録・認証メール送信はできません。配送のご相談・お見積もりは、掲載のLINE・メールからお問い合わせください。画面確認中は実際の個人情報を入力しないでください。</p>
 <p id="availability" role="status" class="status">受付状況を確認しています…</p>
 <p><a href="./cargo-request-preview.html">保存・送信しない申込プレビューに戻る</a></p></section>
 <form id="requestForm"><section><h2>1. 集荷・配送</h2>
@@ -53,7 +53,7 @@ small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 <div id="informationUse" class="status">
 <strong>送信前にご確認ください</strong>
 <p>入力したお名前・メールアドレス・集荷地・配送先・荷物の情報は、メール認証、配送可否の確認、見積もり・返信、対応記録の管理、不正利用の防止に利用します。</p>
-<p>相談・希望日時の受付・メール認証・利用希望の回答だけでは、配送の受諾・予約・料金・契約は確定しません。担当者が内容を確認し、ご案内します。自動決済やドライバーへの出動指示は行いません。</p>
+<p>ご相談・お見積もり・「利用希望」の回答だけでは、正式受注や配送日時の確約にはなりません。運営者が案件ごとに対応可否と条件を確認・判断し、正式受注について個別にご案内します。自動決済やドライバーへの出動指示は行いません。</p>
 <p>お問い合わせは<a href="#contact">メール・LINEの窓口</a>へお願いします。</p>
 </div>
 <label><input aria-describedby="informationUse" id="reviewConfirm" type="checkbox" required> 申込内容・個人情報の取扱いを確認し、メールによる本人確認と担当者からの返信に同意します。</label>
@@ -76,13 +76,13 @@ small{color:#66798c}a{color:#235c96;overflow-wrap:anywhere}
 <p id="verifyStatus" class="status" role="status">未認証</p></section>
 <section id="completedPane" hidden aria-live="polite">
 <h2>6. 受付確認</h2><p class="status" id="completedText"></p>
-<p><small>見積もりの提示だけでは配送は確定しません。利用希望の回答後も、担当者が対応可否を確認し、別途ご案内します。自動決済・ドライバーへの出動指示は行われません。</small></p></section>
+<p><small>見積もりの提示や「利用希望」の回答だけでは、正式受注や配送日時の確約にはなりません。運営者が対応可否と条件を確認・判断し、正式受注について個別にご案内します。自動決済・ドライバーへの出動指示は行われません。</small></p></section>
 <section id="contact" aria-labelledby="contactTitle">
 <h2 id="contactTitle">お問い合わせ</h2>
 <p>申込内容のご相談や、入力情報の取扱いに関するお問い合わせはこちらへお願いします。</p>
 <p>メール：<a href="mailto:rainbow.driver.saitama@gmail.com">rainbow.driver.saitama@gmail.com</a></p>
 <p><a href="https://lin.ee/8YNhfM5" target="_blank" rel="noopener noreferrer">LINEで相談する（別の画面で開きます）</a></p>
-<p><small>お問い合わせだけでは配送・料金は確定しません。</small></p>
+<p><small>お問い合わせだけでは正式受注になりません。運営者の個別判断と正式なご案内が必要です。</small></p>
 </section>
 </main>
 <script src="../cargo-pwa/request-review-rules.js"></script>
@@ -151,12 +151,12 @@ function loadTurnstile(siteKey){
    "error-callback":()=>{turnstileToken="";$("sendEmail").disabled=true}
   });
  };
- script.onerror=()=>status("availability","不正利用防止認証を読み込めません。受付できません。");
+ script.onerror=()=>status("availability","不正利用防止の確認を読み込めません。安全のため、このフォームからは送信できません。");
  document.head.appendChild(script);
 }
 async function initialize(){
  if(!window.supabase||!window.CargoRequestReview){
-  status("availability","受付を利用できません。");return;
+  status("availability","必要な画面機能を読み込めません。安全のため、このフォームからは送信できません。");return;
  }
  db=window.supabase.createClient(
   "https://hvdoqcrnztqmbzgwrovd.supabase.co",
@@ -166,13 +166,13 @@ async function initialize(){
   const result=await invoke("status");
   if(result?.public_intake_enabled!==true||result?.ready!==true||result?.accepts_orders!==false||
     result?.payment_enabled!==false||typeof result?.captcha_site_key!=="string"){
-   status("availability","現在、一般受付を停止しています。申込・メール送信はできません。");return;
+   status("availability","アプリの一般受付フォームは現在準備中です。このフォームからの相談登録・認証メール送信はできません。");return;
   }
   ready=true;
   $("reviewButton").disabled=false;
   status("availability","申込内容を入力してください。確認後にメール認証へ進みます。");
   loadTurnstile(result.captcha_site_key);
- }catch{status("availability","一般受付は準備中です。現在、送信はできません。")}
+ }catch{status("availability","フォームの受付状況を確認できません。安全のため、このフォームからは送信できません。")}
 }
 $("today").addEventListener("change",()=>{
  $("preferredPickupPane").hidden=$("today").checked;

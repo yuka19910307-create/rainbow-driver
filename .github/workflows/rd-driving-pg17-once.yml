@@ -1,0 +1,269 @@
+# LOCAL REVIEW CANDIDATE ONLY. Not installed in .github/workflows.
+# Freeze the proposed input digest locally before asking for owner approval.
+# A digest is not permission: remote writes/execution need explicit approval.
+# Destination, if separately approved: .github/workflows/rd-driving-pg17-once.yml
+name: RD driving isolated PG17 verification run6
+"on":
+  push:
+    branches: [verify/rd-driving-pg17-20261113-run6]
+permissions: {}
+concurrency:
+  group: rd-driving-pg17-20261113-run6
+  cancel-in-progress: false
+env:
+  RD_BASE: 5b788f9b330796eb6d0933e32202e550a91bfc97
+  RD_IMAGE: postgres@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
+  RD_APPROVED_MANIFEST_SHA256: d5d3500c38d13227973dd53e1d076219adf7d7e6485622d4b103e1999ce14233
+jobs:
+  isolated:
+    # First prepare the branch at RD_BASE, then advance it once to the reviewed
+    # child commit. Connector tree/commit/ref APIs can prepare that single update.
+    # No retry, subsequent-commit, private-repo or unexpected-repo execution.
+    if: >-
+      github.repository == 'yuka19910307-create/rainbow-driver' &&
+      github.event.repository.private == false &&
+      github.event.before == '5b788f9b330796eb6d0933e32202e550a91bfc97' &&
+      github.event.created == false && github.event.deleted == false &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check explicit approval and fetch the exact public commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RD_APPROVED_MANIFEST_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
+            echo 'STOP: fixed input manifest and owner approval are not recorded'; exit 1;
+          }
+          [[ "$GITHUB_REF" == refs/heads/verify/rd-driving-pg17-20261113-run6 ]]
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          mkdir -m 700 "$RUNNER_TEMP/rd-pg17-source"
+          cd "$RUNNER_TEMP/rd-pg17-source"
+          git init --quiet
+          # Public read only. No token, checkout action, credentials or git push.
+          git -c credential.helper= fetch --quiet --depth=2 \
+            https://github.com/yuka19910307-create/rainbow-driver.git "$GITHUB_SHA"
+          git checkout --quiet --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD^)" = "$RD_BASE"
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,re,subprocess
+          p=pathlib.Path.cwd(); prefix='verification/rd-driving-pg17/'
+          manifest=p/prefix/'approved-manifest.json'
+          raw=manifest.read_bytes()
+          assert hashlib.sha256(raw).hexdigest()==os.environ['RD_APPROVED_MANIFEST_SHA256']
+          plan=json.loads(raw)
+          expected={
+            'sql/01-rd-operations-REVIEW-ONLY.sql',
+            'sql/02-legacy-writer-guard-REVIEW-ONLY.sql',
+            'sql/03-route-consent-REVIEW-ONLY.sql',
+            'sql/04-termination-plans-REVIEW-ONLY.sql',
+            'sql/05-settlement-observation-REVIEW-ONLY.sql',
+            'sql/06-terminal-finalization-REVIEW-ONLY.sql',
+            'sql/07-operation-terminal-results-REVIEW-ONLY.sql',
+            'validation/fixture.sql','validation/run-isolated.py',
+            'validation/pg_plan.py','validation/outbox_scenarios.py',
+            'validation/customer_termination_scenarios.py','validation/history_scenarios.py'}
+          assert set(plan['inputs'])==expected
+          assert plan['executionReady'] is True and plan['ownerApprovalRecorded'] is False
+          for name,h in plan['inputs'].items():
+              f=p/prefix/name
+              assert re.fullmatch('[0-9a-f]{64}',h) and f.is_file() and not f.is_symlink()
+              assert hashlib.sha256(f.read_bytes()).hexdigest()==h, name
+          allowed={prefix+n for n in expected}|{prefix+'approved-manifest.json','.github/workflows/rd-driving-pg17-once.yml'}
+          diff=subprocess.check_output(['git','diff','--name-status',os.environ['RD_BASE'],'HEAD'],text=True)
+          rows=[line.split('\t') for line in diff.splitlines()]
+          assert len(rows)==len(allowed) and {r[1] for r in rows}==allowed
+          assert all(len(r)==2 and r[0]=='A' for r in rows), 'Only the 15 approved additions are permitted'
+          assert subprocess.check_output(['git','status','--porcelain'],text=True)==''
+          print(json.dumps({'commit':os.environ['GITHUB_SHA'],'base':os.environ['RD_BASE'],
+            'manifestSha256':hashlib.sha256(raw).hexdigest(),'inputs':plan['inputs']},sort_keys=True))
+          PY
+      - name: Download the fixed image and prepare disposable local files
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A dedicated /tmp root has no runner-home ancestors inaccessible to UID 999.
+          # mktemp refuses collisions; only this newly created directory is chmodded.
+          work=$(mktemp -d /tmp/rd-pg17-run6.XXXXXXXXXX)
+          chmod 755 "$work"
+          printf 'RD_PG_WORKROOT=%s\n' "$work" >> "$GITHUB_ENV"
+          mkdir -m 700 "$work/docker-empty"
+          docker --config "$work/docker-empty" pull --platform linux/amd64 "$RD_IMAGE"
+          docker --config "$work/docker-empty" image inspect "$RD_IMAGE" > "$work/image.json"
+          cp -a "$RUNNER_TEMP/rd-pg17-source/verification/rd-driving-pg17" "$work/input"
+          mkdir -m 700 "$work/cluster-temp"
+          mkdir -m 755 "$work/wrappers"
+          # Sleep only: image entrypoint and automatic database initialization are bypassed.
+          docker --config "$work/docker-empty" run --detach --rm --pull never \
+            --name "rd-pg17-run6-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --label rd-isolated-run="$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --network none --read-only --user postgres --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 128 --memory 1g --cpus 2 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m --tmpfs /run:rw,nosuid,nodev,size=16m \
+            --tmpfs /var/lib/postgresql/data:rw,nosuid,nodev,size=16m \
+            --mount "type=bind,src=$work/cluster-temp,dst=$work/cluster-temp" \
+            --entrypoint /bin/sleep "$RD_IMAGE" infinity
+          pg_uid=$(docker exec "rd-pg17-run6-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" id -u)
+          [[ "$pg_uid" =~ ^[1-9][0-9]*$ ]]
+          docker_gid=$(stat -c %g /var/run/docker.sock)
+          [[ "$docker_gid" =~ ^[0-9]+$ ]]
+          printf '%s\n' "$pg_uid" > "$work/pg-uid"
+          printf '%s\n' "$docker_gid" > "$work/docker-gid"
+          sudo chown -R "$pg_uid:$docker_gid" "$work/input" "$work/cluster-temp" "$work/docker-empty"
+          docker inspect "rd-pg17-run6-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" > "$work/container.json"
+          python3 - "$work" <<'PY'
+          import json,os,pathlib,shlex,sys
+          w=pathlib.Path(sys.argv[1])
+          c=json.loads((w/'container.json').read_text())[0]
+          assert c['HostConfig']['NetworkMode']=='none' and c['HostConfig']['ReadonlyRootfs']
+          assert not c['HostConfig']['Privileged'] and c['HostConfig']['CapDrop']==['ALL']
+          assert c['HostConfig']['PortBindings'] in ({},None) and c['Config']['User']=='postgres'
+          binds=[m for m in c['Mounts'] if m['Type']=='bind']
+          assert len(binds)==1 and binds[0]['Source']==str(w/'cluster-temp') and binds[0]['Destination']==str(w/'cluster-temp')
+          assert all(m['Type'] in ['bind','tmpfs'] for m in c['Mounts']), 'Unexpected persistent volume'
+          assert 'no-new-privileges' in c['HostConfig']['SecurityOpt']
+          name='rd-pg17-run6-'+os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT']
+          for cmd in ['postgres','psql','initdb','pg_ctl']:
+              args=['/usr/bin/docker','--config',str(w/'docker-empty'),'exec','--interactive',
+                '--user','postgres',name,'/usr/bin/env','-i',
+                'PATH=/usr/lib/postgresql/17/bin:/usr/bin:/bin','LANG=C.UTF-8',
+                'HOME='+str(w/'cluster-temp'),'/usr/lib/postgresql/17/bin/'+cmd]
+              f=w/'wrappers'/cmd
+              # Preserve only this non-connection label for pg_stat_activity
+              # lock-wait assertions; never forward PGHOST/PGOPTIONS/PGPASSWORD.
+              f.write_text('#!/bin/sh\nexec '+shlex.join(args[:-1])+
+                ' "PGAPPNAME=${PGAPPNAME-}" '+shlex.quote(args[-1])+' "$@"\n'); f.chmod(0o555)
+          print(json.dumps({'network':c['HostConfig']['NetworkMode'],'readOnlyRootfs':True,
+            'ports':c['HostConfig']['PortBindings'],'hostBinds':[m['Source'] for m in binds],
+            'postgresUserUid':(w/'pg-uid').read_text().strip(),'image':c['Image']}))
+          PY
+      - name: Run the approved synthetic suite with no network interfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="${RD_PG_WORKROOT:?dedicated /tmp workroot was not prepared}"
+          # The host Python process also has a new network namespace. The Docker
+          # client reaches only its local Unix socket; PG itself is network-none.
+          timeout --signal=TERM --kill-after=20s 12m sudo unshare --net -- \
+            setpriv --reuid="$(cat "$work/pg-uid")" --regid="$(cat "$work/docker-gid")" --clear-groups \
+            /usr/bin/env -i PATH=/usr/bin:/bin LANG=C.UTF-8 \
+            HOME="$work/cluster-temp" TMPDIR="$work/cluster-temp" \
+            PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 \
+            /usr/bin/python3 - "$work" "$RD_APPROVED_MANIFEST_SHA256" <<'PY'
+          import hashlib,json,os,pathlib,re,runpy,socket,stat,sys,tempfile
+
+          def entry_preflight(w,digest,docker_socket,docker_cli):
+              # Called after UID/GID drop, before importing/executing the PG runner.
+              assert os.geteuid()!=0
+              assert w.parent==pathlib.Path('/tmp') and re.fullmatch(r'rd-pg17-run6\.[A-Za-z0-9]{10}',w.name)
+              assert not w.is_symlink() and w.resolve()==w
+              assert stat.S_IMODE(w.stat().st_mode)==0o755
+              assert os.access(w,os.X_OK) and os.access(w.parent,os.X_OK)
+              # Avoid inheriting an inaccessible runner-home cwd as well.
+              os.chdir(w)
+              manifest=w/'input'/'approved-manifest.json'
+              raw=manifest.read_bytes()
+              assert hashlib.sha256(raw).hexdigest()==digest
+              plan=json.loads(raw)
+              assert len(plan['inputs'])==13 and plan['executionReady'] is True
+              for name,expected in plan['inputs'].items():
+                  rel=pathlib.PurePosixPath(name)
+                  assert not rel.is_absolute() and '..' not in rel.parts
+                  p=w/'input'/rel
+                  assert p.is_file() and not p.is_symlink()
+                  assert hashlib.sha256(p.read_bytes()).hexdigest()==expected,name
+                  if p.suffix=='.py': compile(p.read_bytes(),str(p),'exec')
+              private=w/'cluster-temp'
+              assert private.is_dir() and not private.is_symlink()
+              assert private.stat().st_uid==os.geteuid() and stat.S_IMODE(private.stat().st_mode)==0o700
+              for parent in [w/'input'/'validation',private]:
+                  with tempfile.TemporaryDirectory(prefix='rd-entry-',dir=parent) as name:
+                      p=pathlib.Path(name)/'write-probe'
+                      p.write_text('synthetic-posix-entry-check'); assert p.read_text()=='synthetic-posix-entry-check'
+              # Check the real filesystem Unix-socket path length and permissions.
+              with tempfile.TemporaryDirectory(prefix='rd-isolated-pg-',dir=private) as name:
+                  sockets=pathlib.Path(name)/'socket';sockets.mkdir(mode=0o700)
+                  endpoint=sockets/'.s.PGSQL.55439'
+                  assert len(os.fsencode(endpoint))<104
+                  with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as probe:
+                      probe.bind(str(endpoint))
+                  endpoint.unlink()
+              for name in ['postgres','psql','initdb','pg_ctl']:
+                  p=w/'wrappers'/name
+                  assert p.is_file() and not p.is_symlink() and os.access(p,os.R_OK|os.X_OK)
+              assert docker_cli.is_file() and os.access(docker_cli,os.X_OK)
+              assert stat.S_ISSOCK(docker_socket.stat().st_mode) and os.access(docker_socket,os.R_OK|os.W_OK)
+              assert (w/'docker-empty').is_dir() and os.access(w/'docker-empty',os.R_OK|os.W_OK|os.X_OK)
+              report={'status':'PASS_ENTRY_PREFLIGHT_ONLY','effectiveUid':os.geteuid(),
+                'effectiveGid':os.getegid(),'workroot':str(w),'cwd':os.getcwd(),
+                'manifestSha256':digest,'inputFilesReadAndHashed':13,
+                'privateDirectoryWriteProbe':True,'unixSocketBindProbe':True,
+                'wrapperExecutability':True,'dockerSocketPosixAccess':True,
+                'postgresInvocations':0,'sqlExecutions':0}
+              (w/'input'/'validation'/'entry-preflight.json').write_text(json.dumps(report,sort_keys=True))
+              print(json.dumps(report,sort_keys=True),flush=True)
+              return w/'input'/'validation'/'run-isolated.py'
+
+          w=pathlib.Path(sys.argv[1]); digest=sys.argv[2]
+          assert {name for _,name in socket.if_nameindex()}=={'lo'}, 'Host test network is not isolated'
+          runner=entry_preflight(w,digest,pathlib.Path('/var/run/docker.sock'),pathlib.Path('/usr/bin/docker'))
+          manifest=w/'input'/'approved-manifest.json'
+          sys.path.insert(0,str(runner.parent))
+          sys.argv=[str(runner),'--execute','--owner-approval','APPROVED-SYNTHETIC-LOCAL-SQL-ONLY',
+            '--pg-bin',str(w/'wrappers'),'--approved-manifest',str(manifest),
+            '--manifest-sha256',digest]
+          runpy.run_path(str(runner),run_name='__main__')
+          PY
+      - name: Emit synthetic evidence to the job log only
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo /usr/bin/python3 - "${RD_PG_WORKROOT:?dedicated /tmp workroot was not prepared}" <<'PY'
+          import base64,gzip,hashlib,io,json,pathlib,sys,tarfile
+          w=pathlib.Path(sys.argv[1]); results=sorted((w/'input'/'validation').glob('results-*'))
+          if len(results)!=1:
+              print('INCOMPLETE: exactly one evidence directory was not produced'); sys.exit(1)
+          result=results[0]
+          for name in ['RESULT.txt','scenario-results.json','input-sha256.json']:
+              p=result/name
+              if p.is_file(): print(name+':\n'+p.read_text())
+              else: print('MISSING REQUIRED EVIDENCE: '+name)
+          files=[p for p in result.rglob('*') if p.is_file()]+[w/n for n in ['image.json','container.json','input/validation/entry-preflight.json'] if (w/n).is_file()]
+          assert all(not p.is_symlink() for p in files)
+          assert sum(p.stat().st_size for p in files)<=16*1024*1024, 'Evidence too large; stop without artifact upload'
+          buf=io.BytesIO()
+          with tarfile.open(fileobj=buf,mode='w') as tar:
+              for p in files: tar.add(p,arcname=str(p.relative_to(w)),recursive=False)
+          data=gzip.compress(buf.getvalue(),mtime=0)
+          assert len(data)<=2*1024*1024, 'Compressed evidence too large; no automatic fallback'
+          print('RD_SYNTHETIC_EVIDENCE_SHA256='+hashlib.sha256(data).hexdigest())
+          print('RD_SYNTHETIC_EVIDENCE_BASE64_BEGIN')
+          encoded=base64.b64encode(data).decode()
+          for i in range(0,len(encoded),1000): print(encoded[i:i+1000])
+          print('RD_SYNTHETIC_EVIDENCE_BASE64_END')
+          PY
+      - name: Remove the disposable container and cluster files
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="rd-pg17-run6-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if docker inspect "$name" >/dev/null 2>&1; then
+            test "$(docker inspect --format '{{ index .Config.Labels "rd-isolated-run" }}' "$name")" = "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            docker rm --force --volumes "$name"
+          fi
+          work="${RD_PG_WORKROOT:-}"
+          if test -n "$work"; then
+            sudo /usr/bin/python3 - "$work" "$(id -u)" <<'PY'
+          import pathlib,re,shutil,stat,sys
+          p=pathlib.Path(sys.argv[1]);owner=int(sys.argv[2])
+          assert p.parent==pathlib.Path('/tmp') and re.fullmatch(r'rd-pg17-run6\.[A-Za-z0-9]{10}',p.name)
+          assert not p.is_symlink() and p.resolve()==p
+          assert p.stat().st_uid==owner and stat.S_IMODE(p.stat().st_mode)==0o755
+          shutil.rmtree(p) # only this job's mktemp-created disposable workroot
+          print('DISPOSABLE_CLUSTER_REMOVED')
+          print('DISPOSABLE_WORKROOT_REMOVED')
+          PY
+          fi
